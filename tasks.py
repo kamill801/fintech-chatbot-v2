@@ -1,5 +1,4 @@
 import os
-import time
 import json
 import requests
 from typing import Optional
@@ -7,39 +6,20 @@ from datetime import datetime
 from openai import OpenAI
 from redis import Redis
 from dotenv import load_dotenv
-from sheets_logger import save_chat_log_to_sheet  # ✅ 시트 로깅 추가
+from sheets_logger import save_chat_log_to_sheet
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")
+ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")  # 롤백 대비 유지, 코드에서 사용 안 함
+
+SYSTEM_PROMPT = "너는 70대 국밥집 욕쟁이 할머니 핀테크 챗봇이다. 사용자의 소비 내역을 듣고 잔소리하며 소비 코칭을 한다."
 
 redis_conn = Redis.from_url(os.getenv("REDIS_URL"))
 
 
 # =========================
-# 1️⃣ Thread 관리
-# =========================
-
-def get_or_create_thread(user_id: str):
-    print("🧵 [Thread] 조회 시작")
-
-    key = f"thread:{user_id}"
-    thread_id = redis_conn.get(key)
-
-    if thread_id:
-        thread_id = thread_id.decode()
-        print(f"🧵 [Thread] 재사용: {thread_id}")
-        return thread_id
-
-    thread = client.beta.threads.create()
-    redis_conn.set(key, thread.id)
-    print(f"🧵 [Thread] 신규 생성: {thread.id}")
-    return thread.id
-
-
-# =========================
-# 2️⃣ 사용자 상태 관리
+# 1️⃣ 사용자 상태 관리
 # =========================
 
 def get_user_state(user_id: str):
@@ -187,10 +167,6 @@ def process_kakao_message(
     print(f"💬 message={user_message}")
 
     try:
-        if not ASSISTANT_ID:
-            raise RuntimeError("OPENAI_ASSISTANT_ID is missing")
-
-        thread_id = get_or_create_thread(user_id)
         user_state = get_user_state(user_id)
 
         # 🔥 월간 리포트 요청
@@ -209,47 +185,20 @@ def process_kakao_message(
         user_state = update_monthly_data(user_state, user_message)
         save_user_state(user_id, user_state)
 
-        # Assistant 호출
-        print("🤖 Assistant 메시지 생성")
-        client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=user_message
+        # Responses API 호출
+        print("🤖 Responses API 호출")
+        response = client.responses.create(
+            model="gpt-4o",
+            input=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ]
         )
 
-        run = client.beta.threads.runs.create(
-            thread_id=thread_id,
-            assistant_id=ASSISTANT_ID
-        )
-
-        print(f"🏃 Run 생성: {run.id}")
-
-        while True:
-            run_status = client.beta.threads.runs.retrieve(
-                thread_id=thread_id,
-                run_id=run.id
-            )
-
-            print(f"⏳ Run status={run_status.status}")
-
-            if run_status.status == "completed":
-                break
-
-            if run_status.status in ["failed", "cancelled", "expired"]:
-                raise RuntimeError("Run failed")
-
-            time.sleep(0.7)
-
-        messages = client.beta.threads.messages.list(thread_id=thread_id)
-
-        assistant_reply = None
-        for msg in messages.data:
-            if msg.role == "assistant":
-                assistant_reply = msg.content[0].text.value
-                break
+        assistant_reply = response.output_text
 
         if not assistant_reply:
-            assistant_reply = "오늘 또 사고쳤네? 자세히 말해봐 💀"
+            assistant_reply = "옘병, 말이 길어졌다. 다시 말해봐라."
 
         # =========================
         # 📄 Google Sheets 로그 저장
