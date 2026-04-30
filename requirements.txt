@@ -1,0 +1,9 @@
+flask
+redis
+rq
+openai
+requests
+python-dotenv
+gunicorn
+gspread
+google-auth

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(python3 -m py_compile app.py)",
+      "Bash(python3 -m py_compile tasks.py)",
+      "Bash(python3 -m py_compile sheets_logger.py)",
+      "Bash(python3 -m py_compile worker.py)",
+      "Bash(pip3 show *)",
+      "Bash(pip3 install *)",
+      "Bash(mkdir -p ~/.claude/skills/agent-dev/templates/.claude/commands ~/.claude/skills/agent-dev/references ~/.claude/skills/agent-dev/scripts)",
+      "Read(//Users/dd/.claude/skills/**)",
+      "Bash(chmod +x ~/.claude/skills/agent-dev/scripts/scaffold.py)",
+      "Bash(python3 ~/.claude/skills/agent-dev/scripts/scaffold.py)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(grep -n ' $' ~/.claude/skills/agent-dev/templates/PLAN.md.template)",
+      "Bash(gh auth *)",
+      "Bash(gh api *)"
+    ]
+  }
+}

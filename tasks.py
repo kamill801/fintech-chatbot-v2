@@ -1,0 +1,299 @@
+import os
+import time
+import json
+import requests
+from typing import Optional
+from datetime import datetime
+from openai import OpenAI
+from redis import Redis
+from dotenv import load_dotenv
+from sheets_logger import save_chat_log_to_sheet  # ✅ 시트 로깅 추가
+
+load_dotenv()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")
+
+redis_conn = Redis.from_url(os.getenv("REDIS_URL"))
+
+
+# =========================
+# 1️⃣ Thread 관리
+# =========================
+
+def get_or_create_thread(user_id: str):
+    print("🧵 [Thread] 조회 시작")
+
+    key = f"thread:{user_id}"
+    thread_id = redis_conn.get(key)
+
+    if thread_id:
+        thread_id = thread_id.decode()
+        print(f"🧵 [Thread] 재사용: {thread_id}")
+        return thread_id
+
+    thread = client.beta.threads.create()
+    redis_conn.set(key, thread.id)
+    print(f"🧵 [Thread] 신규 생성: {thread.id}")
+    return thread.id
+
+
+# =========================
+# 2️⃣ 사용자 상태 관리
+# =========================
+
+def get_user_state(user_id: str):
+    print("📦 [State] 불러오기")
+
+    data = redis_conn.get(f"user_state:{user_id}")
+    if not data:
+        print("📦 [State] 신규 상태 생성")
+        return {
+            "emotion_tags": [],
+            "spending_categories": {},
+            "monthly_data": {},
+            "recent_messages": []
+        }
+
+    print("📦 [State] 기존 상태 로드 완료")
+    return json.loads(data)
+
+
+def save_user_state(user_id: str, state: dict):
+    redis_conn.set(
+        f"user_state:{user_id}",
+        json.dumps(state, ensure_ascii=False)
+    )
+    print("💾 [State] 저장 완료")
+
+
+# =========================
+# 3️⃣ 감정 태깅
+# =========================
+
+def update_emotion_state(state: dict, message: str):
+    emotion_keywords = {
+        "스트레스": "stress",
+        "우울": "sad",
+        "짜증": "anger",
+        "보상": "reward",
+        "충동": "impulse"
+    }
+
+    for k, v in emotion_keywords.items():
+        if k in message:
+            state["emotion_tags"].append(v)
+
+    state["recent_messages"].append(message)
+    state["recent_messages"] = state["recent_messages"][-10:]
+
+    print("🧠 [Emotion] 업데이트 완료")
+    return state
+
+
+# =========================
+# 4️⃣ 소비 카테고리 누적
+# =========================
+
+def update_spending_category(state: dict, message: str):
+    categories = {
+        "배달": "food_delivery",
+        "택시": "transport",
+        "커피": "cafe",
+        "쇼핑": "shopping",
+        "술": "alcohol"
+    }
+
+    for k, v in categories.items():
+        if k in message:
+            state["spending_categories"][v] = \
+                state["spending_categories"].get(v, 0) + 1
+
+    print("💳 [Spending] 카테고리 누적 완료")
+    return state
+
+
+# =========================
+# 5️⃣ 월별 데이터 누적
+# =========================
+
+def update_monthly_data(state: dict, message: str):
+    now = datetime.now()
+    month_key = now.strftime("%Y-%m")
+
+    if month_key not in state["monthly_data"]:
+        state["monthly_data"][month_key] = {}
+
+    categories = {
+        "배달": "food_delivery",
+        "택시": "transport",
+        "커피": "cafe",
+        "쇼핑": "shopping",
+        "술": "alcohol"
+    }
+
+    for k, v in categories.items():
+        if k in message:
+            state["monthly_data"][month_key][v] = \
+                state["monthly_data"][month_key].get(v, 0) + 1
+
+    print("📅 [Monthly] 업데이트 완료")
+    return state
+
+
+# =========================
+# 6️⃣ 월간 리포트 생성
+# =========================
+
+def generate_monthly_report(user_state: dict):
+    now = datetime.now()
+    month_key = now.strftime("%Y-%m")
+
+    monthly_data = user_state.get("monthly_data", {}).get(month_key, {})
+
+    if not monthly_data:
+        return "이번 달은 아직 소비 기록이 없네. 숨기고 있는 거 아니지? 🤔"
+
+    total_events = sum(monthly_data.values())
+    worst_category = max(monthly_data, key=monthly_data.get)
+
+    report = f"""
+📊 {month_key} 소비 리포트
+
+총 소비 이벤트: {total_events}회
+
+가장 많이 쓴 분야: {worst_category}
+
+지금 패턴 유지하면 다음 달도 같은 루트다 💀
+줄일 거야? 아니면 또 반복할 거야?
+"""
+
+    print("📊 [Report] 생성 완료")
+    return report.strip()
+
+
+# =========================
+# 7️⃣ 메인 처리 함수
+# =========================
+
+def process_kakao_message(
+    user_id: str,
+    user_message: str,
+    callback_url: str,
+    image_url: Optional[str] = None
+):
+    print(f"\n🚀 ===== 처리 시작 =====")
+    print(f"👤 user_id={user_id}")
+    print(f"💬 message={user_message}")
+
+    try:
+        if not ASSISTANT_ID:
+            raise RuntimeError("OPENAI_ASSISTANT_ID is missing")
+
+        thread_id = get_or_create_thread(user_id)
+        user_state = get_user_state(user_id)
+
+        # 🔥 월간 리포트 요청
+        if "월간 리포트" in user_message:
+            print("📊 월간 리포트 트리거 감지")
+            report = generate_monthly_report(user_state)
+
+            print("📤 카카오 전송 시작")
+            send_to_kakao(callback_url, report)
+            print("📤 카카오 전송 완료")
+            return
+
+        # 상태 업데이트
+        user_state = update_emotion_state(user_state, user_message)
+        user_state = update_spending_category(user_state, user_message)
+        user_state = update_monthly_data(user_state, user_message)
+        save_user_state(user_id, user_state)
+
+        # Assistant 호출
+        print("🤖 Assistant 메시지 생성")
+        client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=user_message
+        )
+
+        run = client.beta.threads.runs.create(
+            thread_id=thread_id,
+            assistant_id=ASSISTANT_ID
+        )
+
+        print(f"🏃 Run 생성: {run.id}")
+
+        while True:
+            run_status = client.beta.threads.runs.retrieve(
+                thread_id=thread_id,
+                run_id=run.id
+            )
+
+            print(f"⏳ Run status={run_status.status}")
+
+            if run_status.status == "completed":
+                break
+
+            if run_status.status in ["failed", "cancelled", "expired"]:
+                raise RuntimeError("Run failed")
+
+            time.sleep(0.7)
+
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+
+        assistant_reply = None
+        for msg in messages.data:
+            if msg.role == "assistant":
+                assistant_reply = msg.content[0].text.value
+                break
+
+        if not assistant_reply:
+            assistant_reply = "오늘 또 사고쳤네? 자세히 말해봐 💀"
+
+        # =========================
+        # 📄 Google Sheets 로그 저장
+        # =========================
+        print("📄 [Sheets] 저장 시도 시작")
+
+        try:
+            save_chat_log_to_sheet(
+                user_id=user_id,
+                user_message=user_message,
+                assistant_reply=assistant_reply
+            )
+            print("📄 [Sheets] 저장 성공")
+        except Exception as sheet_error:
+            print("❌ [Sheets] 저장 실패:", sheet_error)
+
+        # 카카오 전송
+        print("📤 카카오 응답 전송")
+        send_to_kakao(callback_url, assistant_reply)
+        print("✅ ===== 처리 완료 =====")
+
+    except Exception as e:
+        print("❌ 서버 오류 발생:", e)
+        import traceback
+        traceback.print_exc()
+
+        send_to_kakao(callback_url, "서버 오류가 발생했습니다.")
+
+
+# =========================
+# 8️⃣ 카카오 응답
+# =========================
+
+def send_to_kakao(callback_url, text):
+    print("📡 카카오 API 호출")
+    requests.post(
+        callback_url,
+        json={
+            "version": "2.0",
+            "template": {
+                "outputs": [
+                    {"simpleText": {"text": text}}
+                ]
+            }
+        },
+        timeout=5
+    )
