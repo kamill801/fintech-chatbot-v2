@@ -1,0 +1,18 @@
+# Progress Log — fintech-chatbot V2
+# Append-only. Each session adds one block at the bottom.
+# Format:
+# [YYYY-MM-DD HH:MM] [Phase X / Task Y.Z] <commit-sha>
+# What: <one-line summary>
+# Why: <one-line rationale if not obvious>
+# Next: <what the next session should pick up, including any traps to avoid>
+# Issues: <decisions made or issues encountered, optional>
+# ---
+
+[2026-04-30 22:00] [INIT] (no commit yet)
+What: V2 프로젝트 초기 구조 셋업 — TECHSPEC.md, CLAUDE.md, PLAN.md, progress.txt, .claude/commands/ 생성
+Why: V1 (Assistants API)에서 V2 (Responses API)로 마이그레이션 시작. 페르소나 일관성 + Cleo 수준 구체성 확보 목표.
+Next: Task 1.1 시작 — tasks.py의 Assistants API 호출을 Responses API로 교체. 다음 사항 주의:
+      - .env 파일은 아직 없음. Commit 1~3은 코드만 수정하니 OK. Commit 4 카카오톡 테스트 전에 새 API 키 발급 필요.
+      - 기존 ASSISTANT_ID 환경변수는 지우지 말고 사용만 안 하기.
+      - V2 폴더는 V1에서 복사된 상태. tasks.py 등 코드 파일은 V1 그대로.
+Issues: 폴더 이름이 fintech-chatbot-main-v2 (V1은 fintech-chatbot-main). git 분리는 안 했음 (V2 폴더에서 새 git으로 시작).
