@@ -13,7 +13,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")  # 롤백 대비 유지, 코드에서 사용 안 함
 
-SYSTEM_PROMPT = "너는 70대 국밥집 욕쟁이 할머니 핀테크 챗봇이다. 사용자의 소비 내역을 듣고 잔소리하며 소비 코칭을 한다."
+PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts")
 
 redis_conn = Redis.from_url(os.getenv("REDIS_URL"))
 
@@ -128,7 +128,111 @@ def update_monthly_data(state: dict, message: str):
 
 
 # =========================
-# 6️⃣ 월간 리포트 생성
+# 6️⃣ 컨텍스트 조립 (Sandwich)
+# =========================
+
+def load_prompt(filename: str) -> str:
+    path = os.path.join(PROMPTS_DIR, filename)
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read().strip()
+
+
+_KEYWORD_TO_TAGS = [
+    (["배달", "음식", "치킨", "피자", "족발", "보쌈"], ["배달", "배달반복"]),
+    (["커피", "카페", "아메리카노", "라떼", "음료"], ["커피소액"]),
+    (["참았", "절약", "아꼈", "안 샀", "안 마셨"], ["절약성공"]),
+    (["택시"], ["택시소액", "택시고액"]),
+    (["쇼핑", "옷", "코트", "신발", "가방", "질렀"], ["쇼핑고액"]),
+    (["스트레스", "힘들", "우울", "짜증", "지쳐"], ["스트레스소비", "감정토로"]),
+    (["결산", "리포트", "정리"], ["결산요청"]),
+    (["예산", "목표", "저축", "모으"], ["예산설정"]),
+]
+_DEFAULT_TAGS = ["배달", "절약성공", "감정토로"]
+
+
+def _parse_few_shot_sections(raw: str) -> dict:
+    sections = {}
+    current_tag = None
+    current_lines = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]") and len(stripped) > 2 and " " not in stripped:
+            if current_tag is not None:
+                sections[current_tag] = "\n".join(current_lines).strip()
+            current_tag = stripped[1:-1]
+            current_lines = []
+        elif current_tag is not None:
+            current_lines.append(line)
+    if current_tag is not None and current_lines:
+        sections[current_tag] = "\n".join(current_lines).strip()
+    return sections
+
+
+def select_few_shot(user_message: str) -> str:
+    raw = load_prompt("few_shot.md")
+    sections = _parse_few_shot_sections(raw)
+
+    selected_tags = []
+    for keywords, tags in _KEYWORD_TO_TAGS:
+        if any(kw in user_message for kw in keywords):
+            selected_tags.extend(tags)
+
+    seen = set()
+    final_tags = []
+    for tag in selected_tags + _DEFAULT_TAGS:
+        if tag not in seen and tag in sections:
+            seen.add(tag)
+            final_tags.append(tag)
+
+    examples = [sections[tag] for tag in final_tags[:5]]
+    return "[예시 — 욕쟁이 할미 응답 패턴]\n\n" + "\n\n".join(examples)
+
+
+def build_state_summary(user_state: dict) -> str:
+    month_key = datetime.now().strftime("%Y-%m")
+    monthly = user_state.get("monthly_data", {}).get(month_key, {})
+    emotions = user_state.get("emotion_tags", [])[-3:]
+    spending = user_state.get("spending_categories", {})
+
+    lines = ["[현재 사용자 상태]"]
+    if monthly:
+        lines.append("- 이번 달 소비: " + ", ".join(f"{k} {v}회" for k, v in monthly.items()))
+    else:
+        lines.append("- 이번 달 소비: 기록 없음")
+    if emotions:
+        lines.append("- 최근 감정: " + ", ".join(emotions))
+    if spending:
+        lines.append("- 누적 카테고리: " + ", ".join(f"{k} {v}회" for k, v in spending.items()))
+
+    return "\n".join(lines)
+
+
+def build_context(user_state: dict, user_message: str) -> list:
+    persona = load_prompt("persona.md")
+    few_shot = select_few_shot(user_message)
+    state_summary = build_state_summary(user_state)
+    reminder = load_prompt("reminder.md")
+
+    # recent_messages[-1]은 현재 user 메시지 (Task 1.2에서 LLM 호출 전에 저장)
+    # recent_messages[:-1]은 이전 대화 히스토리
+    recent = user_state.get("recent_messages", [])
+    history = recent[:-1] if len(recent) > 1 else []
+
+    messages = [
+        {"role": "system", "content": persona},
+        {"role": "system", "content": few_shot},
+        {"role": "system", "content": state_summary},
+        *history,
+        {"role": "system", "content": reminder},
+        {"role": "user", "content": user_message},
+    ]
+
+    print(f"🔍 [Context] {len(messages)}개 메시지 (history={len(history)}턴)")
+    return messages
+
+
+# =========================
+# 7️⃣ 월간 리포트 생성
 # =========================
 
 def generate_monthly_report(user_state: dict):
@@ -193,14 +297,11 @@ def process_kakao_message(
         # user 메시지 페어 저장 (LLM 호출 전)
         save_message_pair(user_state, "user", user_message)
 
-        # Responses API 호출 (recent_messages 컨텍스트 포함)
+        # Responses API 호출 (sandwich 컨텍스트)
         print("🤖 Responses API 호출")
         response = client.responses.create(
             model="gpt-4o",
-            input=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                *user_state["recent_messages"]
-            ]
+            input=build_context(user_state, user_message)
         )
 
         assistant_reply = response.output_text
