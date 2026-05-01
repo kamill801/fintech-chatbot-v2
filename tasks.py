@@ -47,6 +47,15 @@ def save_user_state(user_id: str, state: dict):
     print("💾 [State] 저장 완료")
 
 
+def save_message_pair(state: dict, role: str, content: str):
+    # V1 마이그레이션: 문자열 배열이면 초기화
+    if state["recent_messages"] and not isinstance(state["recent_messages"][0], dict):
+        state["recent_messages"] = []
+
+    state["recent_messages"].append({"role": role, "content": content})
+    state["recent_messages"] = state["recent_messages"][-20:]
+
+
 # =========================
 # 3️⃣ 감정 태깅
 # =========================
@@ -63,9 +72,6 @@ def update_emotion_state(state: dict, message: str):
     for k, v in emotion_keywords.items():
         if k in message:
             state["emotion_tags"].append(v)
-
-    state["recent_messages"].append(message)
-    state["recent_messages"] = state["recent_messages"][-10:]
 
     print("🧠 [Emotion] 업데이트 완료")
     return state
@@ -183,15 +189,17 @@ def process_kakao_message(
         user_state = update_emotion_state(user_state, user_message)
         user_state = update_spending_category(user_state, user_message)
         user_state = update_monthly_data(user_state, user_message)
-        save_user_state(user_id, user_state)
 
-        # Responses API 호출
+        # user 메시지 페어 저장 (LLM 호출 전)
+        save_message_pair(user_state, "user", user_message)
+
+        # Responses API 호출 (recent_messages 컨텍스트 포함)
         print("🤖 Responses API 호출")
         response = client.responses.create(
             model="gpt-4o",
             input=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message}
+                *user_state["recent_messages"]
             ]
         )
 
@@ -199,6 +207,10 @@ def process_kakao_message(
 
         if not assistant_reply:
             assistant_reply = "옘병, 말이 길어졌다. 다시 말해봐라."
+
+        # assistant 응답 페어 저장 + state 최종 저장
+        save_message_pair(user_state, "assistant", assistant_reply)
+        save_user_state(user_id, user_state)
 
         # =========================
         # 📄 Google Sheets 로그 저장
