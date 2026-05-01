@@ -3,9 +3,9 @@
 ## 🎯 Current State
 
 - **Phase**: 1 (Responses API 전환 + 프롬프트 V2 + Validator)
-- **Active Task**: 1.3
-- **Last Session**: 2026-05-01 (Task 1.2 완료 — recent_messages 페어 저장)
-- **Last Commit**: 5decf9d
+- **Active Task**: 1.4
+- **Last Session**: 2026-05-01 (Task 1.3 완료 — 프롬프트 V2 + build_context)
+- **Last Commit**: a47169f
 - **Branch**: main
 
 ---
@@ -106,9 +106,9 @@
 
 ---
 
-### Task 1.3: 새 프롬프트 V2 + Few-shot + Persona Reminder ⏳
+### Task 1.3: 새 프롬프트 V2 + Few-shot + Persona Reminder ✅ a47169f
 
-**Status**: ⏳ Active  
+**Status**: ✅ Done  
 **Goal**: V1의 단계 지시 기반 프롬프트를 예시 중심 V2로 교체. Sandwich 패턴으로 Lost in the Middle 방어.
 
 **Files to create** (신규):
@@ -200,9 +200,9 @@
 
 ---
 
-### Task 1.4: Response Validator + 1회 리라이트 📋
+### Task 1.4: Response Validator + 1회 리라이트 ⏳
 
-**Status**: 📋 Blocked by 1.3  
+**Status**: ⏳ Active  
 **Goal**: 카카오 전송 전 응답 검증. 기준 미달 시 1회 리라이트, 그래도 실패 시 fallback.
 
 **Files to create** (신규):
