@@ -3,9 +3,9 @@
 ## 🎯 Current State
 
 - **Phase**: 1 (Responses API 전환 + 프롬프트 V2 + Validator)
-- **Active Task**: 1.2
-- **Last Session**: 2026-05-01 (Task 1.1 완료 — Responses API 전환)
-- **Last Commit**: 1f7be48
+- **Active Task**: 1.3
+- **Last Session**: 2026-05-01 (Task 1.2 완료 — recent_messages 페어 저장)
+- **Last Commit**: 5decf9d
 - **Branch**: main
 
 ---
@@ -64,9 +64,9 @@
 
 ---
 
-### Task 1.2: recent_messages user/assistant 페어 저장 ⏳
+### Task 1.2: recent_messages user/assistant 페어 저장 ✅ 5decf9d
 
-**Status**: ⏳ Active  
+**Status**: ✅ Done  
 **Goal**: V1에서 user 메시지만 저장되던 recent_messages를 user/assistant 페어로 저장. 멀티턴 컨텍스트 정상 유지.
 
 **Files to modify**:
@@ -106,9 +106,9 @@
 
 ---
 
-### Task 1.3: 새 프롬프트 V2 + Few-shot + Persona Reminder 📋
+### Task 1.3: 새 프롬프트 V2 + Few-shot + Persona Reminder ⏳
 
-**Status**: 📋 Blocked by 1.2  
+**Status**: ⏳ Active  
 **Goal**: V1의 단계 지시 기반 프롬프트를 예시 중심 V2로 교체. Sandwich 패턴으로 Lost in the Middle 방어.
 
 **Files to create** (신규):

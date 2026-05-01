@@ -22,4 +22,10 @@ What: Assistants API → Responses API 전환. client.beta.threads 폴링 로직
 Why: V1의 thread 누적 페르소나 드리프트 근본 원인 제거. polling 지연도 사라짐.
 Next: Task 1.2 시작 — recent_messages를 user/assistant 페어({role, content})로 저장. update_emotion_state 안의 recent_messages.append(message) 방식 교체. save_message_pair() 함수 신규 추가. V1 Redis 데이터(문자열 배열) 방어 처리 필요.
 Issues: V1 시스템 프롬프트를 임시 placeholder로 대체 ("너는 70대 국밥집 욕쟁이 할머니..."). Task 1.3에서 prompts/persona.md로 교체 예정. openai>=1.66.0 버전 제약 추가.
+
+[2026-05-01] [Phase 1 / Task 1.2] 5decf9d
+What: recent_messages를 user/assistant {role, content} 페어로 저장. 멀티턴 컨텍스트 LLM 호출에 포함.
+Why: V1의 단방향(user only) 메시지 누적 제거 → 할미 응답도 컨텍스트에 포함돼 맥락 유지 가능해짐.
+Next: Task 1.3 시작 — prompts/ 폴더 신규 생성. persona.md / few_shot.md / reminder.md 작성. tasks.py에 build_context() 함수 추가 (sandwich 조립). V1 시스템 프롬프트(SYSTEM_PROMPT 상수) 완전 제거. "필터 우회" 문구 흔적 없는지 확인.
+Issues: recent_messages에 user 메시지를 먼저 append 후 recent_messages를 input에 전달하는 방식이라 user 메시지가 LLM input에 두 번 들어가지 않음(마지막 항목이 곧 현재 user 메시지). V1 Redis 데이터 방어 처리 포함.
 ---
