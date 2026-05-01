@@ -3,10 +3,10 @@
 ## 🎯 Current State
 
 - **Phase**: 1 (Responses API 전환 + 프롬프트 V2 + Validator)
-- **Active Task**: 1.1
-- **Last Session**: 2026-04-30 (INIT — 프로젝트 구조 셋업)
-- **Last Commit**: (none yet — Task 1.1 완료 시 첫 커밋)
-- **Branch**: (확인 필요 — V2 폴더 git 상태 점검)
+- **Active Task**: 1.2
+- **Last Session**: 2026-05-01 (Task 1.1 완료 — Responses API 전환)
+- **Last Commit**: 1f7be48
+- **Branch**: main
 
 ---
 
@@ -18,9 +18,9 @@
 
 ---
 
-### Task 1.1: Responses API 단순 전환 ⏳
+### Task 1.1: Responses API 단순 전환 ✅ 1f7be48
 
-**Status**: ⏳ Active  
+**Status**: ✅ Done  
 **Goal**: tasks.py의 LLM 호출 부분을 Assistants API에서 Responses API로 교체. 프롬프트는 그대로 유지.
 
 **Files to modify**:
@@ -64,9 +64,9 @@
 
 ---
 
-### Task 1.2: recent_messages user/assistant 페어 저장 📋
+### Task 1.2: recent_messages user/assistant 페어 저장 ⏳
 
-**Status**: 📋 Blocked by 1.1  
+**Status**: ⏳ Active  
 **Goal**: V1에서 user 메시지만 저장되던 recent_messages를 user/assistant 페어로 저장. 멀티턴 컨텍스트 정상 유지.
 
 **Files to modify**:

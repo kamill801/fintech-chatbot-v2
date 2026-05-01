@@ -16,3 +16,10 @@ Next: Task 1.1 시작 — tasks.py의 Assistants API 호출을 Responses API로 
       - 기존 ASSISTANT_ID 환경변수는 지우지 말고 사용만 안 하기.
       - V2 폴더는 V1에서 복사된 상태. tasks.py 등 코드 파일은 V1 그대로.
 Issues: 폴더 이름이 fintech-chatbot-main-v2 (V1은 fintech-chatbot-main). git 분리는 안 했음 (V2 폴더에서 새 git으로 시작).
+
+[2026-05-01] [Phase 1 / Task 1.1] 1f7be48
+What: Assistants API → Responses API 전환. client.beta.threads 폴링 로직 전체 제거, client.responses.create()로 교체.
+Why: V1의 thread 누적 페르소나 드리프트 근본 원인 제거. polling 지연도 사라짐.
+Next: Task 1.2 시작 — recent_messages를 user/assistant 페어({role, content})로 저장. update_emotion_state 안의 recent_messages.append(message) 방식 교체. save_message_pair() 함수 신규 추가. V1 Redis 데이터(문자열 배열) 방어 처리 필요.
+Issues: V1 시스템 프롬프트를 임시 placeholder로 대체 ("너는 70대 국밥집 욕쟁이 할머니..."). Task 1.3에서 prompts/persona.md로 교체 예정. openai>=1.66.0 버전 제약 추가.
+---
