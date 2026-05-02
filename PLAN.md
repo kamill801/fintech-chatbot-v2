@@ -3,9 +3,9 @@
 ## 🎯 Current State
 
 - **Phase**: 1 (Responses API 전환 + 프롬프트 V2 + Validator)
-- **Active Task**: 1.4
-- **Last Session**: 2026-05-01 (Task 1.3 완료 — 프롬프트 V2 + build_context)
-- **Last Commit**: a47169f
+- **Active Task**: Phase 1 통합 테스트
+- **Last Session**: 2026-05-02 (Task 1.4 완료 — Validator + 리라이트)
+- **Last Commit**: 94fd187
 - **Branch**: main
 
 ---
@@ -200,9 +200,9 @@
 
 ---
 
-### Task 1.4: Response Validator + 1회 리라이트 ⏳
+### Task 1.4: Response Validator + 1회 리라이트 ✅ 94fd187
 
-**Status**: ⏳ Active  
+**Status**: ✅ Done  
 **Goal**: 카카오 전송 전 응답 검증. 기준 미달 시 1회 리라이트, 그래도 실패 시 fallback.
 
 **Files to create** (신규):

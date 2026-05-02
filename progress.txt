@@ -34,4 +34,10 @@ What: prompts/ 3개 파일 신규 작성 + build_context() sandwich 조립. SYST
 Why: V1의 단순 시스템 프롬프트 → 캐릭터 정당화 기반 persona + few-shot + reminder 구조로 교체. Lost in the Middle 방어.
 Next: Task 1.4 시작 — validators.py 신규 작성. validate_reply()/build_rewrite_prompt()/count_sentences() + FORBIDDEN_PHRASES. tasks.py에서 LLM 응답 후 validator 호출, 1회 리라이트, fallback 처리. 주의: 한국어 문장 카운팅은 . ? ! 외에 "다." "요." "여." 등 종결어미도 잡아야 함.
 Issues: build_context는 recent_messages[-1]을 현재 user 메시지로 보고 [:-1]을 history로 분리. Sandwich 순서: persona→fewshot→state→history→reminder→user. 키워드 매칭 5개 이하로 few-shot 예시 제한.
+
+[2026-05-02] [Phase 1 / Task 1.4] 94fd187
+What: validators.py 신규 작성 + tasks.py에 validator 연동. 3문장 초과/금지어/질문 2개 이상 검사 → 1회 리라이트 → fallback.
+Why: Phase 1 마지막 조각. 카카오 전송 전 응답 품질 보장.
+Next: Phase 1 통합 테스트 세션. .env 파일 세팅(OPENAI_API_KEY, REDIS_URL, 카카오 콜백 등) 후 로컬 실행. TECHSPEC Section 10.5의 12개 테스트 케이스 + 30턴/50턴 연속 대화 확인. ngrok으로 카카오톡 연결 필요. 결과는 progress.txt에 "통합 테스트 결과" 블록으로 추가.
+Issues: 리라이트 API 호출은 풀 sandwich context 없이 rewrite_prompt만 단독 user 메시지로 전달. count_sentences는 .?! 기준 대략 카운트 — 정확도보다 명백한 장문 차단이 목적.
 ---
