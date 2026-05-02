@@ -7,6 +7,7 @@ from openai import OpenAI
 from redis import Redis
 from dotenv import load_dotenv
 from sheets_logger import save_chat_log_to_sheet
+from validators import validate_reply, build_rewrite_prompt, get_fallback
 
 load_dotenv()
 
@@ -307,7 +308,20 @@ def process_kakao_message(
         assistant_reply = response.output_text
 
         if not assistant_reply:
-            assistant_reply = "옘병, 말이 길어졌다. 다시 말해봐라."
+            assistant_reply = get_fallback()
+
+        # 응답 검증 → 1회 리라이트 → fallback
+        is_valid, reason = validate_reply(assistant_reply)
+        if not is_valid:
+            print(f"⚠️ [Validator] 검증 실패: {reason} — 리라이트 시도")
+            rewrite_input = [{"role": "user", "content": build_rewrite_prompt(assistant_reply, reason)}]
+            rewrite_response = client.responses.create(model="gpt-4o", input=rewrite_input)
+            assistant_reply = rewrite_response.output_text or get_fallback()
+
+            is_valid_retry, reason_retry = validate_reply(assistant_reply)
+            if not is_valid_retry:
+                print(f"❌ [Validator] 리라이트도 실패: {reason_retry} — fallback 사용")
+                assistant_reply = get_fallback()
 
         # assistant 응답 페어 저장 + state 최종 저장
         save_message_pair(user_state, "assistant", assistant_reply)
