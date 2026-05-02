@@ -17,7 +17,9 @@
       "Bash(gh auth *)",
       "Bash(gh api *)",
       "Bash(pip show *)",
-      "Bash(python3 -c \"import openai; print\\(openai.__version__\\)\")"
+      "Bash(python3 -c \"import openai; print\\(openai.__version__\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
