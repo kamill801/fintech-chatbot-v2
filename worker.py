@@ -1,11 +1,19 @@
-import os
-from redis import Redis
-from rq import Worker, Queue, Connection
+from __future__ import annotations
 
-redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-redis_conn = Redis.from_url(redis_url)
+import os
+
+from redis import Redis
+from rq import Queue, Worker
+
+
+def main() -> None:
+    if os.getenv("LEDGER_STORE", "memory") != "redis":
+        raise RuntimeError("Kakao RQ worker requires LEDGER_STORE=redis")
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    connection = Redis.from_url(redis_url)
+    worker = Worker([Queue("kakao", connection=connection)], connection=connection)
+    worker.work()
+
 
 if __name__ == "__main__":
-    with Connection(redis_conn):
-        worker = Worker([Queue("kakao")])
-        worker.work()
+    main()

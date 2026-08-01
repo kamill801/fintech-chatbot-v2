@@ -40,4 +40,10 @@ What: validators.py 신규 작성 + tasks.py에 validator 연동. 3문장 초과
 Why: Phase 1 마지막 조각. 카카오 전송 전 응답 품질 보장.
 Next: Phase 1 통합 테스트 세션. .env 파일 세팅(OPENAI_API_KEY, REDIS_URL, 카카오 콜백 등) 후 로컬 실행. TECHSPEC Section 10.5의 12개 테스트 케이스 + 30턴/50턴 연속 대화 확인. ngrok으로 카카오톡 연결 필요. 결과는 progress.txt에 "통합 테스트 결과" 블록으로 추가.
 Issues: 리라이트 API 호출은 풀 sandwich context 없이 rewrite_prompt만 단독 user 메시지로 전달. count_sentences는 .?! 기준 대략 카운트 — 정확도보다 명백한 장문 차단이 목적.
+
+[2026-08-01 18:32] [Phase 2 / Task 2.0] (this commit)
+What: 기존 페르소나 챗봇을 AI 가계부 에이전트로 전환하고 TECHSPEC, PLAN, 전체 백엔드, 테스트, 인수인계 문서를 교체했다.
+Why: 자산/목표/지출을 기반으로 결정론 신호와 AI가 함께 과소비를 판단하고, 불확실하면 이유를 한 번 물으며, 선택형 Roast는 판단이 아닌 말투만 바꾸는 제품으로 방향을 전환했다.
+Next: 사용자와 UI/UX 공동 설계부터 시작한다. 합의 전 화면, 정보 구조, 공유 카드 디자인을 구현하지 않는다.
+Issues: 비-Redis 테스트 67개와 실제 Redis 통합 테스트 3개, compileall, 실제 HTTP 스모크를 통과했다. Python 3.11.6은 이 머신에 없어 3.14.2로 검증했다. 라이브 OpenAI 정확도, 4주 소비 감소, Roast 공유율, 운영 인증/계좌 제공자/배포는 외부 검증 전이며 완료로 간주하지 않는다.
 ---

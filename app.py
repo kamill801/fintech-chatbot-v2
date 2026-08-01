@@ -1,101 +1,85 @@
-from flask import Flask, request, jsonify
-from redis import Redis
-from rq import Queue
-import os
+from __future__ import annotations
 
+import os
+import secrets
+from urllib.parse import urlsplit
+from uuid import uuid4
+
+from flask import jsonify, request
+
+from ledger.factory import create_app
 from tasks import process_kakao_message
 
-app = Flask(__name__)
 
-redis_url = os.getenv("REDIS_URL")
-print(f"🔗 Redis URL: {redis_url}")
-
-try:
-    redis_conn = Redis.from_url(redis_url, socket_connect_timeout=10)
-    redis_conn.ping()
-    print("✅ Redis 연결 성공!")
-except Exception as e:
-    print(f"❌ Redis 연결 실패: {e}")
-
-q = Queue("kakao", connection=redis_conn)
+app = create_app()
 
 
-@app.route("/question", methods=["POST"])
+def _queue():
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url or os.getenv("LEDGER_STORE", "memory") != "redis":
+        return None
+    from redis import Redis
+    from rq import Queue
+
+    return Queue("kakao", connection=Redis.from_url(redis_url))
+
+
+@app.post("/question")
 def question():
-    body = request.json
-    print(f"📥 받은 요청 전체: {body}")
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "invalid Kakao payload"}), 400
+    user_request = body.get("userRequest")
+    if not isinstance(user_request, dict):
+        return jsonify({"error": "missing userRequest"}), 400
+    user = user_request.get("user")
+    if not isinstance(user, dict) or not user.get("id"):
+        return jsonify({"error": "missing Kakao user"}), 400
+    callback_url = user_request.get("callbackUrl")
+    if not isinstance(callback_url, str) or not callback_url.startswith("https://"):
+        return jsonify({"error": "valid Kakao callbackUrl is required"}), 400
+    transport_error = _verify_kakao_transport(callback_url)
+    if transport_error:
+        return transport_error
+    utterance = user_request.get("utterance")
+    if not isinstance(utterance, str) or not utterance.strip():
+        return jsonify({"error": "utterance is required"}), 400
+    platform_request_id = user_request.get("requestId") or request.headers.get(
+        "X-Kakao-Request-Id"
+    )
+    if os.getenv("APP_ENV", "development") == "production" and not platform_request_id:
+        return jsonify({"error": "verified Kakao request id is required"}), 400
+    request_id = str(platform_request_id or uuid4())
+    args = (
+        str(user["id"]),
+        utterance.strip(),
+        callback_url,
+        None,
+        f"kakao:{request_id}",
+    )
+    queue = _queue()
+    if queue is None or app.config.get("TESTING"):
+        process_kakao_message(*args)
+    else:
+        queue.enqueue(process_kakao_message, *args, job_id=request_id)
+    return jsonify({"version": "2.0", "useCallback": True})
 
-    try:
-        user_message = body["userRequest"]["utterance"]
-        user_id = body["userRequest"]["user"]["id"]
 
-        # ✅ 이미지 URL 파싱 (여러 경로 시도)
-        image_url = None
-        
-        # 경로 1: params.media.imageUrl
-        if not image_url:
-            image_url = (
-                body.get("userRequest", {})
-                    .get("params", {})
-                    .get("media", {})
-                    .get("imageUrl")
-            )
-        
-        # 경로 2: params.imageUrl (직접)
-        if not image_url:
-            image_url = (
-                body.get("userRequest", {})
-                    .get("params", {})
-                    .get("imageUrl")
-            )
-        
-        # 경로 3: utterance가 카카오 CDN URL인 경우 (현재 상황)
-        if not image_url and user_message and user_message.startswith("https://talk.kakaocdn.net"):
-            image_url = user_message
-            user_message = "사진을 보냈습니다"
-            print(f"🖼️ utterance에서 이미지 URL 감지!")
-
-        # 카카오톡이 자동 생성한 콜백 URL 추출
-        callback_url = body.get("userRequest", {}).get("callbackUrl")
-        if not callback_url:
-            callback_url = body.get("callbackUrl")
-
-        print(f"👤 사용자 ID: {user_id}")
-        print(f"💬 사용자 메시지: {user_message}")
-        print(f"🖼️ 이미지 URL: {image_url}")
-        print(f"🔗 콜백 URL: {callback_url}")
-
-        if not callback_url:
-            print("❌ 콜백 URL을 찾을 수 없습니다!")
-            return jsonify({
-                "version": "2.0",
-                "template": {
-                    "outputs": [{
-                        "simpleText": {
-                            "text": "콜백 URL이 없습니다. 스킬 설정을 확인해주세요."
-                        }
-                    }]
-                }
-            })
-
-        # 비동기 작업 큐잉
-        job = q.enqueue(
-            process_kakao_message,
-            user_id,
-            user_message,
-            callback_url,
-            image_url,
-            job_timeout='10m'
-        )
-        print(f"✅ Job 등록 성공: {job.id}")
-
-    except Exception as e:
-        print(f"❌ 오류 발생: {e}")
-        import traceback
-        traceback.print_exc()
-
-    # 카카오톡에 즉시 응답 (3초 룰 대응)
-    return jsonify({
-        "version": "2.0",
-        "useCallback": True
-    })
+def _verify_kakao_transport(callback_url: str):
+    if os.getenv("APP_ENV", "development") != "production":
+        return None
+    expected_secret = os.getenv("KAKAO_WEBHOOK_SECRET")
+    allowed_hosts = {
+        host.strip().lower()
+        for host in os.getenv("KAKAO_CALLBACK_HOSTS", "").split(",")
+        if host.strip()
+    }
+    if not expected_secret or not allowed_hosts:
+        return jsonify({"error": "Kakao transport is not configured"}), 503
+    received_secret = request.headers.get("X-Kakao-Webhook-Secret", "")
+    if not secrets.compare_digest(received_secret, expected_secret):
+        return jsonify({"error": "unauthorized Kakao request"}), 401
+    callback_host = (urlsplit(callback_url).hostname or "").lower()
+    if callback_host not in allowed_hosts:
+        return jsonify({"error": "callback host is not allowed"}), 400
+    return None

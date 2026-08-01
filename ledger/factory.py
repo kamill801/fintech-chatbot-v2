@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+import os
+from typing import Any
+
+from flask import Flask
+from dotenv import load_dotenv
+
+from ledger.adapters.memory import InMemoryLedgerRepository
+from ledger.adapters.openai_judge import OpenAIResponsesJudge
+from ledger.adapters.redis_store import RedisLedgerRepository
+from ledger.adapters.synthetic import DisabledProductionAccountAdapter
+from ledger.api import create_api_blueprint
+from ledger.application.service import LedgerService
+from ledger.privacy import PrivacyConfig, PrivacyError, PrivacyService
+from sheets_logger import save_telemetry_event
+
+
+def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
+    LedgerService, PrivacyService, Any, Any
+]:
+    load_dotenv()
+    values = dict(os.environ)
+    if config:
+        values.update({key: str(value) for key, value in config.items()})
+    app_env = values.get("APP_ENV", "development")
+    store_kind = values.get(
+        "LEDGER_STORE", "redis" if app_env == "production" else "memory"
+    )
+    privacy = PrivacyService(PrivacyConfig.from_env(values))
+
+    if app_env == "production" and store_kind != "redis":
+        raise PrivacyError("production requires LEDGER_STORE=redis")
+    if store_kind == "memory":
+        repository = InMemoryLedgerRepository(privacy)
+        ready_check = lambda: True
+    elif store_kind == "redis":
+        redis_url = values.get("REDIS_URL")
+        if not redis_url:
+            raise PrivacyError("REDIS_URL is required for Redis storage")
+        repository = RedisLedgerRepository.from_url(redis_url, privacy)
+        ready_check = lambda: bool(repository._redis.ping())
+    else:
+        raise PrivacyError("LEDGER_STORE must be memory or redis")
+
+    telemetry_sink = save_telemetry_event if values.get("GOOGLE_SHEET_ID") else None
+    service = LedgerService(
+        repository,
+        OpenAIResponsesJudge(model=values.get("OPENAI_LEDGER_MODEL")),
+        DisabledProductionAccountAdapter(),
+        telemetry_sink=telemetry_sink,
+    )
+    return service, privacy, repository, ready_check
+
+
+def create_app(config: dict[str, Any] | None = None) -> Flask:
+    app = Flask(__name__)
+    if config:
+        app.config.update(config)
+    service, privacy, repository, ready_check = create_ledger_runtime(config)
+    app_env = str((config or {}).get("APP_ENV", os.getenv("APP_ENV", "development")))
+    allow_dev_auth = str(
+        (config or {}).get("ALLOW_DEV_AUTH", os.getenv("ALLOW_DEV_AUTH", "0"))
+    ) == "1"
+    app.extensions["ledger_service"] = service
+    app.extensions["ledger_privacy"] = privacy
+    app.extensions["ledger_repository"] = repository
+    app.extensions["ledger_ready_check"] = ready_check
+    app.register_blueprint(
+        create_api_blueprint(
+            service,
+            privacy,
+            app_env=app_env,
+            allow_dev_auth=allow_dev_auth,
+        )
+    )
+    return app
