@@ -1,10 +1,10 @@
 # AI Household Ledger Visual Screen Set V1
 
-Status: generated and awaiting full-set visual review
+Status: approved and implemented in the responsive web/PWA
 
 Approved visual source: `05-home-approved.png`
 
-All files are implementation references, not production image assets. Build the real interface with components, live backend data, responsive states, and accessible semantics after this set is approved.
+All files are implementation references, not production image assets. The live interface recreates them with accessible components, responsive states, and backend data rather than embedding the generated images.
 
 ## Gallery
 
@@ -77,4 +77,7 @@ Do not reproduce image-generation artifacts:
 - Generated dimensions: 14 files at 853x1844; share preview at 852x1846
 - Device chrome: absent
 - Korean copy: visually reviewed for the primary screen contract
-- Frontend implementation: not started
+- Frontend implementation: complete in `frontend/src`
+- Implementation captures: 15/15 at 390x844
+- Additional QA: 360x800, 430x932, 768x1024, and 1280x900 with no horizontal overflow
+- Runtime QA: keyboard focus, reduced motion, offline draft retention, dynamic routes, browser back, and Flask static serving verified

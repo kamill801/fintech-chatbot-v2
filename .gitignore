@@ -4,3 +4,5 @@ __pycache__/
 google-credentials.json
 .coverage
 htmlcov/
+frontend/node_modules/
+frontend/dist/

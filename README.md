@@ -1,6 +1,6 @@
 # AI Household Ledger Agent
 
-Backend for a Korean AI household-ledger agent. It combines deterministic financial signals with a structured AI judgment, asks one focused question when purchase context is insufficient, and renders the same decision in Normal or opt-in Roast tone.
+Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It combines deterministic financial signals with a structured AI judgment, asks one focused question when purchase context is insufficient, and renders the same decision in Normal or opt-in Roast tone.
 
 ## MVP Scope
 
@@ -12,6 +12,7 @@ Backend for a Korean AI household-ledger agent. It combines deterministic financ
 - Return a structured judgment and one corrective action.
 - Record corrections, privacy-safe shares, metrics, and audit events.
 - Support KakaoTalk through a thin Flask/RQ transport.
+- Provide the complete onboarding, Home, ledger, agent, report, settings, judgment, correction, and privacy-safe sharing experience as a responsive installable web app.
 
 The MVP cannot block payments, transfer money, create savings orders, invest, or recommend financial products. Production account linkage and production authentication are intentionally disabled pending separate provider and compliance decisions.
 
@@ -51,11 +52,31 @@ cp .env.example .env
 
 For a dependency-free local data path, keep `LEDGER_STORE=memory`. Kakao messages run inline in that mode. Set `OPENAI_API_KEY` only when testing the live structured judge; otherwise the auditable deterministic fallback is used.
 
-Run the API:
+Install the frontend dependencies:
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+Run the API and production frontend build:
+
+```bash
+cd frontend && npm run build && cd ..
+flask --app app run --debug
+```
+
+The Flask app serves `frontend/dist` at `/` and retains the existing API, health, readiness, and Kakao routes. Development identity headers are enabled only when `ALLOW_DEV_AUTH=1`.
+
+For frontend hot reload, run these in separate terminals:
 
 ```bash
 flask --app app run --debug
+cd frontend && npm run dev
 ```
+
+Open `http://127.0.0.1:3015`. The Vite server proxies API requests to Flask on port `5000`. Use `http://127.0.0.1:3015/?demo=1` only for deterministic visual QA; live mode always uses backend judgment artifacts.
 
 Run Redis and the Kakao worker when exercising the asynchronous transport:
 
@@ -67,6 +88,8 @@ LEDGER_STORE=redis python worker.py
 ## Verification
 
 ```bash
+cd frontend && npm run test && npm run lint && npm run build && npm audit --omit=dev
+cd ..
 python3 -m unittest discover -s tests -v
 python3 -m compileall app.py tasks.py worker.py ledger tests
 LEDGER_TEST_REDIS_URL=redis://127.0.0.1:6389/15 \
@@ -85,4 +108,6 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 
 ## Project Status
 
-The backend pivot has reached its verified stop boundary. UI/UX and visual design are intentionally deferred for co-design with the product owner.
+The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, Normal/Roast rendering, correction, reports, settings, offline draft retention, and redacted image sharing are connected.
+
+Production authentication, a real financial-provider connection, live OpenAI quality evaluation, deployment, and money movement remain separate credential-, compliance-, or provider-gated work. The MVP does not claim those capabilities.

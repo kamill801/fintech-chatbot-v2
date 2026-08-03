@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from flask import Flask
@@ -13,6 +14,7 @@ from ledger.adapters.synthetic import DisabledProductionAccountAdapter
 from ledger.api import create_api_blueprint
 from ledger.application.service import LedgerService
 from ledger.privacy import PrivacyConfig, PrivacyError, PrivacyService
+from ledger.web import create_web_blueprint
 from sheets_logger import save_telemetry_event
 
 
@@ -74,4 +76,13 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             allow_dev_auth=allow_dev_auth,
         )
     )
+    build_dir = Path(
+        str(
+            (config or {}).get(
+                "FRONTEND_DIST",
+                Path(__file__).resolve().parents[1] / "frontend" / "dist",
+            )
+        )
+    )
+    app.register_blueprint(create_web_blueprint(build_dir))
     return app

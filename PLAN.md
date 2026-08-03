@@ -2,8 +2,8 @@
 
 ## Current State
 
-- Phase: 3 - UI/UX foundation
-- Active task: Task 3.1 - full visual screen set
+- Phase: 4 - approved visual set implementation complete
+- Active task: none; Task 4.0 is complete and locally verified
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `codex/ui-ux-foundation`
@@ -102,7 +102,7 @@ Define the mobile-first household-ledger information architecture and a distinct
 - Accessibility, responsive behavior, loading/empty/error states, and Korean financial-number formatting are specified.
 - No frontend implementation starts before the user approves a visual direction.
 
-## Task 3.1 - Full Visual Screen Set (Active)
+## Task 3.1 - Full Visual Screen Set (Completed)
 
 ### Goal
 
@@ -144,18 +144,46 @@ Create an implementation-ready image reference for every MVP screen using the us
 - Generated Korean copy is readable enough to guide implementation; any image-generation artifacts are documented rather than copied into code.
 - No frontend code is implemented in this task.
 
-## Next Phase - Approved Visual Set to Frontend
+## Task 4.0 - Complete Responsive Web/PWA Implementation (Completed)
 
-Start only after the user reviews the complete visual screen set. Then define implementation tasks for:
+### Goal
 
-- onboarding and financial-profile disclosure;
-- home information hierarchy;
-- manual transaction capture;
-- reason-question conversation;
-- Normal/Roast toggle and consent;
-- judgment explanation and corrections;
-- monthly report and goal progress;
-- privacy-safe sharing.
+Implement the user-approved 15-screen visual set as a complete mobile-first web app and installable PWA. Connect the live UI to the existing Flask ledger API while preserving backend ownership of financial judgment, confidence, evidence, recommendation, and Normal/Roast parity.
+
+### Scope
+
+- Add a React, Vite, and TypeScript frontend with one reusable design-token and component system.
+- Implement every screen and primary action defined in `design/screens/v1/README.md`.
+- Connect onboarding, profile, settings, manual transactions, reason answers, judgments, corrections, sharing, summary, and privacy actions to the existing API.
+- Add deterministic demo fixtures only for visual QA and first-run previews; never use frontend fixtures to make a live judgment.
+- Add responsive mobile, tablet, and desktop shells, PWA metadata, loading, empty, error, offline, focus, and reduced-motion states.
+- Serve the production frontend build from Flask without weakening the API authentication or privacy boundaries.
+- Stop after local implementation, visual QA, automated verification, documentation updates, and one scoped local commit. Do not push or deploy.
+
+### Ordered Checkpoints
+
+- [x] Lock this implementation task and verify the existing API contracts.
+- [x] Add the frontend runtime, API client, state model, routes, PWA metadata, and shared visual tokens.
+- [x] Implement onboarding, Home, manual capture, reason, and Normal/Roast judgment flows.
+- [x] Implement ledger, transaction detail/correction, agent inbox, report, settings, and privacy-safe sharing.
+- [x] Add Flask production static serving and focused backend/frontend tests.
+- [x] Run typecheck, lint, unit tests, production build, Flask tests, and real local API flow checks.
+- [x] Capture the 15 approved states at 390x844, compare against references, and iterate on material visual differences.
+- [x] Verify 360px, 390px, 430px, tablet, desktop, keyboard focus, reduced motion, and offline draft behavior.
+- [x] Update `README.md`, this plan, append `progress.txt`, and create one scoped local commit.
+
+### Acceptance Criteria
+
+- All 15 approved screen contracts exist as reachable responsive routes or states and every primary action is interactive.
+- The 390x844 implementation preserves the approved warm-paper palette, bold editorial hierarchy, flat fills, amount emphasis, and mobile navigation.
+- Live labels, confidence, evidence, recommendation, and Normal/Roast messages come from the backend judgment artifact.
+- Roast remains opt-in, immediately reversible, and presentation-only.
+- Manual transaction entry works without account connection and retains an unsent draft offline.
+- Account connection remains visibly future/read-only and cannot initiate money movement.
+- Sharing begins from a redacted preview with amount and merchant excluded by default.
+- Loading, empty, error, fallback, correction, offline, focus, screen-reader, and reduced-motion behavior are represented.
+- Flask can serve a successful production frontend build while `/api/v1`, `/health`, `/ready`, and Kakao routes retain their existing behavior.
+- Frontend typecheck, lint, tests, build, backend tests, local HTTP smoke, and visual screenshot checks pass, or any explicit validation gap is reported.
 
 ## Archived Work
 
