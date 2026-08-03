@@ -2,11 +2,12 @@
 
 ## Current State
 
-- Phase: 2 - full product pivot
-- Active task: none - waiting for user-approved UI/UX co-design
+- Phase: 3 - UI/UX foundation
+- Active task: Task 3.0 - benchmark-led design direction and approval candidate
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
-- Branch: `codex/ai-ledger-backend`
-- Source of truth: `TECHSPEC.md`
+- UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
+- Branch: `codex/ui-ux-foundation`
+- Sources of truth: `TECHSPEC.md` for product/backend invariants, `DESIGN.md` for UI/UX decisions
 - Last pre-pivot commit: `64b46ae`
 
 ## Task 2.0 - AI Ledger Backend Pivot (Completed)
@@ -65,9 +66,45 @@ python3 -m compileall app.py tasks.py worker.py ledger tests
 
 Local Redis integration and Flask smoke tests are also required. A live OpenAI call and production financial-provider E2E are not required without credentials and approvals; they must not be represented as verified.
 
-## Next Phase - UI/UX Co-design (Blocked by Stop Boundary)
+## Task 3.0 - Benchmark-led UI/UX Foundation (Active)
 
-Start only after the backend report and a new user-approved task. Define together:
+### Goal
+
+Define the mobile-first household-ledger information architecture and a distinct visual direction before frontend implementation. Preserve familiar Korean ledger behavior while making the AI agent's pending questions, evidence, and advice visible without turning the product into a chat-first novelty.
+
+### Scope
+
+- Research current official materials for established Korean finance and household-ledger products.
+- Translate the supplied warm-paper Notion references into a finance-appropriate visual system.
+- Define onboarding, home, ledger, manual entry, agent, judgment, reports, goals, settings, and sharing flows.
+- Define Normal/Roast mode interaction and content-safety rules without changing judgment logic.
+- Create one focused mobile home-screen visual candidate for user review.
+- Stop at the visual approval gate. Do not implement frontend routes or components in this task.
+
+### Ordered Checkpoints
+
+- [x] Review current product/backend contracts and user-provided references.
+- [x] Research current official sources for Toss, Banksalad, Money Manager, and Smart Money.
+- [x] Create the canonical `DESIGN.md` foundation.
+- [x] Generate and inspect one mobile home-screen visual candidate.
+- [x] Record unresolved design decisions and request visual approval.
+- [x] Run documentation checks, append `progress.txt`, and create one scoped local commit.
+
+### Acceptance Criteria
+
+- `DESIGN.md` records observed benchmark patterns separately from product design decisions.
+- The primary navigation and every MVP screen have a clear user job.
+- Manual entry remains first-class while account connection remains future-facing and read-only.
+- The AI asks for context in a transaction-bound flow rather than becoming a generic chatbot.
+- Roast is visibly opt-in, instantly reversible, and presentation-only.
+- Financial amounts and evidence remain more visually prominent than character decoration.
+- The design uses the supplied warm-paper, bold-type, flat-card references without copying Notion's marketing composition.
+- Accessibility, responsive behavior, loading/empty/error states, and Korean financial-number formatting are specified.
+- No frontend implementation starts before the user approves a visual direction.
+
+## Next Phase - Approved Visual to Frontend
+
+Start only after the user approves a visual candidate. Then define implementation tasks for:
 
 - onboarding and financial-profile disclosure;
 - home information hierarchy;
