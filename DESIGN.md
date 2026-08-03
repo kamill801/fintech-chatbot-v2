@@ -397,13 +397,45 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 
 ## Visual approval
 
-- Approved reference: none yet
-- Review candidate: `/Users/dd/.codex/generated_images/019e5387-f826-7582-8a6c-18b42e8b7945/exec-81359022-3319-4e17-81dc-94593ef8fee7.png`
-- Candidate dimensions: 853x1844, matching the requested 390x844 mobile aspect ratio
-- Candidate role: visual reference only, not a production asset
-- Candidate review: Korean copy and financial hierarchy are readable; no device chrome is present; Roast remains secondary and off; the screen keeps the ledger ahead of the agent
-- Deliberate implementation cleanup: use true flat fills rather than the candidate's slight surface shading, and reduce the repeated bookkeeper illustration to one primary mark per viewport
-- Approval gate: frontend implementation starts only after the user says `확정`, `이걸로`, `승인`, or gives an unambiguous revision request
+### Approved visual direction
+
+- Reference: `design/screens/v1/05-home-approved.png`
+- Role: visual reference only
+- Approved on: 2026-08-03
+- Prompt summary: warm-paper Korean household-ledger Home with a bold editorial monthly headline, precise budget and goal hierarchy, one transaction-bound agent question, recent activity, and secondary opt-in Roast control
+- Tokens: `paper #F6F3EC`, `ink #171512`, `action #0B71D9`, `peach #F6D5B8`, `goal #F2B544`, 12px cards, 8px buttons, restrained motion
+- Implementation constraints: mobile-first, no device chrome, flat fills, readable Korean financial figures, WCAG AA, real backend states, no client-side judgment logic
+- Deliberate deviations: implementation must remove the candidate's slight surface shading and reduce the repeated bookkeeper illustration to one primary mark per viewport
+
+### Full screen-set gate
+
+- Status: 15-screen V1 set generated; awaiting full-set visual review
+- Output root: `design/screens/v1`
+- Gallery and implementation notes: `design/screens/v1/README.md`
+- Every image is a visual reference, not a production UI asset
+- Frontend implementation starts only after the complete image set is reviewed and approved
+
+### Screen references
+
+| Flow | Reference |
+| --- | --- |
+| Trust onboarding | `design/screens/v1/01-trust-onboarding.png` |
+| Financial baseline | `design/screens/v1/02-financial-baseline.png` |
+| Goal setup | `design/screens/v1/03-goal-setup.png` |
+| Data-source choice | `design/screens/v1/04-data-source.png` |
+| Home | `design/screens/v1/05-home-approved.png` |
+| Manual transaction | `design/screens/v1/06-manual-transaction.png` |
+| Reason question | `design/screens/v1/07-reason-question.png` |
+| Normal judgment | `design/screens/v1/08-judgment-normal.png` |
+| Roast judgment | `design/screens/v1/09-judgment-roast.png` |
+| Ledger | `design/screens/v1/10-ledger.png` |
+| Transaction detail | `design/screens/v1/11-transaction-detail.png` |
+| Agent inbox | `design/screens/v1/12-agent-inbox.png` |
+| Monthly report | `design/screens/v1/13-monthly-report.png` |
+| Settings | `design/screens/v1/14-settings.png` |
+| Share preview | `design/screens/v1/15-share-preview.png` |
+
+Normal and Roast references deliberately keep the same `12,000원` transaction, caution label, `81%` confidence, evidence, recommendation, and action. Only the mode stamp and headline presentation change.
 
 ## Open questions
 

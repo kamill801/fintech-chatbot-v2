@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 3 - UI/UX foundation
-- Active task: Task 3.0 - benchmark-led design direction and approval candidate
+- Active task: Task 3.1 - full visual screen set
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `codex/ui-ux-foundation`
@@ -66,7 +66,7 @@ python3 -m compileall app.py tasks.py worker.py ledger tests
 
 Local Redis integration and Flask smoke tests are also required. A live OpenAI call and production financial-provider E2E are not required without credentials and approvals; they must not be represented as verified.
 
-## Task 3.0 - Benchmark-led UI/UX Foundation (Active)
+## Task 3.0 - Benchmark-led UI/UX Foundation (Completed)
 
 ### Goal
 
@@ -102,9 +102,51 @@ Define the mobile-first household-ledger information architecture and a distinct
 - Accessibility, responsive behavior, loading/empty/error states, and Korean financial-number formatting are specified.
 - No frontend implementation starts before the user approves a visual direction.
 
-## Next Phase - Approved Visual to Frontend
+## Task 3.1 - Full Visual Screen Set (Active)
 
-Start only after the user approves a visual candidate. Then define implementation tasks for:
+### Goal
+
+Create an implementation-ready image reference for every MVP screen using the user-approved Home direction. Keep the visual system coherent across the complete journey before writing frontend code.
+
+### Screen Set
+
+- Trust onboarding
+- Financial baseline
+- Goal setup
+- Data-source choice
+- Home (approved reference)
+- Manual transaction entry
+- Reason question
+- Normal judgment
+- Roast judgment
+- Ledger
+- Transaction detail and correction
+- Agent inbox
+- Monthly report
+- Settings
+- Privacy-safe share preview
+
+### Ordered Checkpoints
+
+- [x] Persist the approved Home reference in `design/screens/v1`.
+- [x] Generate the remaining 14 screens in the approved visual direction.
+- [x] Inspect Korean copy, hierarchy, visual continuity, and safety/privacy states.
+- [x] Add a screen index with implementation notes and known generation deviations.
+- [x] Update `DESIGN.md`, append `progress.txt`, verify image dimensions, and create one scoped local commit.
+
+### Acceptance Criteria
+
+- Every screen is a separate image in the same mobile aspect ratio.
+- Home remains the visual source of truth for palette, typography, spacing, and illustration treatment.
+- Images show one primary job per screen rather than feature inventory.
+- Normal and Roast judgment screens share all financial facts and differ only in rendered message and mode state.
+- Manual entry is live; account connection remains explicitly future/read-only.
+- Generated Korean copy is readable enough to guide implementation; any image-generation artifacts are documented rather than copied into code.
+- No frontend code is implemented in this task.
+
+## Next Phase - Approved Visual Set to Frontend
+
+Start only after the user reviews the complete visual screen set. Then define implementation tasks for:
 
 - onboarding and financial-profile disclosure;
 - home information hierarchy;
