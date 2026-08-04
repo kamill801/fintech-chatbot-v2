@@ -2,8 +2,8 @@
 
 ## Current State
 
-- Phase: 4 - approved visual set implementation complete
-- Active task: none; Task 4.0 is complete and locally verified
+- Phase: 5 - Vercel frontend production deployment complete
+- Active task: none; Task 5.0 is complete and production frontend verified
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `codex/ui-ux-foundation`
@@ -184,6 +184,36 @@ Implement the user-approved 15-screen visual set as a complete mobile-first web 
 - Loading, empty, error, fallback, correction, offline, focus, screen-reader, and reduced-motion behavior are represented.
 - Flask can serve a successful production frontend build while `/api/v1`, `/health`, `/ready`, and Kakao routes retain their existing behavior.
 - Frontend typecheck, lint, tests, build, backend tests, local HTTP smoke, and visual screenshot checks pass, or any explicit validation gap is reported.
+
+## Task 5.0 - Vercel Frontend Production Deployment (Completed)
+
+### Goal
+
+Deploy the verified Vite/PWA frontend to Vercel production without misrepresenting the unavailable production backend, authentication, Redis, or live OpenAI path as complete.
+
+### Scope
+
+- Add Vercel SPA routing configuration and ignore local Vercel project metadata.
+- Use build-time demo mode for the first public frontend deployment so every approved screen remains usable without production financial storage.
+- Link a dedicated Vercel project, deploy production, and verify the public URL and deep routes.
+- Keep the Flask API, RQ worker, Redis, authentication, and secrets out of Vercel until their production runtime is configured separately.
+
+### Ordered Checkpoints
+
+- [x] Re-check the production boundary, current Vercel account, and project inventory.
+- [x] Add deterministic Vercel/Vite SPA deployment configuration.
+- [x] Run frontend tests, lint, audit, and production build with demo mode enabled.
+- [x] Deploy to a dedicated Vercel production project and inspect deployment readiness.
+- [x] Verify the public Home, onboarding, deep route, manifest, service worker, and asset responses.
+- [x] Update deployment documentation, append `progress.txt`, and create one scoped local commit.
+
+### Acceptance Criteria
+
+- The production URL serves the frontend and all client-side routes resolve on direct navigation.
+- The deployed build is explicitly demo-backed until the production API and authentication are connected.
+- No backend secret, Redis credential, OpenAI key, or Vercel project metadata enters Git.
+- The existing Flask/RQ/Redis architecture and production authentication fail-closed contract are not weakened for deployment convenience.
+- Verification distinguishes Vercel frontend readiness from backend/live-AI readiness.
 
 ## Archived Work
 

@@ -68,3 +68,10 @@ Why: 이미지로 승인된 전체 사용자 여정을 실제 동작하는 제�
 Next: production 인증과 배포는 별도 승인 후 진행한다. 계좌 연결은 제공자와 컴플라이언스 결정 전까지 읽기 전용 미래 기능으로 유지한다.
 Issues: frontend 테스트 7개, lint, typecheck/build, backend 72개 테스트(외부 Redis 3개 skip), compileall, 실제 Flask HTTP/API/브라우저 흐름, 15개 390x844 캡처, 360/430/tablet/desktop, 포커스, reduced-motion, offline draft를 통과했다. 외부 라우터는 공개 안전 버전 부재로 내부 History API 라우터로 교체했고 production npm audit는 0건이다. 라이브 OpenAI 품질, production auth/provider, Redis E2E, 배포는 이번 로컬 구현의 검증 범위가 아니다.
 ---
+
+[2026-08-04 14:42] [Phase 5 / Task 5.0] (this commit)
+What: Vite SPA용 Vercel 설정과 빌드타임 데모 기본값을 추가하고 `upglow/jangbu-ai`를 production 배포해 `https://jangbu-ai.vercel.app`에 공개했다.
+Why: production 인증과 외부 Flask/RQ/Redis 런타임이 준비되기 전에도 승인된 전체 UI를 안전하게 검증할 수 있게 하되 데모를 실데이터 서비스로 오인하지 않도록 배포 경계를 분리하기 위해서다.
+Next: Cloudtype에 Flask API와 RQ worker를 분리 배포하고 managed Redis와 trusted auth를 연결한 뒤 Vercel의 데모 기본값을 제거한다.
+Issues: deployment `dpl_24Qa1EcwiXYpUhhW6gZB42zJg4Nc`는 READY다. public Home, onboarding, `/agent`, judgment deep route, manifest, service worker, JS/CSS를 HTTP 200으로 확인했고 390x844 브라우저에서 console error와 horizontal overflow가 없었다. 실데이터 저장, 라이브 OpenAI 판단, production auth와 Redis는 아직 배포되지 않았다.
+---

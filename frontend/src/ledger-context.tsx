@@ -68,7 +68,9 @@ function errorMessage(error: unknown): string {
 
 export function LedgerProvider({ children }: { children: ReactNode }) {
   const initialQuery = new URLSearchParams(window.location.search);
-  const demo = initialQuery.get("demo") === "1";
+  const demo =
+    initialQuery.get("demo") === "1" ||
+    import.meta.env.VITE_DEMO_DEFAULT === "1";
   const demoRoast = initialQuery.get("roast") === "1";
   const [profile, setProfile] = useState<Profile | null>(demo ? demoProfile : null);
   const [settings, setSettings] = useState<Settings>(demo ? { ...demoSettings, roast_enabled: demoRoast } : initialSettings);

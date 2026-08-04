@@ -69,6 +69,21 @@ flask --app app run --debug
 
 The Flask app serves `frontend/dist` at `/` and retains the existing API, health, readiness, and Kakao routes. Development identity headers are enabled only when `ALLOW_DEV_AUTH=1`.
 
+For a frontend-only Vercel release, deploy from `frontend/`:
+
+```bash
+cd frontend
+VITE_DEMO_DEFAULT=1 npm run build
+vercel env add VITE_DEMO_DEFAULT production --value 1 --yes --no-sensitive
+vercel --prod --yes
+```
+
+The first public Vercel release uses build-time demo mode because production authentication and the external Flask/RQ/Redis runtime are separate release gates. A successful frontend deployment does not prove financial persistence or live OpenAI judgment is configured.
+
+Current public frontend: `https://jangbu-ai.vercel.app`
+
+The production backend target is an always-on Flask API plus a separate RQ worker on Cloudtype, backed by managed Redis. Trusted user authentication must be implemented before switching the Vercel build out of demo mode or accepting real financial data.
+
 For frontend hot reload, run these in separate terminals:
 
 ```bash
