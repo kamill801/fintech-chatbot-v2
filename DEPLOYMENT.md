@@ -31,7 +31,7 @@ Never place these values in Git, Vercel client variables, browser code, screensh
 
 - `APP_ENV=production`
 - `LEDGER_STORE=redis`
-- `SUPABASE_URL`: the public HTTPS project URL.
+- `SUPABASE_URL=https://ijdodqldneduqeblkivo.supabase.co`: the selected public project URL, committed as non-secret Blueprint configuration.
 - `SUPABASE_JWT_AUDIENCE=authenticated`
 - `CORS_ALLOWED_ORIGINS=https://jangbu-ai.vercel.app`
 
@@ -59,7 +59,8 @@ Supabase `service_role`, legacy JWT shared secrets, database passwords, Redis cr
 ## Current Provider Status
 
 - Vercel frontend: deployed at `https://jangbu-ai.vercel.app`, still demo-backed.
-- Supabase: signed in, but the current Free organization already has two active projects; no project was created or reused.
+- Supabase: project `ijdodqldneduqeblkivo` is Healthy in Seoul. Email auth and email confirmation are enabled, Site URL and the sole redirect URL are `https://jangbu-ai.vercel.app`, and the public JWKS exposes one ES256 EC key with a key ID.
+- Vercel Supabase configuration: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are registered for Production only. No redeploy has been triggered yet.
 - Upstash: sign-in required; no database was created.
 - Render: sign-in required; no service was created.
 - Live authenticated API and live OpenAI judgment: not yet verified.

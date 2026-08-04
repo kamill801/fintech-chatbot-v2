@@ -50,13 +50,13 @@ The product is now a privacy-first AI household-ledger agent, not a persona-firs
 - The target runtime is Python 3.11.6, but this machine only had Python 3.14.2 for verification.
 - No live OpenAI call was made. The 85% judgment-agreement target needs labeled evaluation with a configured key and then pilot evidence.
 - The 10% four-week discretionary-spend reduction and 10% Roast share-rate targets require a user pilot; they are not backend test claims.
-- The Supabase organization is already at its two-project Free limit, so a dedicated project was not created or an existing project reused without owner approval.
+- Supabase project `ijdodqldneduqeblkivo` is selected and Healthy in Seoul. Production Site URL/redirect URL, email auth, email confirmation, ES256 JWKS compatibility, and Vercel Production public variables are configured.
 - Render and Upstash were not authenticated, so no service, Redis database, provider credential, or production environment variable was created.
 - Vercel remains in explicit demo mode. Do not set `VITE_DEMO_DEFAULT=0` until Supabase, Upstash, Render, CORS, readiness, and one real authenticated API flow are verified together.
 - Production account-provider integration, compliance approval, live OpenAI quality evaluation, live Kakao verification, and money movement remain outside this task.
 
 ## Next Task
 
-Resolve the provider gates in this order: free a Supabase project slot or choose an existing project, sign in to Upstash and Render, create the resources from `DEPLOYMENT.md`, verify the live authenticated API path, then switch Vercel out of demo mode and redeploy.
+Resolve the remaining provider gates in this order: sign in to Upstash and Render, create the resources from `DEPLOYMENT.md`, verify the live authenticated API path, then switch Vercel out of demo mode and redeploy.
 
 Do not paste provider credentials into chat or commit them. Do not activate live Vercel mode based only on successful builds or health checks.

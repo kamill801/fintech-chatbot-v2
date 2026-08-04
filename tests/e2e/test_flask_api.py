@@ -194,6 +194,8 @@ class FlaskLedgerE2ETests(unittest.TestCase):
                     APP_ENV="production",
                     LEDGER_STORE="redis",
                     REDIS_URL="rediss://example/0",
+                    SUPABASE_URL="",
+                    SUPABASE_JWT_AUDIENCE="",
                     CORS_ALLOWED_ORIGINS="https://jangbu-ai.vercel.app",
                 )
             )
