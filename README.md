@@ -11,17 +11,21 @@ Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It 
 - Ask exactly one reason question for uncertain transactions.
 - Return a structured judgment and one corrective action.
 - Record corrections, privacy-safe shares, metrics, and audit events.
-- Support KakaoTalk through a thin Flask/RQ transport.
+- Retain KakaoTalk as an optional thin Flask/RQ transport outside the free web deployment.
 - Provide the complete onboarding, Home, ledger, agent, report, settings, judgment, correction, and privacy-safe sharing experience as a responsive installable web app.
 
-The MVP cannot block payments, transfer money, create savings orders, invest, or recommend financial products. Production account linkage and production authentication are intentionally disabled pending separate provider and compliance decisions.
+The MVP cannot block payments, transfer money, create savings orders, invest, or recommend financial products. Production account linkage remains disabled pending separate provider and compliance decisions.
 
 ## Architecture
 
 ```text
-Flask REST / KakaoTalk transport
+Vercel web/PWA or KakaoTalk
+              |
+       Supabase Auth JWT
               |
               v
+       Render Flask API
+              |
       application service
               |
     +---------+----------+
@@ -34,7 +38,7 @@ deterministic signals  structured AI judge
               |
        Normal / Roast
               |
-   Redis Streams + projections
+   Upstash Redis + projections
 ```
 
 See `TECHSPEC.md` for the complete product, privacy, API, and storage contract.
@@ -67,7 +71,7 @@ cd frontend && npm run build && cd ..
 flask --app app run --debug
 ```
 
-The Flask app serves `frontend/dist` at `/` and retains the existing API, health, readiness, and Kakao routes. Development identity headers are enabled only when `ALLOW_DEV_AUTH=1`.
+The Flask app serves `frontend/dist` at `/` and retains the existing API, health, readiness, and Kakao routes. Development identity headers are enabled only when `ALLOW_DEV_AUTH=1`; production accepts only verified Supabase bearer tokens.
 
 For a frontend-only Vercel release, deploy from `frontend/`:
 
@@ -78,11 +82,11 @@ vercel env add VITE_DEMO_DEFAULT production --value 1 --yes --no-sensitive
 vercel --prod --yes
 ```
 
-The first public Vercel release uses build-time demo mode because production authentication and the external Flask/RQ/Redis runtime are separate release gates. A successful frontend deployment does not prove financial persistence or live OpenAI judgment is configured.
+The first public Vercel release uses build-time demo mode because production authentication and the external Flask/Redis runtime are separate release gates. A successful frontend deployment does not prove financial persistence or live OpenAI judgment is configured.
 
 Current public frontend: `https://jangbu-ai.vercel.app`
 
-The production backend target is an always-on Flask API plus a separate RQ worker on Cloudtype, backed by managed Redis. Trusted user authentication must be implemented before switching the Vercel build out of demo mode or accepting real financial data.
+The selected production topology is Vercel for the web app, Supabase Auth for email sessions, a Render Free Flask web service in Singapore, and Upstash Redis over TLS. The free web deployment does not run RQ or claim always-on availability; Render may cold-start after idle periods. See `DEPLOYMENT.md` for the environment-variable boundary and activation order.
 
 For frontend hot reload, run these in separate terminals:
 
@@ -111,7 +115,7 @@ LEDGER_TEST_REDIS_URL=redis://127.0.0.1:6389/15 \
   python3 -m unittest tests.integration.test_redis_repository -v
 ```
 
-A local passing suite does not prove production OpenAI behavior, a production financial-provider connection, production authentication, or deployment. Those require separate credentials, approvals, and live verification.
+A local passing suite does not prove production OpenAI behavior, a production financial-provider connection, provider configuration, or live authenticated deployment. Those require separate credentials, approvals, and runtime verification.
 
 ## Privacy Defaults
 
@@ -125,4 +129,4 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 
 The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, Normal/Roast rendering, correction, reports, settings, offline draft retention, and redacted image sharing are connected.
 
-Production authentication, a real financial-provider connection, live OpenAI quality evaluation, deployment, and money movement remain separate credential-, compliance-, or provider-gated work. The MVP does not claim those capabilities.
+The trusted production authentication and deployment path is implemented locally. Provider creation and live configuration remain incomplete: the current Supabase organization has reached its two-project Free limit, and Render and Upstash require account sign-in. Vercel therefore remains intentionally demo-backed until the complete authenticated path passes live verification. A real financial-provider connection, live OpenAI quality evaluation, and money movement remain outside the verified MVP.

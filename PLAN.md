@@ -2,8 +2,8 @@
 
 ## Current State
 
-- Phase: 5 - Vercel frontend production deployment complete
-- Active task: none; Task 5.0 is complete and production frontend verified
+- Phase: 6 - trusted production backend and authentication setup
+- Active task: Task 6.0 - Supabase Auth, Render API, Upstash Redis, and Vercel live-mode connection
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `codex/ui-ux-foundation`
@@ -214,6 +214,46 @@ Deploy the verified Vite/PWA frontend to Vercel production without misrepresenti
 - No backend secret, Redis credential, OpenAI key, or Vercel project metadata enters Git.
 - The existing Flask/RQ/Redis architecture and production authentication fail-closed contract are not weakened for deployment convenience.
 - Verification distinguishes Vercel frontend readiness from backend/live-AI readiness.
+
+## Task 6.0 - Trusted Production Backend Setup (Active)
+
+### Goal
+
+Replace the frontend-only demo boundary with a fail-closed production web path: Supabase Auth issues short-lived user JWTs, Flask verifies asymmetric signatures and claims, Render hosts the API, Upstash provides TLS Redis persistence, and Vercel calls the API with the authenticated session token.
+
+### Scope
+
+- This task is the dedicated authorization to revise `TECHSPEC.md` for the selected production auth and deployment architecture.
+- Add Supabase email authentication to the web app and send only the session access token to Flask.
+- Verify production bearer tokens against the project JWKS, issuer, audience, expiry, and required subject before deriving the existing HMAC pseudonym.
+- Add an exact-origin CORS allowlist for the Vercel production domain.
+- Add a Render Blueprint that keeps credentials out of Git and generates application encryption/HMAC secrets inside Render.
+- Use Upstash Redis over TLS for the production repository.
+- Keep Kakao/RQ out of the free web deployment; RQ remains an optional Kakao-only transport for a later worker-capable runtime.
+- Configure provider projects, environment variables, and Vercel live mode where existing authenticated sessions and approval boundaries permit.
+
+### Ordered Checkpoints
+
+- [x] Confirm Supabase JWT, Render Blueprint, and Upstash security contracts against current official documentation.
+- [x] Revise `TECHSPEC.md` and deployment documentation with the selected architecture and free-tier limitations.
+- [x] Add production JWT verification, fail-closed configuration, and exact-origin CORS tests.
+- [x] Add frontend Supabase session handling, email sign-in, bearer API client, sign-out, and production API base URL support.
+- [x] Add `render.yaml` with non-secret configuration, generated application secrets, and prompted provider credentials.
+- [x] Run backend/frontend tests, lint, build, compile, dependency audit, and a secret scan of the intended diff.
+- [ ] Configure and verify Supabase, Upstash, Render, and Vercel where provider authentication permits.
+- [x] Append `progress.txt` and create one scoped local commit without staging unrelated workspace files.
+
+### Acceptance Criteria
+
+- Production REST routes reject `X-User-Id`, missing bearer tokens, invalid signatures, wrong issuer/audience, expired tokens, and tokens without `sub`.
+- A valid Supabase user token maps only its verified `sub` through the existing HMAC pseudonymization boundary.
+- Browser requests are accepted only from the exact configured Vercel origin; credentials and wildcard origins are not enabled.
+- No Redis URL, OpenAI key, Supabase secret/service-role key, encryption key, HMAC secret, or provider token enters Git, frontend bundles, command output, or chat.
+- The browser receives only the Supabase project URL and publishable key, which are public client configuration by design.
+- Render production startup requires Redis, trusted auth configuration, encryption, and pseudonymization secrets.
+- Upstash transport uses TLS and sensitive ledger payloads remain application-encrypted at rest.
+- The free Render deployment does not claim an always-on SLA and does not run the RQ/Kakao worker.
+- Local verification passes; provider deployment and real authenticated API behavior are reported separately with direct evidence or an explicit login/credential blocker.
 
 ## Archived Work
 

@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: jangbu-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 app:app
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.6
+      - key: APP_ENV
+        value: production
+      - key: LEDGER_STORE
+        value: redis
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://jangbu-ai.vercel.app
+      - key: REDIS_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LEDGER_ENCRYPTION_KEY
+        generateValue: true
+      - key: LEDGER_USER_REF_SECRET
+        generateValue: true

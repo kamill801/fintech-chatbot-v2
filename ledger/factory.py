@@ -7,6 +7,7 @@ from typing import Any
 from flask import Flask
 from dotenv import load_dotenv
 
+from ledger.auth import create_production_verifier, parse_cors_origins
 from ledger.adapters.memory import InMemoryLedgerRepository
 from ledger.adapters.openai_judge import OpenAIResponsesJudge
 from ledger.adapters.redis_store import RedisLedgerRepository
@@ -40,6 +41,8 @@ def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
         redis_url = values.get("REDIS_URL")
         if not redis_url:
             raise PrivacyError("REDIS_URL is required for Redis storage")
+        if app_env == "production" and not redis_url.startswith("rediss://"):
+            raise PrivacyError("production REDIS_URL must use rediss:// TLS")
         repository = RedisLedgerRepository.from_url(redis_url, privacy)
         ready_check = lambda: bool(repository._redis.ping())
     else:
@@ -64,6 +67,23 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     allow_dev_auth = str(
         (config or {}).get("ALLOW_DEV_AUTH", os.getenv("ALLOW_DEV_AUTH", "0"))
     ) == "1"
+    values = dict(os.environ)
+    if config:
+        values.update(
+            {key: str(value) for key, value in config.items() if isinstance(value, (str, int, float, bool))}
+        )
+    production = app_env == "production"
+    cors_allowed_origins = parse_cors_origins(
+        values.get("CORS_ALLOWED_ORIGINS", ""),
+        production=production,
+    )
+    configured_verifier = (config or {}).get("AUTH_VERIFIER")
+    if configured_verifier is not None:
+        auth_verifier = configured_verifier
+    elif production:
+        auth_verifier = create_production_verifier(values).verify_subject
+    else:
+        auth_verifier = None
     app.extensions["ledger_service"] = service
     app.extensions["ledger_privacy"] = privacy
     app.extensions["ledger_repository"] = repository
@@ -74,6 +94,8 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             privacy,
             app_env=app_env,
             allow_dev_auth=allow_dev_auth,
+            auth_verifier=auth_verifier,
+            cors_allowed_origins=cors_allowed_origins,
         )
     )
     build_dir = Path(

@@ -9,6 +9,7 @@ import type {
   TransactionDraft,
   TransactionResult,
 } from "./types";
+import { getAccessToken } from "./auth-client";
 
 interface Envelope<T> {
   data: T;
@@ -29,20 +30,20 @@ export class ApiError extends Error {
   }
 }
 
-const USER_KEY = "jangbu-user-id";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL?.trim() ?? "").replace(/\/+$/, "");
 
-function userId(): string {
-  const existing = window.localStorage.getItem(USER_KEY);
-  if (existing) return existing;
-  const next = `web-${crypto.randomUUID()}`;
-  window.localStorage.setItem(USER_KEY, next);
-  return next;
+export function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  headers.set("X-User-Id", userId());
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    throw new ApiError("unauthorized", "로그인이 필요해요.", 401);
+  }
+  headers.set("Authorization", `Bearer ${accessToken}`);
   if (init.body) headers.set("Content-Type", "application/json");
   if (init.method && init.method !== "GET") {
     headers.set("Idempotency-Key", crypto.randomUUID());
@@ -50,7 +51,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(path, { ...init, headers });
+    response = await fetch(apiUrl(path), { ...init, headers });
   } catch {
     throw new ApiError("offline", "네트워크에 연결할 수 없어요.", 0);
   }

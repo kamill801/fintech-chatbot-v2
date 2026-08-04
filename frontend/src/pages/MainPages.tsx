@@ -10,6 +10,7 @@ import {
   LockKey,
   MagnifyingGlass,
   SlidersHorizontal,
+  SignOut,
   Target,
   Trash,
   UserCircle,
@@ -30,6 +31,7 @@ import {
   TransactionRow,
 } from "../components";
 import { demoJudgment } from "../demo";
+import { useAuth } from "../auth-context";
 import { useLedger } from "../ledger-context";
 import { Link, useNavigate } from "../router";
 import type { Transaction } from "../types";
@@ -132,6 +134,7 @@ export function ReportPage() {
 
 export function SettingsPage() {
   const { deleteData, demo, profile, saveSettings, settings } = useLedger();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const [preview, setPreview] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -164,6 +167,7 @@ export function SettingsPage() {
         <button className="danger-row" onClick={() => setConfirmDelete(true)}><Trash size={25} /><span><strong>모든 데이터 삭제</strong><small>삭제한 데이터는 복구할 수 없어요</small></span><CaretRight /></button>
       </Surface>
       {status && <p className="settings-status" role="status">{status}</p>}
+      {!demo && <button className="logout-button" onClick={() => void signOut()}><SignOut size={21} /> 로그아웃</button>}
       <p className="version">버전 0.1</p>
       {confirmDelete && <div className="dialog-backdrop" onMouseDown={() => setConfirmDelete(false)}><section className="correction-dialog delete-dialog" role="alertdialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><LockKey size={32} /><h2>모든 데이터를 삭제할까요?</h2><p>프로필, 지출, 이유, 판단 기록이 삭제되고 복구할 수 없어요.</p><PrimaryButton onClick={() => void removeData()}>삭제하기</PrimaryButton><button className="text-button" onClick={() => setConfirmDelete(false)}>취소</button></section></div>}
     </main>

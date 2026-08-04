@@ -75,3 +75,10 @@ Why: production 인증과 외부 Flask/RQ/Redis 런타임이 준비되기 전에
 Next: Cloudtype에 Flask API와 RQ worker를 분리 배포하고 managed Redis와 trusted auth를 연결한 뒤 Vercel의 데모 기본값을 제거한다.
 Issues: deployment `dpl_24Qa1EcwiXYpUhhW6gZB42zJg4Nc`는 READY다. public Home, onboarding, `/agent`, judgment deep route, manifest, service worker, JS/CSS를 HTTP 200으로 확인했고 390x844 브라우저에서 console error와 horizontal overflow가 없었다. 실데이터 저장, 라이브 OpenAI 판단, production auth와 Redis는 아직 배포되지 않았다.
 ---
+
+[2026-08-04 16:54] [Phase 6 / Task 6.0] (this commit)
+What: Supabase 이메일 인증, 비대칭 JWKS 검증, bearer API 호출, exact-origin CORS, Upstash TLS Redis 강제, Render Free Blueprint와 비밀값 분리 배포 문서를 구현했다.
+Why: Vercel 데모를 실사용 경로로 전환하기 전에 브라우저 공개 설정과 서버 비밀값을 분리하고 검증된 사용자 subject만 기존 HMAC 가명화 경계로 전달하기 위해서다.
+Next: Render와 Upstash에 로그인하고, Supabase Free 프로젝트 슬롯을 확보하거나 사용할 기존 프로젝트를 명시한 뒤 `DEPLOYMENT.md` 순서대로 공급자를 생성·연결한다. 실제 로그인과 API read/write가 통과하기 전에는 Vercel의 `VITE_DEMO_DEFAULT=1`을 유지한다.
+Issues: backend 전체 81개 중 78개 통과·Redis 3개 skip, 격리 Redis 8.6.2에서 해당 3개 별도 통과, frontend 9개 테스트·lint·build·npm audit 0건, compileall, Render YAML 파싱, 비밀값 검사, 실제 HTTP health/ready/auth/CORS 스모크를 통과했다. Supabase 조직은 Free 프로젝트 2개 한도에 도달했고 Render/Upstash는 로그인되지 않아 외부 리소스와 production 환경변수는 생성하지 않았다. 라이브 OpenAI 호출과 실제 production auth E2E는 하지 않았다.
+---

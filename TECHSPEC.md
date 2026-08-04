@@ -57,13 +57,14 @@ Backend completion before design requires:
 - Legacy Redis state import without creating fake monetary transactions.
 - KakaoTalk webhook/RQ compatibility as a thin transport.
 - Versioned JSON REST API for future UI use.
+- Supabase Auth for the production web user identity boundary.
+- Vercel web frontend, Render Flask API, and Upstash Redis production topology.
 
 ### 3.2 Out of Scope
 
-- UI/UX, design system, screens, share-card visual design.
-- Production deployment.
+- Native mobile apps and additional visual redesign beyond the approved web/PWA.
 - Production financial-data provider selection, contract, or paid integration.
-- Production auth-provider selection.
+- Paid uptime, background-worker, or data-residency guarantees.
 - Payment blocking, transfers, automatic savings, or investment orders.
 - Any autonomous movement of money.
 - Investment, insurance, credit, or loan product recommendations.
@@ -95,7 +96,7 @@ Stop and report after the backend and its tests are complete. Do not begin UI/UX
 Use a modular monolith that preserves Flask, RQ, and Redis:
 
 ```text
-KakaoTalk or future UI
+Vercel web/PWA or KakaoTalk
         |
         v
 Flask transports: app.py + ledger/api.py
@@ -117,7 +118,10 @@ Repository ports
         +--> Redis Streams + projections
         +--> InMemory repository for tests
 
-RQ worker: async Kakao callback adapter only
+Supabase Auth: web JWT issuer only; Flask verifies the token locally
+Render web service: Flask API only on the free MVP deployment
+RQ worker: async Kakao callback adapter only; not deployed on the free web MVP
+Upstash: TLS Redis storage with application-encrypted sensitive payloads
 External sinks: centralized privacy allowlist first
 ```
 
@@ -540,7 +544,11 @@ Transaction creation returns:
 
 - development/test: X-User-Id is accepted only when APP_ENV is development or test and ALLOW_DEV_AUTH=1.
 - production: X-User-Id is always rejected.
-- production REST routes return AUTH_NOT_CONFIGURED until a trusted auth provider is separately selected.
+- production web authentication uses `Authorization: Bearer <access-token>` issued by Supabase Auth.
+- Flask verifies the token against `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` using an asymmetric algorithm allowlist, the exact issuer `${SUPABASE_URL}/auth/v1`, the configured audience, expiry, and required `sub` claim.
+- Only the verified `sub` becomes input to `PrivacyService.user_ref`; email, phone, refresh token, publishable key, and unverified JWT claims never enter ledger storage.
+- Production startup fails closed when `SUPABASE_URL` or the JWT audience is missing. A missing, malformed, or invalid bearer token returns 401 without reaching a use case.
+- Shared-secret Supabase JWT verification and `service_role` keys are forbidden in this application.
 - Kakao user identity is resolved only inside the Kakao transport from the verified platform payload.
 - Production Kakao requests require `KAKAO_WEBHOOK_SECRET`, and callback URLs must match the exact host allowlist in `KAKAO_CALLBACK_HOSTS` before any outbound request is queued.
 - Production Kakao requests without a verified platform request identifier are rejected instead of receiving a generated idempotency key.
@@ -563,15 +571,23 @@ Transaction creation returns:
 - LEDGER_USER_REF_SECRET is required in production for HMAC-SHA256 pseudonyms.
 - Development/test may generate ephemeral secrets with a warning.
 - Key material is never written to logs or Redis.
+- Upstash connections must use `rediss://` TLS URLs. The free tier's lack of storage-volume encryption is not treated as sufficient; sensitive event and projection payloads remain Fernet-encrypted by the application.
 
-### 12.3 Retention
+### 12.3 Browser Origin Boundary
+
+- Production CORS uses the comma-separated exact origin allowlist in `CORS_ALLOWED_ORIGINS`.
+- `*`, reflected arbitrary origins, and credentialed cross-origin cookies are forbidden.
+- Allowed request headers are `Authorization`, `Content-Type`, `Idempotency-Key`, and `X-Correlation-Id`.
+- Health and readiness remain publicly readable but receive CORS headers only for an allowlisted browser origin.
+
+### 12.4 Retention
 
 - LEDGER_RETENTION_DAYS defaults to 365.
 - Cleanup removes expired sensitive event streams, projections, pending questions, and idempotency records.
 - User deletion overrides retention immediately.
 - Deleted or expired aggregates are ignored during replay/rebuild.
 
-### 12.4 Revocation and Deletion
+### 12.5 Revocation and Deletion
 
 POST /api/v1/me/accounts/{connection_id}/revoke:
 
@@ -653,6 +669,8 @@ Integration:
 - share metrics;
 - deletion and revocation;
 - production dev-auth rejection;
+- production Supabase JWT signature, issuer, audience, expiry, and subject rejection plus valid-subject acceptance;
+- exact-origin CORS preflight and disallowed-origin behavior;
 - Sheets redaction.
 
 E2E:
@@ -679,6 +697,9 @@ LEDGER_TEST_REDIS_URL=redis://127.0.0.1:6389/15 python3 -m unittest tests.integr
 - LEDGER_USER_REF_SECRET: HMAC secret; required in production.
 - LEDGER_RETENTION_DAYS: defaults to 365.
 - ALLOW_DEV_AUTH: must be 1 to accept X-User-Id outside production.
+- SUPABASE_URL: exact HTTPS project URL; required in production and used to derive the issuer and JWKS URL.
+- SUPABASE_JWT_AUDIENCE: expected access-token audience; required in production and set to authenticated for the selected Supabase project.
+- CORS_ALLOWED_ORIGINS: comma-separated exact browser origins; required in production for the Vercel web app.
 - KAKAO_WEBHOOK_SECRET: required to authenticate the production Kakao webhook transport.
 - KAKAO_CALLBACK_HOSTS: comma-separated exact callback hosts allowed in production.
 - GOOGLE_SHEET_ID and GOOGLE_CREDENTIALS_JSON: optional redacted telemetry sink only.
@@ -694,9 +715,11 @@ LEDGER_TEST_REDIS_URL=redis://127.0.0.1:6389/15 python3 -m unittest tests.integr
 - requests
 - python-dotenv
 - gunicorn
+- PyJWT with cryptography support for remote JWKS verification
+- Supabase JavaScript client in the frontend for browser sessions
 - optional gspread and google-auth for redacted telemetry
 
-No new database, auth provider, or financial-data provider is introduced in this milestone.
+No Supabase service-role key or Supabase database dependency is introduced. Supabase is the identity provider only; Redis remains the ledger datastore.
 
 ## 17. External Provider Constraints
 
@@ -721,3 +744,6 @@ References:
 | 2026-08-01 | Storage | Redis Streams events plus projections; schema portable to Postgres |
 | 2026-08-01 | Privacy | Encrypted sensitive payloads and allowlisted external sinks |
 | 2026-08-01 | Stop boundary | Backend complete, stop before UI/UX design |
+| 2026-08-04 | Web auth | Supabase Auth JWT with asymmetric JWKS verification; verified `sub` only |
+| 2026-08-04 | Deployment | Vercel frontend, Render Flask web service, Upstash TLS Redis |
+| 2026-08-04 | Free-tier worker | RQ remains Kakao-only and is not deployed on the free web MVP |

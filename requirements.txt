@@ -6,5 +6,6 @@ requests>=2,<3
 python-dotenv>=1,<2
 gunicorn>=23,<24
 cryptography>=46,<48
+PyJWT[crypto]>=2.12,<3
 gspread>=6,<7
 google-auth>=2,<3

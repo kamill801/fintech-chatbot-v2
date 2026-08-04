@@ -274,6 +274,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .loading-mark { width: 36px; height: 36px; border: 3px solid var(--line); border-top-color: var(--action); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Authentication */
+.auth-page { width: 100%; max-width: 500px; min-height: 100svh; margin: 0 auto; padding: 38px 20px 34px; }
+.auth-hero { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; margin-bottom: 28px; }
+.auth-hero h1 { margin: 18px 0 14px; font-size: clamp(37px, 10vw, 54px); line-height: 1.17; letter-spacing: -.055em; }
+.auth-hero p { max-width: 330px; margin: 0; color: var(--muted); line-height: 1.55; }
+.auth-hero .bookkeeper { width: 96px; height: 112px; }
+.auth-kicker { display: inline-flex; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--safe); font-size: 13px; font-weight: 700; }
+.auth-card { display: grid; grid-template-columns: auto 1fr; gap: 12px 14px; padding: 22px 20px; }
+.auth-card h2 { margin: 1px 0 5px; font-size: 22px; }
+.auth-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.auth-card form { grid-column: 1 / -1; display: grid; gap: 9px; margin-top: 10px; }
+.auth-card label { font-size: 14px; font-weight: 700; }
+.auth-card input { width: 100%; min-height: 52px; padding: 12px 14px; border: 1px solid #c8c1b7; border-radius: 8px; background: #fff; }
+.auth-card .primary-button { margin-top: 4px; }
+.auth-card .text-button, .auth-card .form-error { grid-column: 1 / -1; }
+.auth-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #fff0df; color: var(--action); }
+.auth-privacy { display: flex; align-items: flex-start; justify-content: center; gap: 7px; margin: 18px auto 2px; color: var(--muted); font-size: 12px; line-height: 1.45; text-align: center; }
+.auth-demo-link { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 7px; color: var(--action); font-weight: 650; }
+
 /* Onboarding */
 .step-header { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; min-height: 44px; margin-bottom: 34px; }
 .step-header > span { text-align: left; color: var(--muted); font-size: 16px; }
@@ -524,6 +543,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .danger-row span { display: flex; flex-direction: column; }
 .danger-row small { margin-top: 3px; color: var(--muted); }
 .settings-status { font-size: 13px; }
+.logout-button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; margin: 4px auto 0; padding: 0 18px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .version { margin-top: 34px; color: var(--muted); text-align: center; font-size: 13px; }
 .delete-dialog { text-align: center; }
 
@@ -553,6 +573,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .reason-signals { grid-template-columns: 1fr; }
   .report-goal { grid-template-columns: auto 1fr; }
   .report-goal > p { grid-column: 1 / -1; border: 0; }
+}
+
+@media (max-width: 420px) {
+  .auth-hero { grid-template-columns: 1fr; }
+  .auth-hero .bookkeeper { display: none; }
 }
 
 @media (min-width: 768px) {

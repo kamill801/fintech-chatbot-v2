@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from flask import Blueprint, Response, current_app, g, jsonify, request
 
+from ledger.auth import AuthenticationError
 from ledger.application.service import LedgerService, ServiceError, ServiceResult
 from ledger.domain.models import DomainValidationError
 from ledger.privacy import PrivacyService
@@ -17,12 +18,39 @@ def create_api_blueprint(
     *,
     app_env: str,
     allow_dev_auth: bool,
+    auth_verifier: Callable[[str], str] | None = None,
+    cors_allowed_origins: frozenset[str] = frozenset(),
 ) -> Blueprint:
     api = Blueprint("ledger_api", __name__)
 
     @api.before_app_request
     def assign_correlation_id() -> None:
         g.correlation_id = request.headers.get("X-Correlation-Id") or str(uuid4())
+
+    @api.before_app_request
+    def handle_cors_preflight() -> Response | None:
+        if not _is_api_path(request.path) or request.method != "OPTIONS":
+            return None
+        origin = request.headers.get("Origin", "")
+        if origin not in cors_allowed_origins:
+            return _error("origin_not_allowed", "request origin is not allowed", 403)
+        return Response(status=204)
+
+    @api.after_app_request
+    def add_cors_headers(response: Response) -> Response:
+        if not _is_api_path(request.path):
+            return response
+        origin = request.headers.get("Origin", "")
+        if origin not in cors_allowed_origins:
+            return response
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers.add("Vary", "Origin")
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Authorization, Content-Type, Idempotency-Key, X-Correlation-Id"
+        )
+        response.headers["Access-Control-Max-Age"] = "600"
+        return response
 
     @api.get("/health")
     def health() -> Response:
@@ -39,11 +67,23 @@ def create_api_blueprint(
         @wraps(handler)
         def wrapped(*args: Any, **kwargs: Any) -> Response:
             if app_env == "production":
-                return _error(
-                    "AUTH_NOT_CONFIGURED",
-                    "trusted production authentication is not configured",
-                    503,
-                )
+                if request.headers.get("X-User-Id"):
+                    return _error("unauthorized", "development identity is forbidden", 401)
+                token = _bearer_token(request.headers.get("Authorization", ""))
+                if token is None:
+                    return _error("unauthorized", "valid bearer token is required", 401)
+                if auth_verifier is None:
+                    return _error(
+                        "AUTH_NOT_CONFIGURED",
+                        "trusted production authentication is not configured",
+                        503,
+                    )
+                try:
+                    raw_user_id = auth_verifier(token)
+                except AuthenticationError:
+                    return _error("unauthorized", "valid bearer token is required", 401)
+                g.user_ref = privacy.user_ref(raw_user_id)
+                return handler(*args, **kwargs)
             if not allow_dev_auth:
                 return _error("unauthorized", "development authentication is disabled", 401)
             raw_user_id = request.headers.get("X-User-Id")
@@ -206,6 +246,19 @@ def create_api_blueprint(
         return _error("invalid_request", str(error), 400)
 
     return api
+
+
+def _bearer_token(value: str) -> str | None:
+    scheme, separator, token = value.partition(" ")
+    if separator != " " or scheme.lower() != "bearer" or not token.strip():
+        return None
+    if " " in token.strip():
+        return None
+    return token.strip()
+
+
+def _is_api_path(path: str) -> bool:
+    return path in {"/health", "/ready"} or path.startswith("/api/v1/")
 
 
 def _mutating(operation: Callable[[str], ServiceResult]) -> Response:

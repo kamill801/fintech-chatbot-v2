@@ -6,6 +6,7 @@ import os
 import unittest
 from unittest.mock import patch
 
+from ledger.auth import AuthConfigurationError, AuthenticationError
 from tests.helpers import FERNET_KEY, USER_REF_SECRET, profile_payload
 
 
@@ -177,10 +178,107 @@ class FlaskLedgerE2ETests(unittest.TestCase):
     def test_production_rejects_x_user_id(self) -> None:
         from ledger.factory import create_app
 
-        app = create_app(app_config(APP_ENV="production", LEDGER_STORE="redis", REDIS_URL="redis://example/0"))
-        with patch.dict(app.extensions["ledger_repository"].__dict__, {}, clear=False):
-            response = app.test_client().get("/api/v1/me/profile", headers={"X-User-Id": "prod-user"})
-        self.assertEqual(response.get_json()["error"]["code"], "AUTH_NOT_CONFIGURED")
+        app = create_app(self.production_config(AUTH_VERIFIER=lambda _token: "prod-user"))
+        response = app.test_client().get(
+            "/api/v1/me/profile", headers={"X-User-Id": "prod-user"}
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json()["error"]["code"], "unauthorized")
+
+    def test_production_requires_trusted_auth_and_tls_redis_config(self) -> None:
+        from ledger.factory import create_app
+
+        with self.assertRaises(AuthConfigurationError):
+            create_app(
+                app_config(
+                    APP_ENV="production",
+                    LEDGER_STORE="redis",
+                    REDIS_URL="rediss://example/0",
+                    CORS_ALLOWED_ORIGINS="https://jangbu-ai.vercel.app",
+                )
+            )
+        with self.assertRaises(ValueError):
+            create_app(
+                self.production_config(
+                    REDIS_URL="redis://example/0",
+                    AUTH_VERIFIER=lambda _token: "prod-user",
+                )
+            )
+
+    def test_production_bearer_subject_crosses_only_pseudonym_boundary(self) -> None:
+        from ledger.factory import create_app
+
+        app = create_app(self.production_config(AUTH_VERIFIER=lambda token: f"subject-{token}"))
+        service = app.extensions["ledger_service"]
+        expected = app.extensions["ledger_privacy"].user_ref("subject-valid-token")
+        with patch.object(service, "get_profile", wraps=service.get_profile) as get_profile:
+            service.repository.get_profile = lambda _user_ref: None
+            response = app.test_client().get(
+                "/api/v1/me/profile",
+                headers={"Authorization": "Bearer valid-token"},
+            )
+        self.assertEqual(response.status_code, 200)
+        get_profile.assert_called_once_with(expected)
+
+    def test_production_rejects_missing_and_invalid_bearer_tokens(self) -> None:
+        from ledger.factory import create_app
+
+        def reject(_token: str) -> str:
+            raise AuthenticationError("invalid")
+
+        app = create_app(self.production_config(AUTH_VERIFIER=reject))
+        client = app.test_client()
+        missing = client.get("/api/v1/me/profile")
+        malformed = client.get(
+            "/api/v1/me/profile", headers={"Authorization": "Basic token"}
+        )
+        invalid = client.get(
+            "/api/v1/me/profile", headers={"Authorization": "Bearer invalid"}
+        )
+        self.assertEqual([missing.status_code, malformed.status_code, invalid.status_code], [401, 401, 401])
+
+    def test_cors_allows_only_configured_origin(self) -> None:
+        from ledger.factory import create_app
+
+        cors_app = create_app(
+            app_config(CORS_ALLOWED_ORIGINS="https://jangbu-ai.vercel.app")
+        )
+        client = cors_app.test_client()
+        allowed = client.options(
+            "/api/v1/me/profile",
+            headers={
+                "Origin": "https://jangbu-ai.vercel.app",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        blocked = client.options(
+            "/api/v1/me/profile",
+            headers={
+                "Origin": "https://attacker.example",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        self.assertEqual(allowed.status_code, 204)
+        self.assertEqual(
+            allowed.headers["Access-Control-Allow-Origin"],
+            "https://jangbu-ai.vercel.app",
+        )
+        self.assertNotIn("Access-Control-Allow-Credentials", allowed.headers)
+        self.assertEqual(blocked.status_code, 403)
+        self.assertNotIn("Access-Control-Allow-Origin", blocked.headers)
+
+    @staticmethod
+    def production_config(**overrides):
+        config = app_config(
+            APP_ENV="production",
+            LEDGER_STORE="redis",
+            REDIS_URL="rediss://example/0",
+            CORS_ALLOWED_ORIGINS="https://jangbu-ai.vercel.app",
+            SUPABASE_URL="https://project.supabase.co",
+            SUPABASE_JWT_AUDIENCE="authenticated",
+        )
+        config.update(overrides)
+        return config
 
 
 class FixtureTests(unittest.TestCase):

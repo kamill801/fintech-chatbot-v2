@@ -1,8 +1,8 @@
 # AI Household Ledger Agent - Backend Handoff
 
-> Date: 2026-08-01
-> Branch: `codex/ai-ledger-backend`
-> Status: backend pivot complete at the UI/UX stop boundary
+> Date: 2026-08-04
+> Branch: `codex/ui-ux-foundation`
+> Status: trusted production path implemented locally; provider activation blocked
 
 ## Product Contract
 
@@ -28,25 +28,35 @@ The product is now a privacy-first AI household-ledger agent, not a persona-firs
 - Thin Kakao callback transport with production secret, callback-host allowlist, verified request-id requirement, and Redis-only RQ guard.
 - Manual and synthetic read-only account adapters plus a fail-closed disabled production adapter.
 - Allowlisted telemetry replaces raw chat logging.
+- Supabase access-token verification uses asymmetric JWKS keys and requires the exact issuer, audience, expiry, and subject before deriving the existing HMAC user pseudonym.
+- Production REST routes reject development identity headers and exact-origin CORS accepts only configured browser origins without credentialed cookies.
+- `render.yaml` defines a Render Free Flask web service in Singapore; production Redis requires a TLS `rediss://` URL and sensitive payloads remain application-encrypted.
+- The frontend owns Supabase email sessions and sends only the short-lived bearer access token to Flask. No service-role key is used.
 
 ## Verification Evidence
 
-- 67 non-Redis unit/integration/E2E tests passed; 3 Redis-only tests skipped without `LEDGER_TEST_REDIS_URL`.
-- The 3 Redis integration tests passed separately against Redis 8.6.2 on an isolated local database.
+- The backend suite discovered 81 tests: 78 passed and 3 Redis-only tests skipped without `LEDGER_TEST_REDIS_URL`.
+- The 3 skipped Redis integration tests passed separately against Redis 8.6.2 on an isolated local database.
 - Redis tests cover app/worker shared projections, idempotency replay, events, correction state, per-user concurrency, encrypted storage, 1-day TTL, and repeated deletion.
+- Frontend Vitest passed 9 tests; ESLint, TypeScript/Vite production build, and production dependency audit passed with zero reported vulnerabilities.
 - `python3 -m compileall -q app.py tasks.py worker.py ledger tests` passed.
+- `render.yaml` parsed successfully and contains every required production variable boundary.
+- Intended source and built bundles passed the credential-pattern and local-secret-value scan.
 - `git diff --check` passed.
-- Real local HTTP smoke passed: `/health` 200, `/ready` 200, profile PUT 200, uncertain transaction POST 202 with one reason question.
+- Real local HTTP smoke passed: `/health` 200, `/ready` 200, authenticated profile GET 200, allowed CORS preflight 204, and disallowed origin 403 without credential headers.
 
 ## Explicit Gaps
 
 - The target runtime is Python 3.11.6, but this machine only had Python 3.14.2 for verification.
 - No live OpenAI call was made. The 85% judgment-agreement target needs labeled evaluation with a configured key and then pilot evidence.
 - The 10% four-week discretionary-spend reduction and 10% Roast share-rate targets require a user pilot; they are not backend test claims.
-- Production auth, financial-provider integration, credentials, compliance approval, deployment, and live Kakao verification remain unconfigured and unverified.
+- The Supabase organization is already at its two-project Free limit, so a dedicated project was not created or an existing project reused without owner approval.
+- Render and Upstash were not authenticated, so no service, Redis database, provider credential, or production environment variable was created.
+- Vercel remains in explicit demo mode. Do not set `VITE_DEMO_DEFAULT=0` until Supabase, Upstash, Render, CORS, readiness, and one real authenticated API flow are verified together.
+- Production account-provider integration, compliance approval, live OpenAI quality evaluation, live Kakao verification, and money movement remain outside this task.
 
 ## Next Task
 
-Start a new user-approved UI/UX co-design task. Do not implement screens before agreeing together on onboarding disclosure, home hierarchy, manual transaction capture, the reason-question interaction, Roast consent and controls, judgment correction, monthly progress, and privacy-safe sharing.
+Resolve the provider gates in this order: free a Supabase project slot or choose an existing project, sign in to Upstash and Render, create the resources from `DEPLOYMENT.md`, verify the live authenticated API path, then switch Vercel out of demo mode and redeploy.
 
-Do not push, deploy, choose a provider, or add money movement as an implicit next step.
+Do not paste provider credentials into chat or commit them. Do not activate live Vercel mode based only on successful builds or health checks.

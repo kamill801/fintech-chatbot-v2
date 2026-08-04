@@ -4,6 +4,9 @@ import { OnboardingBaseline, OnboardingGoal, OnboardingSource, OnboardingTrust }
 import { HomePage, ManualTransactionPage, ReasonPage } from "./pages/HomeFlow";
 import { JudgmentPage, SharePage, TransactionDetailPage } from "./pages/JudgmentFlow";
 import { AgentPage, LedgerPage, ReportPage, SettingsPage } from "./pages/MainPages";
+import { AuthProvider, useAuth } from "./auth-context";
+import { LedgerProvider } from "./ledger-context";
+import { LoginPage } from "./pages/LoginPage";
 
 function LoadingScreen() {
   return (
@@ -45,6 +48,16 @@ function AppRoutes() {
   );
 }
 
+function SessionGate() {
+  const { loading, session } = useAuth();
+  const query = new URLSearchParams(window.location.search);
+  const demo = query.get("demo") === "1" || import.meta.env.VITE_DEMO_DEFAULT === "1";
+  if (demo) return <LedgerProvider><AppRoutes /></LedgerProvider>;
+  if (loading) return <LoadingScreen />;
+  if (!session) return <LoginPage />;
+  return <LedgerProvider><AppRoutes /></LedgerProvider>;
+}
+
 export default function App() {
-  return <AppRoutes />;
+  return <AuthProvider><SessionGate /></AuthProvider>;
 }
