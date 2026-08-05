@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confidenceText, formatCompactWon, formatWon, labelText, withDemo } from "./utils";
+import { confidenceText, currentMonthKey, formatCompactWon, formatMonthLabel, formatTodayLabel, formatWon, labelText, withDemo } from "./utils";
 
 describe("Korean ledger formatting", () => {
   it("formats won without decimals", () => {
@@ -15,5 +15,12 @@ describe("Korean ledger formatting", () => {
   it("keeps demo state across routes", () => {
     expect(withDemo("/ledger", true)).toBe("/ledger?demo=1");
     expect(withDemo("/ledger", false)).toBe("/ledger");
+  });
+
+  it("derives Korean month and today labels without fixed production dates", () => {
+    const date = new Date("2026-08-05T12:00:00+09:00");
+    expect(currentMonthKey(date)).toBe("2026-08");
+    expect(formatMonthLabel("2026-08")).toBe("2026년 8월");
+    expect(formatTodayLabel(date)).toBe("8월 5일 수요일");
   });
 });

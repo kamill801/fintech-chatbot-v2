@@ -52,8 +52,8 @@ export function LoginPage() {
       <section className="auth-hero">
         <div>
           <span className="auth-kicker">AI 가계부 에이전트</span>
-          <h1>내 돈을 맡기는 게 아니라,<br /><Highlight>판단</Highlight>을 같이 하는 거야.</h1>
-          <p>로그인하면 내 장부와 목표를 기기 사이에서 안전하게 이어서 관리해요.</p>
+          <h1>쓴 돈은 기록하고,<br /><Highlight>다음 소비</Highlight>는 더 나아지게.</h1>
+          <p>지출을 남기면 예산과 목표를 함께 보고, 과소비라고 단정하기 전에 이유부터 확인해요.</p>
         </div>
         <BookkeeperMark />
       </section>

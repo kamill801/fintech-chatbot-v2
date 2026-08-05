@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Wallet,
 } from "@phosphor-icons/react";
-import { BookkeeperMark, Highlight, PrimaryButton, Surface } from "../components";
+import { BookkeeperMark, CurrencyInput, Highlight, PrimaryButton, Surface } from "../components";
 import { demoProfile } from "../demo";
 import { useLedger } from "../ledger-context";
 import { useNavigate } from "../router";
@@ -53,24 +53,11 @@ function MoneyEditRow({
   value: number;
   onChange(value: number): void;
 }) {
-  const [editing, setEditing] = useState(false);
   return (
     <div className="money-edit-row">
       <label htmlFor={`money-${label}`}>{label}</label>
-      <PencilSimple size={19} />
-      {editing ? (
-        <input
-          id={`money-${label}`}
-          type="number"
-          inputMode="numeric"
-          autoFocus
-          value={value}
-          onChange={(event) => onChange(Math.max(0, Number(event.target.value)))}
-          onBlur={() => setEditing(false)}
-        />
-      ) : (
-        <button type="button" onClick={() => setEditing(true)}>{formatWon(value)}</button>
-      )}
+      <PencilSimple size={19} aria-hidden="true" />
+      <CurrencyInput id={`money-${label}`} ariaLabel={`${label} 금액`} value={value} onChange={onChange} />
     </div>
   );
 }
@@ -112,8 +99,8 @@ export function OnboardingBaseline() {
       <StepHeader step={2} />
       <div className="onboarding-title with-mark">
         <div>
-          <h1>이번 달<br /><Highlight>기준</Highlight>을 알려줘.</h1>
-          <p>그래야 함부로 과소비라고 안 해.</p>
+          <h1>내 소비를 볼<br /><Highlight>기준</Highlight>부터 맞춰요.</h1>
+          <p>수입과 고정비를 함께 봐야 같은 지출도 내 상황에 맞게 판단할 수 있어요.</p>
         </div>
         <BookkeeperMark compact />
       </div>
@@ -149,8 +136,8 @@ export function OnboardingGoal() {
       </div>
       <Surface className="goal-form">
         <label>목표 이름<input value={draft.goal.name} onChange={(event) => updateGoal({ name: event.target.value })} /></label>
-        <label>목표 금액<input type="number" inputMode="numeric" value={draft.goal.target_amount_krw} onChange={(event) => updateGoal({ target_amount_krw: Number(event.target.value) })} /></label>
-        <label>현재 금액<input type="number" inputMode="numeric" value={draft.goal.current_amount_krw} onChange={(event) => updateGoal({ current_amount_krw: Number(event.target.value) })} /></label>
+        <label><span>목표 금액</span><CurrencyInput ariaLabel="목표 금액" value={draft.goal.target_amount_krw} onChange={(value) => updateGoal({ target_amount_krw: value })} /></label>
+        <label><span>현재 금액</span><CurrencyInput ariaLabel="현재 금액" value={draft.goal.current_amount_krw} onChange={(value) => updateGoal({ current_amount_krw: value })} /></label>
         <label>목표 날짜<input type="date" value={draft.goal.target_date} onChange={(event) => updateGoal({ target_date: event.target.value })} /></label>
       </Surface>
       <div className="goal-progress-card">

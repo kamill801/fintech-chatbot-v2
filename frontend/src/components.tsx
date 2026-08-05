@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import {
   ArrowLeft,
   Basket,
@@ -34,6 +34,64 @@ export function Surface({ children, className = "" }: { children: ReactNode; cla
 
 export function PrimaryButton({ className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button className={`primary-button ${className}`} {...props} />;
+}
+
+export function CurrencyInput({
+  ariaLabel,
+  className = "",
+  id,
+  minimum = 0,
+  onChange,
+  value,
+}: {
+  ariaLabel: string;
+  className?: string;
+  id?: string;
+  minimum?: number;
+  onChange(value: number): void;
+  value: number;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    if (!editing) setDraft(String(value));
+  }, [editing, value]);
+
+  function commit() {
+    const parsed = draft === "" ? minimum : Number(draft);
+    onChange(Math.max(minimum, Number.isSafeInteger(parsed) ? parsed : minimum));
+    setEditing(false);
+  }
+
+  return (
+    <span className={`currency-input ${className}`}>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        maxLength={15}
+        aria-label={ariaLabel}
+        value={editing ? draft : Math.round(value).toLocaleString("ko-KR")}
+        onFocus={(event) => {
+          setDraft(String(value));
+          setEditing(true);
+          event.currentTarget.select();
+        }}
+        onChange={(event) => {
+          const next = event.target.value.replace(/[^0-9]/g, "").slice(0, 15);
+          setDraft(next);
+          if (next !== "") onChange(Math.max(minimum, Number(next)));
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+      />
+      <span aria-hidden="true">원</span>
+    </span>
+  );
 }
 
 export function TextButton({ className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
@@ -95,9 +153,8 @@ export function Toggle({
 export function BookkeeperMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`bookkeeper ${compact ? "bookkeeper-compact" : ""}`} aria-label="장부지기">
-      <UserCircle size={compact ? 31 : 48} weight="duotone" />
-      {!compact && <BookOpenText size={25} />}
-      <span>장부지기</span>
+      <UserCircle size={compact ? 36 : 64} weight="duotone" />
+      {!compact && <span>장부지기</span>}
     </div>
   );
 }

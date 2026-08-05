@@ -23,7 +23,6 @@ import {
   FieldRow,
   Highlight,
   InfoCallout,
-  JudgmentBadge,
   ModePill,
   PrimaryButton,
   Surface,
@@ -35,7 +34,7 @@ import { useAuth } from "../auth-context";
 import { useLedger } from "../ledger-context";
 import { Link, useNavigate } from "../router";
 import type { Transaction } from "../types";
-import { categoryNames, formatWon, withDemo } from "../utils";
+import { categoryNames, currentMonthKey, formatKoreanDate, formatMonthLabel, formatWon, withDemo } from "../utils";
 
 function groupTransactions(transactions: Transaction[]) {
   const groups = new Map<string, Transaction[]>();
@@ -51,16 +50,19 @@ export function LedgerPage() {
   const navigate = useNavigate();
   const [view, setView] = useState<"list" | "calendar">("list");
   const groups = useMemo(() => groupTransactions(transactions), [transactions]);
+  const month = summary?.month ?? currentMonthKey();
+  const [year, monthNumber] = month.split("-").map(Number);
+  const daysInMonth = Number.isInteger(year) && Number.isInteger(monthNumber) ? new Date(year, monthNumber, 0).getDate() : 31;
   return (
     <AppShell active="/ledger" showAdd>
       <div className="screen ledger-screen">
-        <header className="ledger-header"><h1>장부</h1><button className="month-select">2026년 8월 <CaretDown /></button><button className="icon-button" aria-label="검색"><MagnifyingGlass size={27} /></button><button className="icon-button" aria-label="필터"><SlidersHorizontal size={27} /></button></header>
+        <header className="ledger-header"><h1>장부</h1><button className="month-select">{formatMonthLabel(month)} <CaretDown /></button><button className="icon-button" aria-label="검색"><MagnifyingGlass size={27} /></button><button className="icon-button" aria-label="필터"><SlidersHorizontal size={27} /></button></header>
         <div className="segmented-control"><button className={view === "list" ? "selected" : ""} onClick={() => setView("list")}>내역</button><button className={view === "calendar" ? "selected" : ""} onClick={() => setView("calendar")}>달력</button></div>
-        <section className="ledger-summary"><h2>이번 달 <Highlight>{formatWon(summary?.total_spent_krw || 377_500)}</Highlight> 썼어.</h2><p><span>수입 <strong>{formatWon(profile?.monthly_income_krw || 3_500_000)}</strong></span><i /><span>지출 <strong>{formatWon(summary?.total_spent_krw || 377_500)}</strong></span></p></section>
+        <section className="ledger-summary"><h2>이번 달 <Highlight>{formatWon(summary?.total_spent_krw ?? 0)}</Highlight> 썼어요.</h2><p><span>수입 <strong>{formatWon(profile?.monthly_income_krw ?? 0)}</strong></span><i /><span>지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span></p></section>
         {view === "calendar" ? (
           <Surface className="calendar-placeholder">
-            <CalendarBlank size={38} /><h2>8월 지출 달력</h2><p>날짜를 누르면 그날의 지출을 보여줘요.</p>
-            <div className="calendar-grid">{Array.from({ length: 31 }, (_, index) => <button key={index + 1} className={[2, 3].includes(index + 1) ? "has-spend" : ""}>{index + 1}</button>)}</div>
+            <CalendarBlank size={38} /><h2>{monthNumber}월 지출 달력</h2><p>날짜를 누르면 그날의 지출을 보여줘요.</p>
+            <div className="calendar-grid">{Array.from({ length: daysInMonth }, (_, index) => <button key={index + 1}>{index + 1}</button>)}</div>
           </Surface>
         ) : (
           <Surface className="ledger-list">
@@ -75,10 +77,18 @@ export function LedgerPage() {
 }
 
 export function AgentPage() {
-  const { demo, settings, transactions } = useLedger();
+  const { demo, profile, settings, summary, transactions } = useLedger();
   const navigate = useNavigate();
   const pending = transactions.find((item) => item.status === "awaiting_reason") ?? (demo ? transactions[0] : undefined);
   const recent = transactions.filter((item) => item.status === "judged").slice(0, 2);
+  const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
+  const budgetUsage = budget > 0 ? Math.min(100, Math.round(((summary?.total_spent_krw ?? 0) / budget) * 100)) : 0;
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weeklyTransactions = demo ? transactions : transactions.filter((item) => new Date(item.occurred_at).getTime() >= weekAgo);
+  const weeklyCounts = weeklyTransactions.reduce<Record<string, number>>((counts, item) => ({ ...counts, [item.category]: (counts[item.category] ?? 0) + 1 }), {});
+  const weeklyTop = Object.entries(weeklyCounts).sort((a, b) => b[1] - a[1])[0];
+  const weeklyCategory = weeklyTop?.[0] ?? "other";
+  const weeklyCount = weeklyTop?.[1] ?? 0;
   return (
     <AppShell active="/agent">
       <div className="screen agent-screen">
@@ -94,14 +104,14 @@ export function AgentPage() {
         ) : <InfoCallout>답할 질문이 없어요. 다음 지출을 기록하면 먼저 확인할게요.</InfoCallout>}
         <Surface className="weekly-word">
           <h3>이번 주 한마디</h3>
-          <div><Wallet size={25} /> 생활비 예산 <strong>62%</strong> 사용</div>
-          <div><CategoryIcon category="cafe" /> 카페 지출 <strong className="caution-text">3회</strong></div>
-          <div className="weekly-advice"><Lightbulb size={26} /><p>이번 주 카페는 여기까지 하고<br />다음 만남은 산책 어때?</p></div>
+          <div><Wallet size={25} /> 생활비 예산 <strong>{budgetUsage}%</strong> 사용</div>
+          <div><CategoryIcon category={weeklyCategory} /> {categoryNames[weeklyCategory] ?? weeklyCategory} 지출 <strong className="caution-text">{weeklyCount}회</strong></div>
+          <div className="weekly-advice"><Lightbulb size={26} /><p>반복된 지출부터 확인하면<br />다음 소비 기준을 세우기 쉬워요.</p></div>
         </Surface>
         <h3>최근 판단</h3>
         <Surface className="recent-judgments">
-          {recent.map((transaction, index) => (
-            <button key={transaction.transaction_id} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))}><CategoryIcon category={transaction.category} /><span>{transaction.merchant || categoryNames[transaction.category]}</span><b>{formatWon(transaction.amount_krw)}</b><JudgmentBadge label={index === 0 ? "justified" : "caution"} /></button>
+          {recent.map((transaction) => (
+            <button key={transaction.transaction_id} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))}><CategoryIcon category={transaction.category} /><span>{transaction.merchant || categoryNames[transaction.category]}</span><b>{formatWon(transaction.amount_krw)}</b><span className="judgment-state">판단 완료</span></button>
           ))}
         </Surface>
       </div>
@@ -112,21 +122,26 @@ export function AgentPage() {
 const barColors: Record<string, string> = { food: "blue", shopping: "gold", cafe: "peach", transport: "green" };
 
 export function ReportPage() {
-  const { profile, summary } = useLedger();
-  const [applied, setApplied] = useState(false);
-  const entries = Object.entries(summary?.by_category_krw ?? { food: 160_000, shopping: 95_000, cafe: 72_000, transport: 50_500 }).sort((a, b) => b[1] - a[1]);
+  const { demo, profile, summary } = useLedger();
+  const entries = Object.entries(summary?.by_category_krw ?? {}).sort((a, b) => b[1] - a[1]);
   const max = Math.max(...entries.map(([, amount]) => amount), 1);
   const goal = summary?.goal ?? profile?.goal;
-  const goalProgress = goal ? Math.round((goal.current_amount_krw / Math.max(goal.target_amount_krw, 1)) * 100) : 70;
+  const goalProgress = goal ? Math.round((goal.current_amount_krw / Math.max(goal.target_amount_krw, 1)) * 100) : 0;
+  const month = summary?.month ?? currentMonthKey();
+  const topEntry = entries[0];
+  const topCategory = topEntry?.[0] ?? "other";
+  const topAmount = topEntry?.[1] ?? 0;
+  const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
+  const budgetRemaining = budget > 0 ? Math.max(0, Math.round((1 - ((summary?.total_spent_krw ?? 0) / budget)) * 100)) : 0;
   return (
     <AppShell active="/report">
       <div className="screen report-screen">
-        <header><h1>8월 리포트</h1><button className="month-select">2026년 8월 <CaretDown /></button></header>
-        <h2>이번 달, <Highlight>카페</Highlight>가 발목 잡았어.</h2>
-        <div className="report-totals"><span>총 지출 <strong>{formatWon(summary?.total_spent_krw || 377_500)}</strong></span><i /><span>예산 <strong>52%</strong> 남음</span></div>
-        <Surface className="category-report"><h3>어디에 썼나</h3>{entries.map(([category, amount]) => <div className="report-row" key={category}><CategoryIcon category={category} /><span>{categoryNames[category] || category}</span><strong>{formatWon(amount)}</strong><div className="report-bar"><span className={barColors[category] || "blue"} style={{ width: `${Math.round((amount / max) * 66)}%` }} /></div></div>)}</Surface>
-        {goal && <Surface className="report-goal"><Target size={28} /><strong>{goal.name} 목표</strong><div><span>현재 {goalProgress}%</span><div className="mini-progress"><span style={{ width: `${goalProgress}%` }} /></div></div><p>이대로면 목표가<br /><b>8일</b> 늦어질 수 있어</p></Surface>}
-        <section className="report-advice"><Lightbulb size={28} /><p>다음 7일은 카페 예산을 쉬고<br />72,000원을 목표에 남겨두자.</p><button onClick={() => setApplied(true)}>{applied ? "반영 완료" : "다음 주 계획에 반영"}</button></section>
+        <header><h1>{Number(month.split("-")[1])}월 리포트</h1><button className="month-select">{formatMonthLabel(month)} <CaretDown /></button></header>
+        <h2>{topAmount > 0 ? <>이번 달, <Highlight>{categoryNames[topCategory] ?? topCategory}</Highlight> 지출이 가장 컸어요.</> : "이번 달 지출을 기록해 보세요."}</h2>
+        <div className="report-totals"><span>총 지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span><i /><span>예산 <strong>{budgetRemaining}%</strong> 남음</span></div>
+        <Surface className="category-report"><h3>어디에 썼나</h3>{entries.map(([category, amount]) => <div className="report-row" key={category}><CategoryIcon category={category} /><span>{categoryNames[category] || category}</span><strong>{formatWon(amount)}</strong><div className="report-bar"><span className={barColors[category] || "blue"} style={{ width: `${Math.round((amount / max) * 66)}%` }} /></div></div>)}{entries.length === 0 && <p className="empty-copy">지출을 기록하면 카테고리별 흐름을 보여드려요.</p>}</Surface>
+        {goal && <Surface className="report-goal"><Target size={28} /><strong>{goal.name} 목표</strong><div><span>현재 {goalProgress}%</span><div className="mini-progress"><span style={{ width: `${goalProgress}%` }} /></div></div><p>목표일<br /><b>{formatKoreanDate(goal.target_date)}</b></p></Surface>}
+        {entries.length > 0 ? <section className="report-advice"><Lightbulb size={28} /><p>가장 큰 지출부터 판단 근거를 확인하고<br />다음 주 기준을 정해 보세요.</p><Link to={withDemo("/agent", demo)}>판단 확인하기</Link></section> : <InfoCallout>첫 지출부터 기록하면 월간 패턴을 정리해 드려요.</InfoCallout>}
       </div>
     </AppShell>
   );
@@ -157,8 +172,8 @@ export function SettingsPage() {
       </section>
       {preview && <div className="roast-preview"><strong>Normal</strong><p>{demoJudgment(false).message}</p><strong>Roast</strong><p>{demoJudgment(true).message}</p></div>}
       <Surface className="settings-list">
-        <FieldRow icon={<Wallet />} label="내 자금 기준" value={`생활비 예산 ${formatWon(profile?.discretionary_budget_krw || 800_000)}`} onClick={() => navigate(withDemo("/onboarding/baseline", demo))} />
-        <FieldRow icon={<Target />} label="목표" value={`${profile?.goal.name || "비상금"} · 현재 ${profile ? Math.round((profile.goal.current_amount_krw / profile.goal.target_amount_krw) * 100) : 70}%`} onClick={() => navigate(withDemo("/onboarding/goal", demo))} />
+        <FieldRow icon={<Wallet />} label="내 자금 기준" value={profile ? `생활비 예산 ${formatWon(profile.discretionary_budget_krw)}` : "기준 미설정"} onClick={() => navigate(withDemo("/onboarding/baseline", demo))} />
+        <FieldRow icon={<Target />} label="목표" value={profile ? `${profile.goal.name} · 현재 ${Math.round((profile.goal.current_amount_krw / Math.max(profile.goal.target_amount_krw, 1)) * 100)}%` : "목표 미설정"} onClick={() => navigate(withDemo("/onboarding/goal", demo))} />
         <FieldRow icon={<FileText />} label="데이터 방식" value="수기 입력 중 · 계좌 연결 준비 중" onClick={() => navigate(withDemo("/onboarding/source", demo))} />
       </Surface>
       <Surface className="settings-list privacy-settings"><h2>개인정보와 데이터</h2>

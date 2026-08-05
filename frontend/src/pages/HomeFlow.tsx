@@ -10,6 +10,7 @@ import {
   AppShell,
   BookkeeperMark,
   CategoryIcon,
+  CurrencyInput,
   Highlight,
   InfoCallout,
   ModePill,
@@ -21,7 +22,7 @@ import {
 import { useLedger } from "../ledger-context";
 import { Link, useNavigate, useParams } from "../router";
 import type { Transaction, TransactionDraft } from "../types";
-import { categoryNames, formatCompactWon, formatWon, withDemo } from "../utils";
+import { categoryNames, formatCompactWon, formatDate, formatTodayLabel, formatWon, withDemo } from "../utils";
 
 const MANUAL_DRAFT_KEY = "jangbu-manual-draft";
 const categories = ["cafe", "food", "transport", "shopping", "housing", "health", "other"];
@@ -45,7 +46,7 @@ export function HomePage() {
     <AppShell active="/" showAdd>
       <div className="screen home-screen">
         <header className="home-header">
-          <time>8월 3일 월요일</time>
+          <time>{demo ? "8월 3일 월요일" : formatTodayLabel()}</time>
           <Link to={withDemo("/settings", demo)}><ModePill enabled={settings.roast_enabled} /></Link>
         </header>
         <section className="home-hero reveal-1">
@@ -105,26 +106,33 @@ function todayForInput(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-function readManualDraft(): TransactionDraft {
+function manualDraftKey(demo: boolean): string {
+  return demo ? `${MANUAL_DRAFT_KEY}-demo` : MANUAL_DRAFT_KEY;
+}
+
+function readManualDraft(demo: boolean): TransactionDraft {
   try {
-    const saved = window.localStorage.getItem(MANUAL_DRAFT_KEY);
-    return saved ? (JSON.parse(saved) as TransactionDraft) : { amount_krw: 12_000, category: "cafe", merchant: "카페 온도" };
+    const saved = window.localStorage.getItem(manualDraftKey(demo));
+    if (saved) return JSON.parse(saved) as TransactionDraft;
   } catch {
-    return { amount_krw: 12_000, category: "cafe", merchant: "카페 온도" };
+    // Start from a safe blank draft if local storage is unavailable.
   }
+  return demo
+    ? { amount_krw: 12_000, category: "cafe", merchant: "카페 온도" }
+    : { amount_krw: 0, category: "other", merchant: "" };
 }
 
 export function ManualTransactionPage() {
   const { createTransaction, demo } = useLedger();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<TransactionDraft>(readManualDraft);
+  const [draft, setDraft] = useState<TransactionDraft>(() => readManualDraft(demo));
   const [date, setDate] = useState(todayForInput);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem(MANUAL_DRAFT_KEY, JSON.stringify(draft));
-  }, [draft]);
+    window.localStorage.setItem(manualDraftKey(demo), JSON.stringify(draft));
+  }, [demo, draft]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -137,7 +145,7 @@ export function ManualTransactionPage() {
     try {
       const occurredAt = new Date(`${date}T12:00:00+09:00`).toISOString();
       const result = await createTransaction({ ...draft, occurred_at: occurredAt });
-      window.localStorage.removeItem(MANUAL_DRAFT_KEY);
+      window.localStorage.removeItem(manualDraftKey(demo));
       if (result.pending_question) {
         navigate(withDemo(`/transactions/${result.transaction.transaction_id}/reason`, demo));
       } else {
@@ -156,7 +164,7 @@ export function ManualTransactionPage() {
       <form onSubmit={submit}>
         <section className="amount-entry">
           <h1>얼마 썼어?</h1>
-          <label><span className="sr-only">금액</span><input type="number" inputMode="numeric" value={draft.amount_krw} onChange={(event) => setDraft({ ...draft, amount_krw: Number(event.target.value) })} /><b>원</b></label>
+          <CurrencyInput className="composer-money-input" ariaLabel="금액" value={draft.amount_krw} onChange={(amount_krw) => setDraft({ ...draft, amount_krw })} />
         </section>
         <div className="transaction-type"><button type="button">수입</button><button className="selected" type="button">지출</button></div>
         <Surface className="composer-fields">
@@ -189,10 +197,10 @@ export function ManualTransactionPage() {
 
 export function ReasonPage() {
   const { transactionId = "" } = useParams();
-  const { answerReason, demo, getTransaction, transactions } = useLedger();
+  const { answerReason, demo, getTransaction, profile, summary, transactions } = useLedger();
   const navigate = useNavigate();
   const [transaction, setTransaction] = useState<Transaction | null>(transactions.find((item) => item.transaction_id === transactionId) ?? null);
-  const [reason, setReason] = useState("친구와 오랜만에 만나서 이야기할 곳이 필요했어.");
+  const [reason, setReason] = useState(demo ? "친구와 오랜만에 만나서 이야기할 곳이 필요했어." : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -215,20 +223,24 @@ export function ReasonPage() {
   }
 
   if (!transaction) return <div className="loading-screen">거래를 불러오는 중</div>;
+  const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
+  const budgetUsage = budget > 0 ? Math.round(((summary?.total_spent_krw ?? 0) / budget) * 100) : 0;
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const sameCategoryCount = Math.max(1, transactions.filter((item) => item.category === transaction.category && (demo || new Date(item.occurred_at).getTime() >= weekAgo)).length);
   return (
     <main className="standalone-screen reason-screen">
       <PageHeader title="이유 한 번만" close />
       <Surface className="reason-transaction">
         <CategoryIcon category={transaction.category} />
         <span><small>{categoryNames[transaction.category]}</small><strong>{transaction.merchant || "지출"}</strong></span>
-        <time>8월 3일</time>
+        <time>{formatDate(transaction.occurred_at)}</time>
         <b>{formatWon(transaction.amount_krw)}</b>
       </Surface>
       <section className="reason-hero">
         <div><h1>이 지출이<br />꼭 필요했던<br /><Highlight>이유</Highlight>가 뭐야?</h1></div>
         <BookkeeperMark />
       </section>
-      <div className="reason-signals"><span><i /> 생활비 예산 62% 사용</span><span><CalendarBlank size={19} /> 이번 주 카페 3번째</span></div>
+      <div className="reason-signals"><span><i /> 생활비 예산 {budgetUsage}% 사용</span><span><CalendarBlank size={19} /> 이번 주 같은 분류 {sameCategoryCount}번째</span></div>
       <label className="reason-box">
         <span className="sr-only">지출 이유</span>
         <textarea maxLength={120} value={reason} onChange={(event) => setReason(event.target.value)} />
@@ -236,7 +248,7 @@ export function ReasonPage() {
       </label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <PrimaryButton disabled={saving || !reason.trim()} onClick={() => void submit()}>{saving ? "판단하는 중" : "이유 보내기"}</PrimaryButton>
-      <button className="skip-reason" onClick={() => void submit()}>답하지 않고 기본 판단</button>
+      <button className="skip-reason" onClick={() => navigate(withDemo("/", demo))}>나중에 답하기</button>
     </main>
   );
 }

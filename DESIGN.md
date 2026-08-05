@@ -2,8 +2,8 @@
 
 ## Source of truth
 
-- Status: Draft - information architecture and visual candidate await user approval
-- Last refreshed: 2026-08-03
+- Status: Implemented - post-deployment correction release approved
+- Last refreshed: 2026-08-05
 - Product name: undecided; screen copy uses `내 장부` as a neutral working label
 - Primary product surfaces: mobile app first, responsive web second, Kakao transport retained as a thin secondary surface
 - Product contract: `TECHSPEC.md`
@@ -16,6 +16,7 @@
   - [Banksalad recommendation explanation](https://help.banksalad.com/129): recommendations expose the user's actual spending data and calculation basis
   - [Money Manager Google Play listing](https://play.google.com/store/apps/details?id=com.realbyteapps.moneymanagerfree): fast recording, budget comparison, account/card management, category and month statistics, quick-add patterns
   - [Smart Money Google Play listing](https://play.google.com/store/apps/details?id=com.dencreak.spbook): automatic message capture, budget, period/category statistics, and glanceable charts
+  - [Good Household Ledger Google Play listing](https://play.google.com/store/apps/details?id=cashbook.app.hs): selectable ledger/calendar views, quick search, category budgets, and configurable detail
 
 ## Design read
 
@@ -46,6 +47,14 @@ The home screen must answer four questions in this order:
 2. Am I on pace for my goal?
 3. Does the agent need one answer from me?
 4. What changed most recently?
+
+### Post-deployment correction rules
+
+- Benefit-first copy: explain what recording a purchase changes before explaining the agent metaphor.
+- Input before decoration: authentication and money-entry controls must appear before large character or editorial decoration.
+- Replaceable money: KRW inputs must allow a temporarily empty field and whole-value replacement; state validation happens on commit, not on every deleted digit.
+- Live-data integrity: zero is valid financial data. Demo amounts and dates can appear only in explicit demo mode.
+- One mark, one symbol: the bookkeeper avatar uses one icon with a separately laid-out label; layered icons and stamps are not an implementation target.
 
 ## Brand
 

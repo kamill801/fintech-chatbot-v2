@@ -77,12 +77,11 @@ For a frontend-only Vercel release, deploy from `frontend/`:
 
 ```bash
 cd frontend
-VITE_DEMO_DEFAULT=1 npm run build
-vercel env add VITE_DEMO_DEFAULT production --value 1 --yes --no-sensitive
+npm run test && npm run lint && npm run build
 vercel --prod --yes
 ```
 
-The first public Vercel release uses build-time demo mode because production authentication and the external Flask/Redis runtime are separate release gates. A successful frontend deployment does not prove financial persistence or live OpenAI judgment is configured.
+Production variables are managed in the Vercel dashboard or CLI and must never be inlined in a command committed to documentation. The public frontend defaults to live mode and calls the Render API; append `?demo=1` only for deterministic visual QA. A successful frontend deployment alone does not prove authenticated persistence or live OpenAI judgment quality.
 
 Current public frontend: `https://jangbu-ai.vercel.app`
 
@@ -129,4 +128,4 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 
 The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, Normal/Roast rendering, correction, reports, settings, offline draft retention, and redacted image sharing are connected.
 
-The trusted production authentication and deployment path is implemented locally. Supabase project `ijdodqldneduqeblkivo` is selected, its production site/redirect URL and email authentication are configured, and its public browser variables are registered in Vercel Production. Render and Upstash still require account sign-in, so Vercel remains intentionally demo-backed until the complete authenticated path passes live verification. A real financial-provider connection, live OpenAI quality evaluation, and money movement remain outside the verified MVP.
+The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Render health and Redis-backed readiness returned HTTP 200 on 2026-08-05, and the Vercel production alias serves the login build. A real authenticated transaction-to-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.

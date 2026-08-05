@@ -2,11 +2,11 @@
 
 ## Current State
 
-- Phase: 6 - trusted production backend and authentication setup
-- Active task: Task 6.0 - Supabase Auth, Render API, Upstash Redis, and Vercel live-mode connection
+- Phase: 6 - production hardening
+- Active task: Task 6.1 - release approved; production deployment in progress
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
-- Branch: `codex/ui-ux-foundation`
+- Branch: `main`
 - Sources of truth: `TECHSPEC.md` for product/backend invariants, `DESIGN.md` for UI/UX decisions
 - Last pre-pivot commit: `64b46ae`
 
@@ -215,7 +215,7 @@ Deploy the verified Vite/PWA frontend to Vercel production without misrepresenti
 - The existing Flask/RQ/Redis architecture and production authentication fail-closed contract are not weakened for deployment convenience.
 - Verification distinguishes Vercel frontend readiness from backend/live-AI readiness.
 
-## Task 6.0 - Trusted Production Backend Setup (Active)
+## Task 6.0 - Trusted Production Backend Setup (Provider configured; authenticated E2E pending)
 
 ### Goal
 
@@ -241,7 +241,8 @@ Replace the frontend-only demo boundary with a fail-closed production web path: 
 - [x] Replace the initial magic-link UX with user-approved email/password login and immediate signup.
 - [x] Add `render.yaml` with non-secret configuration, generated application secrets, and prompted provider credentials.
 - [x] Run backend/frontend tests, lint, build, compile, dependency audit, and a secret scan of the intended diff.
-- [ ] Configure and verify Supabase, Upstash, Render, and Vercel where provider authentication permits.
+- [x] Configure Supabase, Upstash, Render, and Vercel and verify public health/readiness where provider authentication permits.
+- [ ] Complete the authenticated production transaction-to-judgment E2E with an owner-controlled test account.
 - [x] Append `progress.txt` and create one scoped local commit without staging unrelated workspace files.
 
 ### Acceptance Criteria
@@ -255,6 +256,34 @@ Replace the frontend-only demo boundary with a fail-closed production web path: 
 - Upstash transport uses TLS and sensitive ledger payloads remain application-encrypted at rest.
 - The free Render deployment does not claim an always-on SLA and does not run the RQ/Kakao worker.
 - Local verification passes; provider deployment and real authenticated API behavior are reported separately with direct evidence or an explicit login/credential blocker.
+
+## Task 6.1 - Post-deployment UX Correction (Release approved)
+
+### Goal
+
+Correct the first production usability defects without changing the financial judgment contract: replace vague auth copy, simplify the overlapping bookkeeper mark, make KRW fields fully replaceable, and prevent demo values or fixed dates from appearing as live user data.
+
+### Scope
+
+- Refresh the login hero around the product's concrete benefit and keep the form visible earlier in the first viewport.
+- Render the bookkeeper as one canonical avatar mark with a separate optional label instead of overlapping icons and a stamp.
+- Add one reusable KRW input that supports an empty editing state, select-all replacement, digit-only input, formatted display, and explicit minimum validation.
+- Apply the KRW input to the baseline, goal, and manual transaction flows.
+- Replace hard-coded live month/date labels and truthy fallbacks that turn valid zero values into demo amounts.
+- Preserve demo fixtures only when explicit demo mode is active.
+- Run focused component tests, the full frontend suite, lint, build, and responsive visual QA.
+- Stop and report before commit, push, or deployment.
+
+### Acceptance Criteria
+
+- A user can clear `1`, type `800000`, and leave the field as `800,000원` without an inserted leading digit.
+- Mobile number inputs show no browser stepper and expose an appropriate numeric keyboard hint.
+- The login hero explains recording, budget/goal context, and reason-first judgment without implying money custody.
+- Every `BookkeeperMark` contains one avatar icon and no overlapping decorative icon.
+- Live zero spend, zero income, and empty category data remain zero or empty instead of showing demo fixtures.
+- Visible dates and month labels come from the current date or API summary outside explicit demo mode.
+- No backend judgment, Roast parity, authentication, privacy, or money-movement boundary changes.
+- Release only after explicit user approval; approval was granted on 2026-08-05.
 
 ## Archived Work
 

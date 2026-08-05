@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-The production web path is intentionally activated in dependency order. Keep `https://jangbu-ai.vercel.app` in demo mode until every verification gate below passes.
+The production web path is active at `https://jangbu-ai.vercel.app`. Use `?demo=1` only for isolated visual QA; the default production path uses Supabase authentication and the Render API.
 
 ## Topology
 
@@ -48,21 +48,21 @@ Supabase `service_role`, legacy JWT shared secrets, database passwords, Redis cr
 
 ## Activation Order
 
-1. Create or select a dedicated Supabase project. Configure the site URL as `https://jangbu-ai.vercel.app` and allow that exact redirect origin for email sign-in.
-2. Create an Upstash Redis database in the nearest practical region. Copy its TLS URL directly into the protected Render `REDIS_URL` field.
-3. Create the Render service from `render.yaml`. Enter the prompted Supabase URL, Redis URL, and OpenAI key without committing them.
-4. Verify `GET /health` and `GET /ready` on Render. Readiness must prove Redis connectivity.
-5. Configure the three public Supabase/API variables on Vercel, but keep `VITE_DEMO_DEFAULT=1` for the first integration deployment.
-6. Complete one real email sign-in and verify an authenticated profile read/write from the Vercel origin. Confirm missing, invalid, and development identity credentials still fail.
-7. Set `VITE_DEMO_DEFAULT=0`, redeploy Vercel, and repeat login, profile, transaction, judgment, sign-out, CORS, readiness, and cold-start checks.
+- [x] Select the dedicated Supabase project and configure the exact production site origin.
+- [x] Create the Upstash Redis database and place its TLS URL only in Render.
+- [x] Create the Render service from `render.yaml` with protected secrets.
+- [x] Verify Render `GET /health` and `GET /ready`; readiness proves current Redis connectivity.
+- [x] Configure Vercel's public API/Supabase variables and set `VITE_DEMO_DEFAULT=0`.
+- [x] Deploy the login-based live frontend at the production alias.
+- [ ] Complete an authenticated production profile read/write, transaction, reason, judgment, correction, sign-out, and live OpenAI quality check with an owner-controlled test account.
 
 ## Current Provider Status
 
-- Vercel frontend: deployed at `https://jangbu-ai.vercel.app`, still demo-backed.
-- Supabase: project `ijdodqldneduqeblkivo` is Healthy in Seoul. Email auth and email confirmation are enabled, Site URL and the sole redirect URL are `https://jangbu-ai.vercel.app`, and the public JWKS exposes one ES256 EC key with a key ID.
-- Vercel Supabase configuration: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are registered for Production only. No redeploy has been triggered yet.
-- Upstash: sign-in required; no database was created.
-- Render: sign-in required; no service was created.
-- Live authenticated API and live OpenAI judgment: not yet verified.
+- Vercel frontend: live-mode login is deployed at `https://jangbu-ai.vercel.app`. Production has `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_DEMO_DEFAULT` registered.
+- Supabase: project `ijdodqldneduqeblkivo` is Healthy in Seoul. Email/password authentication is enabled, email confirmation is disabled for immediate signup, and the public JWKS exposes an ES256 EC key with a key ID.
+- Upstash: the Free Redis database is provisioned in Tokyo. Credentials remain server-side in Render; a successful readiness response proves current connectivity.
+- Render: `https://jangbu-api.onrender.com` runs the Free Flask web service in Singapore. `GET /health` and `GET /ready` returned HTTP 200 on 2026-08-05.
+- OpenAI: the owner configured the server-side key in Render. A live model response and judgment-quality evaluation have not been independently verified.
+- Authenticated profile, transaction, reason, judgment, correction, and sign-out E2E remain a separate production verification gate.
 
 Provider dashboard state and free-tier terms can change. Re-check them at activation time and distinguish successful configuration from verified end-to-end behavior.

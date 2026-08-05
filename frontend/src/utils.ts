@@ -39,6 +39,40 @@ export function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
+export function formatTodayLabel(value = new Date()): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(value);
+}
+
+export function currentMonthKey(value = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(value);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  return year && month ? `${year}-${month}` : "";
+}
+
+export function formatMonthLabel(value: string): string {
+  const [year, month] = value.split("-").map(Number);
+  return Number.isInteger(year) && Number.isInteger(month) ? `${year}년 ${month}월` : value;
+}
+
+export function formatKoreanDate(value: string): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(value));
+}
+
 export function labelText(label: JudgmentLabel): string {
   return {
     justified: "납득 가능한 지출",

@@ -39,6 +39,14 @@ describe("LoginPage", () => {
     expect(screen.queryByText(/로그인 링크/)).not.toBeInTheDocument();
   });
 
+  it("leads with the next-spend benefit instead of an abstract judgment slogan", () => {
+    render(<LoginPage />);
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("쓴 돈은 기록하고,다음 소비는 더 나아지게.");
+    expect(screen.getByText(/과소비라고 단정하기 전에 이유부터 확인해요/)).toBeInTheDocument();
+    expect(screen.queryByText(/판단을 같이/)).not.toBeInTheDocument();
+  });
+
   it("creates an account only after both password fields match", async () => {
     const user = userEvent.setup();
     render(<LoginPage />);
