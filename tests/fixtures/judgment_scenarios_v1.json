@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "policy_version": "overspending-v1",
+  "cases": [
+    {
+      "case_id": "necessary-high-cost-purchase",
+      "description": "Necessary high-cost medical purchase should not be treated as discretionary overspending.",
+      "transaction": {"amount_krw": 280000, "category": "medical", "reason": "응급 진료비"},
+      "expected_label": "justified",
+      "requires_reason": false,
+      "tone_checks": ["normal_non_shaming", "roast_acknowledges_justified"]
+    },
+    {
+      "case_id": "repeated-low-cost-discretionary-spending",
+      "description": "Repeated cafe spending should surface recurrence and caution.",
+      "transaction": {"amount_krw": 8500, "category": "cafe", "reason": null},
+      "expected_label": "caution",
+      "requires_reason": true,
+      "tone_checks": ["normal_actionable", "roast_same_recommendation"]
+    },
+    {
+      "case_id": "emergency-expense",
+      "description": "Emergency expense explanation should preserve justified outcome.",
+      "transaction": {"amount_krw": 160000, "category": "transport", "reason": "가족 응급실 이동"},
+      "expected_label": "justified",
+      "requires_reason": false,
+      "tone_checks": ["roast_acknowledges_justified"]
+    },
+    {
+      "case_id": "goal-threatening-purchase",
+      "description": "Large discretionary purchase under goal pressure should be overspending.",
+      "transaction": {"amount_krw": 320000, "category": "shopping", "reason": "기분 전환"},
+      "expected_label": "overspending",
+      "requires_reason": true,
+      "tone_checks": ["same_label", "same_recommendation"]
+    },
+    {
+      "case_id": "reimbursable-purchase",
+      "description": "Reimbursable work purchase should rely on reason evidence.",
+      "transaction": {"amount_krw": 120000, "category": "shopping", "reason": "회사 비용으로 환급 예정"},
+      "expected_label": "justified",
+      "requires_reason": true,
+      "tone_checks": ["user_reason_factor"]
+    },
+    {
+      "case_id": "merchant-category-misclassification",
+      "description": "Category mismatch should be correctable without deleting original judgment.",
+      "transaction": {"amount_krw": 52000, "category": "unknown", "reason": "마트 장보기였음"},
+      "expected_label": "caution",
+      "requires_reason": true,
+      "tone_checks": ["correction_preserves_original"]
+    },
+    {
+      "case_id": "sparse-history",
+      "description": "Sparse history lowers confidence and asks one focused question.",
+      "transaction": {"amount_krw": 45000, "category": "food_delivery", "reason": null},
+      "expected_label": "insufficient_context",
+      "requires_reason": true,
+      "tone_checks": ["exactly_one_question"]
+    },
+    {
+      "case_id": "conflicting-explanation",
+      "description": "Conflicting explanation should include user_reason as evidence rather than raw text.",
+      "transaction": {"amount_krw": 90000, "category": "alcohol", "reason": "생필품이라고 했지만 술자리"},
+      "expected_label": "caution",
+      "requires_reason": true,
+      "tone_checks": ["sanitized_reason"]
+    },
+    {
+      "case_id": "normal-roast-parity",
+      "description": "Roast mode changes only the message string.",
+      "transaction": {"amount_krw": 70000, "category": "shopping", "reason": "필요한 옷 교체"},
+      "expected_label": "caution",
+      "requires_reason": true,
+      "tone_checks": ["same_artifact"]
+    },
+    {
+      "case_id": "false-positive-correction",
+      "description": "User correction appends audit evidence and keeps the original judgment.",
+      "transaction": {"amount_krw": 110000, "category": "education", "reason": "자격증 시험 교재"},
+      "expected_label": "justified",
+      "requires_reason": false,
+      "tone_checks": ["audit_append_only"]
+    }
+  ]
+}

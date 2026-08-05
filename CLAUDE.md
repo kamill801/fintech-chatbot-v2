@@ -1,45 +1,55 @@
-# fintech-chatbot V2
+# fintech-chatbot V2 - AI Household Ledger Agent
 
-카카오톡 기반 핀테크 챗봇. 페르소나: 70대 욕쟁이 할머니. Cleo 벤치마킹.
+Korean AI household-ledger backend. The primary product is a financial agent that tracks transactions, judges likely overspending, asks for missing context, and recommends one corrective action. The opt-in Roast mode changes tone only.
 
 ## Stack
-- Python 3.11.6, Flask + RQ + Redis
-- OpenAI Responses API (Assistants API에서 마이그레이션 중, 2026/8/26 종료)
-- 배포: Cloudtype / 로깅: Google Sheets
 
-## 작업 방식 (반드시 준수)
+- Python 3.11.6, Flask, RQ, Redis
+- OpenAI Responses API with strict JSON Schema
+- Redis Streams events plus encrypted projections
+- Manual transactions first; provider-neutral read-only account port
+- Optional redacted Google Sheets telemetry
 
-1. **TECHSPEC-First**: 코드 작업 전 반드시 @TECHSPEC.md 확인. 모호하면 사용자에게 질문.
-2. **PLAN 기반**: @PLAN.md의 active task만 작업. 여러 task 동시 진행 금지.
-3. **Get Bearings**: 매 세션 시작 시 pwd → progress.txt 마지막 블록 → @PLAN.md → `git log --oneline -10`.
-4. **Plan Mode**: 파일 수정 전 변경 계획 제시 → 사용자 승인 → 실행.
-5. **Incremental**: 한 세션 = 한 task = 한 커밋. 한 번에 다 하지 말 것.
-6. **Clean Exit**: 세션 종료 시 commit + progress.txt 추가 + PLAN.md 마킹 갱신.
-7. **Self-Verify**: 기능 완료 표시 전 end-to-end 테스트. 코드 read만으로 "완료" 판단 금지.
-8. **막히면 멈춘다**: 가정 기반 진행 금지. 환경변수/외부 API/비즈니스 로직은 반드시 질문.
+## Required Workflow
 
-## 절대 원칙
+1. Read `TECHSPEC.md` before code work.
+2. Work only on the active task in `PLAN.md`.
+3. Start each session with `pwd`, the final `progress.txt` block, `PLAN.md`, and `git log --oneline -10`.
+4. One session is one active task and one scoped commit.
+5. Append to `progress.txt`; never rewrite historical entries.
+6. Run end-to-end tests before marking backend behavior complete.
+7. Treat production credentials, providers, auth, deployment, and money movement as explicit approval boundaries.
 
-- @TECHSPEC.md는 immutable. 수정하려면 PLAN.md에 dedicated task 필요.
-- progress.txt는 **append-only**. 과거 항목 수정 금지.
-- 페르소나 작업 시:
-  - "필터 우회" 같은 표현 절대 금지 → 캐릭터 정당화로 대체
-  - 페르소나는 "지시"가 아니라 "예시"로 정의
-  - user_state는 매 턴 시스템 컨텍스트에 주입
-  - recent_messages는 user/assistant 페어로 저장
-  - 페르소나 리마인더는 사용자 메시지 *직전*에 sandwich
-- 건드리지 말 것: app.py, worker.py, sheets_logger.py (Phase 1 한정)
+## Product Invariants
 
-## 주요 문서
+- Accuracy comes before entertainment.
+- Deterministic signals are computed before the AI judgment.
+- Uncertain transactions ask exactly one focused reason question.
+- Roast defaults off and is immediately reversible.
+- Roast can change only the rendered message, never the judgment or recommendation.
+- Necessary spending remains justified in Roast mode.
+- The MVP can read, ask, judge, and advise; it cannot move money.
+- Manual transaction entry must work without an account provider.
+- Production account linkage stays disabled until separately approved.
+- Sensitive financial data is encrypted at rest.
+- Raw identifiers, amounts, merchants, reasons, balances, and chat text never enter logs, Sheets, metrics, shares, or model prompts outside the explicit TECHSPEC allowlist.
 
-- @PLAN.md — 작업 큐, 현재 active task
-- @TECHSPEC.md — 불변 명세
-- progress.txt — 세션 인수인계 노트 (append-only)
-- HANDOFF.md — V1→V2 전환 컨텍스트 (참고용)
+## Repository Boundaries
 
-## 잊지 마라
+- `ledger/domain`: pure domain types and ports; no Flask, Redis, RQ, OpenAI, requests, Kakao, or Sheets imports.
+- `ledger/application`: use-case orchestration, signal policy, and reason state machine.
+- `ledger/adapters`: storage, AI, and read-only account implementations.
+- `ledger/api.py` and `app.py`: thin HTTP transports.
+- `tasks.py`: thin Kakao/RQ transport.
+- `sheets_logger.py`: redacted allowlisted telemetry only.
 
-세션 시작 시 가장 먼저 progress.txt 마지막 블록을 읽는다. 
-TECHSPEC을 함부로 수정하지 않는다. 
-하나의 세션에 하나의 task만 작업한다.
-욕쟁이 할머니는 욕설 단어가 본질이 아니라 생활 비유 + 장부 검사 톤 + 정 많은 잔소리다.
+## Current Stop Boundary
+
+Complete and verify the backend, then stop. UI/UX, screen hierarchy, visual language, onboarding, transaction-capture interaction, Roast controls, reports, and share-card design must be defined with the user in the next approved phase.
+
+## Source Documents
+
+- `TECHSPEC.md`: immutable technical and product contract after the pivot.
+- `PLAN.md`: active task and verification queue.
+- `progress.txt`: append-only handoff history.
+- `HANDOFF.md`: current implementation handoff.

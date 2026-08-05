@@ -1,355 +1,749 @@
-# Technical Specification — fintech-chatbot
+# Technical Specification - AI Household Ledger Agent
 
-> **이 문서는 immutable입니다.**  
-> 변경하려면 PLAN.md에 "TECHSPEC 수정: <섹션>" task를 만들고 사용자 승인 받기.  
-> 작성일: 2026-04-30
+> This document is the backend source of truth after the 2026-08-01 product pivot.
+> Future changes require a dedicated PLAN.md task and explicit approval.
 
----
+## 1. Product Goal
 
-## 1. 목표 (What)
+Build a Korean AI household-ledger agent that understands a user's financial position and goal, tracks manually entered or read-only imported transactions, judges likely overspending, asks for missing purchase context, and recommends one concrete corrective action.
 
-카카오톡 채널에서 사용자가 소비 내역을 보고하면, 70대 국밥집 욕쟁이 할머니 페르소나가 잔소리 + 합리적 소비 코칭을 응답하는 핀테크 챗봇.
+The primary outcome is behavior change, not transaction storage alone.
 
-V1 MVP는 작동하지만 페르소나 일관성과 답변 품질이 부족함. V2의 목표는 인프라(Flask + Redis + RQ + 카카오 콜백)를 유지한 채로 LLM 응답 생성 방식을 개선하는 것.
+The product has two presentation modes:
 
-핵심 변경: OpenAI Assistants API → Responses API 전환 + 응답 하네스 재설계.
+- Normal: direct, non-shaming financial coaching.
+- Roast: opt-in Korean market-grandmother scolding.
 
----
+Roast is a presentation layer. It cannot change evidence, confidence thresholds, labels, or financial recommendations.
 
-## 2. 동기 (Why)
+## 2. Success Criteria
 
-### 시장 갭
-- Cleo (영국 핀테크 챗봇)의 "roast mode"가 한국 시장엔 없음
-- 기존 한국 가계부 앱들은 친절한 톤 일변도 → 사용자 행동 변화 유도력 약함
-- 욕쟁이 할머니 페르소나가 한국 정서에 맞는 차별화 포인트
+The MVP is successful only when all three product metrics can be measured:
 
-### V1의 실패 원인 (분석된 핵심 결함 4가지)
-1. Assistants API thread 영구보존 → 페르소나 드리프트 (50턴 후 톤 사라짐)
-2. user_state를 LLM에 안 보냄 → 일반론만 함, Cleo의 "구체성" 결여
-3. "필터 우회" 문구가 RLHF 방어모드 트리거 → 욕쟁이가 점점 친절해짐
-4. 관계 진화 축 부재 → 1턴 사용자/100턴 사용자 반응 동일
+1. Overspending judgment agreement is at least 85% on a versioned, human-labeled scenario set.
+2. Four-week pilot users reduce discretionary spending by at least 10% against their defined baseline.
+3. Intentional Roast-result shares are at least 10% of eligible Roast-result views.
 
-이 4가지가 전체 문제의 80%. V2에서 모두 해결.
+Backend completion before design requires:
 
----
+- Financial profile and one goal can be stored and retrieved.
+- Manual transactions work without any account provider.
+- Deterministic signals are computed before every final judgment.
+- Low or medium confidence causes exactly one transaction-bound reason question.
+- AI returns a structured final judgment.
+- Normal and Roast modes share one judgment artifact.
+- Corrections, audit events, views, and shares are recorded.
+- Sensitive data is encrypted at rest and excluded from external sinks by allowlist.
+- User data deletion and account revocation contracts exist.
+- Unit, integration, E2E, compile, and local API smoke checks pass.
 
-## 3. 범위 (Scope)
+## 3. Scope
 
-### In Scope (Phase 1)
-- OpenAI Responses API 전환
-- 새 프롬프트 V2 (예시 중심, 캐릭터 정당화)
-- recent_messages를 user/assistant 페어로 저장
-- 페르소나 리마인더 sandwich 패턴
-- 가벼운 응답 validator (3문장/금지어/1회 리라이트)
+### 3.1 In Scope
 
-### Out of Scope (Phase 1)
-- 본격 intent 분류 (LLM 기반) → Phase 2
-- turn_policy 모듈 → Phase 2
-- 친밀도 단계 명시 + 단계별 어조 → Phase 2
-- LLM 기반 상태 추출 (키워드 매칭 폐기) → Phase 2
-- JSON 구조화 출력 (visible_reply + state_update) → Phase 2
-- 장기 기억 RAG (이원적 요약 + 임베딩) → Phase 3
-- 이미지/영수증 처리 (별도 트랙)
-- 멀티 캐릭터 (다른 페르소나)
-- 음성 기능
-- 결제/구독
-- 멀티 사용자 스케일링 최적화
+- Financial profile: liquid assets, income, fixed expenses, debt payments, discretionary budget.
+- One active financial goal: name, target amount, current amount, target date.
+- Manual transaction entry as a first-class source.
+- Provider-neutral read-only account adapter port.
+- Synthetic provider adapter for contract tests.
+- Deterministic financial signals.
+- OpenAI Responses API strict JSON Schema judgment.
+- Deterministic fallback judgment when OpenAI is unavailable.
+- One-question reason workflow.
+- Normal and Roast rendering from the same judgment.
+- User agreement/disagreement and corrected labels.
+- Privacy-safe share payload and share metrics.
+- Append-only audit events and current-state projections.
+- Legacy Redis state import without creating fake monetary transactions.
+- KakaoTalk webhook/RQ compatibility as a thin transport.
+- Versioned JSON REST API for future UI use.
+- Supabase Auth for the production web user identity boundary.
+- Vercel web frontend, Render Flask API, and Upstash Redis production topology.
 
-### 가정 (Assumptions)
-- OpenAI API 키와 Responses API 접근 가능
-- Assistants API는 2026년 8월 26일 종료 → 그 전에 마이그레이션 완료
-- 기존 인프라(Flask + Redis + RQ + 카카오 콜백 + Google Sheets) 유지
-- 카카오톡 5초 룰은 비동기 콜백으로 이미 해결됨
-- 사용자는 한국어로 입력하고 한국어로 응답받음
-- few-shot 예시는 한국어로 작성
+### 3.2 Out of Scope
 
----
+- Native mobile apps and additional visual redesign beyond the approved web/PWA.
+- Production financial-data provider selection, contract, or paid integration.
+- Paid uptime, background-worker, or data-residency guarantees.
+- Payment blocking, transfers, automatic savings, or investment orders.
+- Any autonomous movement of money.
+- Investment, insurance, credit, or loan product recommendations.
+- Receipt or image processing.
+- Multiple personas.
+- Production Open Banking or MyData launch approval.
 
-## 4. 사용자 / 페르소나
+### 3.3 Stop Boundary
 
-### 주요 사용자
-- 20~30대 한국어 사용자
-- 카카오톡으로 소비 내역을 보고하고 싶은 사람
-- 친절한 가계부 앱에 지친 사람, 감정적 자극 통한 행동 변화를 원하는 사람
+Stop and report after the backend and its tests are complete. Do not begin UI/UX decisions. The next phase must start with the user and cover information architecture, onboarding, transaction capture, agent conversation, Roast toggle, reports, and sharing.
 
-### 캐릭터 페르소나 (욕쟁이 할머니)
-- 70대 국밥집 50년 운영
-- 입은 험하지만 손주 챙기듯 진심으로 사용자의 경제적 자립을 돕고 싶어 함
-- 알고 보면 미국 우량주/ETF 장기투자로 큰 돈 굴리는 "숨은 투자 고수"
-- 거친 말투는 욕설이 아니라 한국 시장통 세대의 애정 표현
-- 핵심: 욕설 단어가 아니라 **생활감 있는 비유 + 장부 검사 톤 + 정 많은 잔소리**
+## 4. Product Invariants
 
----
+1. Accuracy before entertainment.
+2. Roast defaults off and is immediately reversible.
+3. Roast never changes a judgment or recommended action.
+4. Missing context triggers one focused question before a final accusation.
+5. Justified purchases remain justified in Roast mode.
+6. The MVP is read-and-advise only.
+7. User corrections append evidence; they never erase the original judgment.
+8. Production startup fails closed when encryption, pseudonymization, or authentication trust is missing.
+9. Production account linkage remains disabled until separately approved.
+10. Raw sensitive financial data never enters Sheets, structured logs, metrics, or share payloads.
 
-## 5. 시스템 아키텍처
+## 5. Architecture
 
-### 다이어그램 (V2)
+### 5.1 Selected Architecture
 
+Use a modular monolith that preserves Flask, RQ, and Redis:
+
+```text
+Vercel web/PWA or KakaoTalk
+        |
+        v
+Flask transports: app.py + ledger/api.py
+        |
+        v
+ledger/application/service.py
+        |
+        +--> profile and goal use cases
+        +--> transaction ingestion
+        +--> deterministic signals
+        +--> reason-question state machine
+        +--> structured AI judgment
+        +--> mode-specific rendering
+        +--> correction/share/deletion use cases
+        |
+        v
+Repository ports
+        |
+        +--> Redis Streams + projections
+        +--> InMemory repository for tests
+
+Supabase Auth: web JWT issuer only; Flask verifies the token locally
+Render web service: Flask API only on the free MVP deployment
+RQ worker: async Kakao callback adapter only; not deployed on the free web MVP
+Upstash: TLS Redis storage with application-encrypted sensitive payloads
+External sinks: centralized privacy allowlist first
 ```
-KakaoTalk
-  ↓
-Flask /question (app.py)
-  ↓
-Redis Queue (kakao)
-  ↓
-RQ Worker (worker.py)
-  ↓
-process_kakao_message (tasks.py)
-  ├─→ load_user_state (Redis)
-  ├─→ load_recent_messages (Redis)
-  ├─→ build_context (sandwich 조립)
-  │    ├─ Static Persona (prompts/persona.md)
-  │    ├─ Few-shot Examples (prompts/few_shot.md)
-  │    ├─ User State Summary
-  │    ├─ Recent Messages (user/assistant 페어)
-  │    └─ Persona Reminder (prompts/reminder.md)
-  ├─→ Responses API 호출 (OpenAI)
-  ├─→ validate_reply (3문장/금지어 체크)
-  ├─→ rewrite_if_needed (1회 한정)
-  ├─→ save_recent_messages (user + assistant 페어)
-  ├─→ save_user_state (키워드 매칭 누적)
-  ├─→ Google Sheets 로그 저장
-  └─→ 카카오 callback 전송
+
+### 5.2 Rejected Alternatives
+
+- Extend legacy user_state JSON: rejected because it cannot reliably replay events, enforce idempotency, or preserve correction history.
+- Split microservices: rejected because it adds deployment and coordination cost before product validation.
+- Add Postgres now: deferred. SQL is stronger for cross-user reporting, but Redis is the current production dependency. The event schema must remain portable to a later Postgres migration.
+
+### 5.3 Required File Boundaries
+
+```text
+ledger/
+  domain/
+    models.py
+    events.py
+    ports.py
+  application/
+    service.py
+    signals.py
+    state_machine.py
+  adapters/
+    memory.py
+    redis_store.py
+    manual.py
+    synthetic.py
+    openai_judge.py
+  api.py
+  factory.py
+  privacy.py
+  rendering.py
+  telemetry.py
+
+tests/
+  fixtures/judgment_scenarios_v1.json
+  unit/
+  integration/
+  e2e/
 ```
 
-### 컴포넌트
-- **app.py**: 카카오 웹훅 수신, RQ 큐 등록 (수정 안 함)
-- **worker.py**: RQ 워커 (수정 안 함)
-- **tasks.py**: LLM 호출 + 상태 관리 + 응답 처리 (대대적 리팩토링)
-- **sheets_logger.py**: Google Sheets 로깅 (수정 안 함)
-- **prompts/persona.md**: Static Persona 정의 (신규)
-- **prompts/few_shot.md**: Few-shot 예시 모음 (신규)
-- **prompts/reminder.md**: 사용자 메시지 직전 reinjection (신규)
+Domain modules cannot import Flask, Redis, RQ, OpenAI, requests, Kakao code, or Google Sheets code.
 
-### 데이터 흐름
-1. 사용자 카카오톡 메시지 → Flask /question → Redis Queue
-2. Worker가 큐에서 작업 꺼냄
-3. Redis에서 user_state, recent_messages 로드
-4. 컨텍스트 조립 (sandwich 패턴)
-5. Responses API 호출 → 응답 받음
-6. Validator 검사 → 실패 시 1회 리라이트
-7. user 메시지 + assistant 응답 → recent_messages에 페어로 저장
-8. Sheets 로그 + 카카오 callback 전송
+## 6. Domain Model
 
----
+Money is stored as integer KRW. Timestamps are timezone-aware ISO 8601 UTC strings.
 
-## 6. 기술 스택 / 의존성
-
-### LLM
-- Provider: OpenAI
-- API: Responses API (`client.responses.create()`)
-- 모델: `gpt-4o` 또는 `gpt-4o-mini` (Phase 1에서 비용 vs 품질 검증 후 결정)
-- 호출 방식: 매 턴 컨텍스트 직접 조립, thread 사용 안 함
-
-### 백엔드
-- Python 3.11.6
-- Flask (웹훅 수신)
-- RQ (Redis Queue, 비동기 작업)
-- openai 라이브러리 (Responses API 지원 버전)
-- redis-py
-- python-dotenv
-
-### 데이터 / 상태 저장
-- Redis (사용자 상태, 최근 메시지, 세션 데이터)
-- 키 패턴:
-  - `user_state:{user_id}` → 사용자 상태 JSON
-  - 기존 `thread:{user_id}` → 사용 안 함 (Phase 1 끝나면 정리)
-
-### 외부 서비스
-- 카카오톡 웹훅
-- Google Sheets API (로깅)
-- OpenAI Responses API
-
-### 배포
-- 환경: Cloudtype
-- Python 3.11.6
-- Gunicorn
-
----
-
-## 7. 데이터 모델
-
-### user_state (Redis: `user_state:{user_id}`)
+### 6.1 FinancialProfile
 
 ```json
 {
-  "emotion_tags": ["stress", "impulse"],
-  "spending_categories": {
-    "food_delivery": 5,
-    "cafe": 3
+  "user_ref": "pseudonymous-id",
+  "monthly_income_krw": 3500000,
+  "liquid_assets_krw": 10000000,
+  "fixed_expenses_krw": 1400000,
+  "monthly_debt_payment_krw": 300000,
+  "discretionary_budget_krw": 800000,
+  "goal": {
+    "goal_id": "uuid",
+    "name": "비상금",
+    "target_amount_krw": 10000000,
+    "current_amount_krw": 3000000,
+    "target_date": "2027-12-31"
   },
-  "monthly_data": {
-    "2026-04": {
-      "food_delivery": 12,
-      "cafe": 8
-    }
-  },
-  "recent_messages": [
-    {"role": "user", "content": "오늘 배달 18000원 씀"},
-    {"role": "assistant", "content": "옘병, 또 배달이여?"}
-  ]
+  "created_at": "UTC timestamp",
+  "updated_at": "UTC timestamp",
+  "schema_version": 1
 }
 ```
 
-**Phase 1 핵심 변경**: `recent_messages`가 문자열 배열에서 `{role, content}` 객체 배열로 바뀜.
+Validation:
 
-**Phase 2 추가 예정 필드** (Phase 1엔 없음):
-- `current_phase`, `pending_question`, `relationship_level`, `char_state` 등
+- All money fields are non-negative integers.
+- Monthly fixed expenses plus debt payments may exceed income, but this creates a high goal-pressure signal.
+- Discretionary budget must be positive.
+- Goal target amount must exceed or equal current amount.
+- Goal target date cannot be before the current date when first created.
 
-### Phase 1에서 안 만드는 것
-- 별도 monthly_budget, remaining_budget 필드 (단순 카운트만)
-- structured_state JSON 출력 (Phase 2)
+### 6.2 UserSettings
 
----
-
-## 8. 인터페이스
-
-### 입력
-- 카카오톡 웹훅 POST `/question`
-- Body: `{"userRequest": {"utterance": "...", "user": {"id": "..."}, "callbackUrl": "..."}}`
-
-### 출력
-- 카카오톡 callback URL로 POST
-- Body: `{"version": "2.0", "template": {"outputs": [{"simpleText": {"text": "..."}}]}}`
-- 응답 길이: 1~3문장
-
-### 에러 처리
-- LLM 호출 실패 → fallback 답변 ("옘병, 말이 길어졌다. 다시 말해봐라.")
-- Redis 연결 실패 → 카카오에 에러 메시지 전송
-- Validator 1회 리라이트 실패 → fallback 답변
-
----
-
-## 9. 성공 기준 (Success Criteria)
-
-> 이 섹션이 feature_list.json의 source of truth.
-
-### Phase 1 완료 기준
-
-**기능적 기준**:
-- [ ] F001: Responses API 호출이 정상 작동 (Assistants API 호출 0회)
-- [ ] F002: 50턴 연속 대화 후에도 페르소나 톤 유지 (생활 비유, 장부 검사 느낌)
-- [ ] F003: recent_messages가 user/assistant 페어로 Redis에 저장됨
-- [ ] F004: 응답이 1~3문장 이내로 유지됨 (95% 이상)
-- [ ] F005: 금지어("제가 도와드릴게요", "요약하자면" 등) 응답 0회
-- [ ] F006: 페르소나 리마인더가 사용자 메시지 직전에 sandwich됨
-
-**품질 기준** (수동 평가):
-- [ ] F007: 12개 테스트 케이스 (Section 10.5 참조) 통과
-- [ ] F008: 절약 성공 보고 시 퉁명스러운 칭찬 (욕만 X)
-- [ ] F009: 감정 토로 시 정 묻은 반응 (욕만 X)
-- [ ] F010: 소비 이유 모를 때 조언 안 하고 이유부터 추궁
-
-### 평가 시 금지 항목 (중요)
-- ❌ 특정 욕설 단어("옘병", "썩을 놈" 등)가 계속 나오는지 평가하지 말 것
-- ✅ 평가해야 할 것: 생활 비유, 장부 검사 톤, 정 많은 잔소리, 소비 맥락 반영
-
----
-
-## 10. Phase 분해
-
-### Phase 1: Responses API 전환 + 프롬프트 V2 + Validator (목표 4커밋)
-
-**Commit 1: Responses API 단순 전환**
-- Assistants API thread/run/polling 로직 제거
-- `client.responses.create()` 호출로 교체
-- 기존 프롬프트는 그대로 시스템 메시지로 전달
-- 검증: 카카오톡으로 1~3턴 대화 → 응답 정상
-
-**Commit 2: recent_messages user/assistant 페어 저장**
-- `update_emotion_state`에서 user 메시지만 append하던 것 변경
-- user 메시지 + assistant 응답을 페어로 저장
-- 최근 10턴 (= 20 메시지) 유지
-- 응답 생성 시 페어를 컨텍스트에 포함
-- 검증: Redis 직접 확인 + 멀티턴 대화에서 맥락 유지
-
-**Commit 3: 새 프롬프트 V2 + Few-shot + Persona Reminder**
-- `prompts/persona.md` 작성 (Static Persona, 캐릭터 정당화)
-- `prompts/few_shot.md` 작성 (10~12개 예시, 다양한 시나리오)
-- `prompts/reminder.md` 작성 (3~5줄, 사용자 메시지 직전 sandwich용)
-- few-shot 선택은 간단 키워드 매칭 (배달/커피/택시/쇼핑/저축)
-- user_state 요약을 시스템 메시지로 단순 주입
-- "필터 우회" 문구 제거, 캐릭터 정당화로 대체
-- 검증: 50턴 연속 대화 후 톤 유지 확인
-
-**Commit 4: Response Validator + 리라이트**
-- 3문장 초과 검사
-- 금지어 체크 (`제가 도와드릴게요`, `요약하자면`, `결론적으로`, `AI로서`, `안녕하세요`, `도움이 필요하시면`)
-- 1회 리라이트 시도
-- 실패 시 fallback 답변
-- 검증: 일부러 길이/금지어 유발하는 입력 시도
-
-### Phase 2 (예정): JSON 구조화 출력 + turn_policy + 친밀도
-- visible_reply + state_update JSON 분리 (Responses API structured output)
-- turn_policy 모듈 (코드가 매 턴 목표/제약 결정)
-- 친밀도 단계 명시 + 단계별 어조
-- LLM 기반 상태 추출 (키워드 매칭 폐기)
-- 입력 타입 구분 (open-ended vs 트랜잭션)
-
-### Phase 3 (예정): 장기 기억 RAG
-- 이원적 요약 (관계 + 사용자 상태)
-- 메모리 필터링 (실시간 데이터 충돌 처리)
-- Redis Stack RediSearch 또는 외부 벡터 DB
-- 임베딩 기반 유사도 검색
-
----
-
-## 10.5 Phase 1 테스트 케이스
-
-```
-1. 이번 달 예산 50만원이야         (예산 설정)
-2. 오늘 배달 18000원 씀             (소비 보고)
-3. 오늘도 배달 시켰어 22000원       (반복 소비)
-4. 스트레스 받아서 치킨 시켰어      (스트레스성 소비)
-5. 커피 5800원 마셨어               (작은 소비)
-6. 오늘 커피 안 사고 참았어         (절약 성공)
-7. 택시비 13000원 나갔어            (교통)
-8. 택시 38000원 썼어                (고액 교통)
-9. 코트 23만원 질렀어               (고액 쇼핑)
-10. 너무 세게 말하지 마             (말투 조절 요청)
-11. 이번 주 결산해줘                (리포트 요청)
-12. 요즘 너무 힘들어서 돈 막 쓰게 돼  (감정 토로)
+```json
+{
+  "roast_enabled": false,
+  "locale": "ko-KR",
+  "timezone": "Asia/Seoul",
+  "schema_version": 1
+}
 ```
 
-추가:
-- 13. 30턴 연속 대화 후 톤 유지 (시작 톤 vs 30턴 후 톤 비교)
-- 14. 50턴 연속 대화 후 톤 유지 (실제 페르소나 드리프트 측정)
+### 6.3 Transaction
 
----
+```json
+{
+  "transaction_id": "uuid",
+  "user_ref": "pseudonymous-id",
+  "amount_krw": 120000,
+  "merchant": "encrypted raw merchant or null",
+  "category": "shopping",
+  "description": "encrypted optional text",
+  "occurred_at": "UTC timestamp",
+  "source": "manual",
+  "source_reference": null,
+  "reason": null,
+  "status": "recorded",
+  "created_at": "UTC timestamp",
+  "schema_version": 1
+}
+```
 
-## 11. 핵심 결정 사항 (Decisions Log)
+Allowed source values: manual, synthetic, provider_readonly, legacy.
 
-| # | 결정 | 옵션 | 선택 | 이유 | 날짜 |
-|---|------|------|------|------|------|
-| 1 | LLM Provider | OpenAI / Anthropic | OpenAI 유지 | Claude로 갈아타면 토큰 결제 또 필요 | 2026-04-29 |
-| 2 | OpenAI API | Assistants / Chat Completions / Responses | Responses API | Assistants 4개월 후 종료, Responses가 새 표준 | 2026-04-29 |
-| 3 | 메모리 트릭 | 정규식 메타데이터 / JSON 구조화 출력 | JSON 구조화 (Phase 2) | OpenAI/Claude 둘 다 안정적 | 2026-04-29 |
-| 4 | 페르소나 정의 | 단계 지시 / Few-shot 예시 | Few-shot 예시 | 모델은 지시보다 예시 따름 | 2026-04-29 |
-| 5 | 편향 억제 | 필터 우회 / 캐릭터 정당화 | 캐릭터 정당화 | RLHF 방어모드 회피 | 2026-04-29 |
-| 6 | 컨텍스트 조립 | 단방향 / Sandwich | Sandwich (앞뒤 reinjection) | Lost in the middle 방어 | 2026-04-29 |
-| 7 | Phase 1 커밋 수 | 6커밋 / 4커밋 | 4커밋 | 빠른 검증 후 다음 결정 | 2026-04-30 |
-| 8 | 프롬프트 형식 | Python 모듈 / 마크다운 파일 | 마크다운 파일 | 프롬프트 튜닝 시 코드 안 건드려도 됨 | 2026-04-30 |
-| 9 | Phase 1 intent 분류 | LLM 기반 / 키워드 매칭 / 안 함 | 간단 키워드 매칭 (few-shot 선택용만) | LLM 호출 2배 회피, Phase 2에서 JSON으로 통합 | 2026-04-30 |
+Allowed status values: recorded, awaiting_reason, judged, corrected.
 
----
+### 6.4 DeterministicSignalSet
 
-## 12. 참고 자료
+```json
+{
+  "budget_usage_after": 0.72,
+  "transaction_budget_share": 0.15,
+  "goal_pressure": 0.55,
+  "baseline_deviation": 1.4,
+  "recurrence_30d": 3,
+  "essentiality": 0.2,
+  "risk_score": 0.61,
+  "data_confidence": 0.66,
+  "requires_reason": true,
+  "factors": ["budget_usage", "goal_pressure"]
+}
+```
 
-- Cleo: https://meetcleo.com (메모리 블로그, Sifted 인터뷰)
-- 크랙 (뤼튼): https://help.crack.wrtn.ai (공식 헬프 문서, 유저 커뮤니티)
-- RisuAI: https://namu.wiki/w/RisuAI (Hypa Memory)
-- ChatHaruhi: https://github.com/LC1332/Chat-Haruhi-Suzumiya
-- Character-LLM (EMNLP 2023): https://github.com/choosewhatulike/trainable-agents
-- arXiv 2511.00222 (2025): persona drift 측정
-- arXiv 2501.09959: Multi-Turn LLM Survey, LOCOMO 벤치마크
-- Anthropic Effective Harnesses (Nov 2025)
-- Anthropic Harness Design (Mar 2026)
-- OpenAI Responses API: https://platform.openai.com/docs/guides/migrate-to-responses
+All ratios and scores are clamped to documented ranges. Signals are evidence, not the final label.
 
----
+### 6.5 JudgmentResult
 
-## 13. 변경 이력
+```json
+{
+  "judgment_id": "uuid",
+  "transaction_id": "uuid",
+  "label": "caution",
+  "confidence": 0.81,
+  "rationale": "목표 달성 속도를 늦추지만 필수 지출은 아니다.",
+  "recommended_action": "이번 주 외식 예산에서 같은 금액을 줄인다.",
+  "decision_factors": ["goal_pressure", "user_reason"],
+  "normal_message": "...",
+  "roast_message": "...",
+  "fallback_used": false,
+  "model": "configured model or deterministic-fallback-v1",
+  "policy_version": "overspending-v1",
+  "created_at": "UTC timestamp",
+  "schema_version": 1
+}
+```
 
-| 날짜 | 변경 내용 | 관련 PLAN task | 승인자 |
-|------|-----------|---------------|--------|
-| 2026-04-30 | 초안 작성 (V2 통합본 → TECHSPEC 형식 변환) | Task 0.1 | 사용자 |
+Allowed labels: justified, caution, overspending, insufficient_context.
+
+### 6.6 PendingQuestion
+
+```json
+{
+  "question_id": "uuid",
+  "transaction_id": "uuid",
+  "question": "이 지출이 꼭 필요했던 이유가 뭐야?",
+  "asked_at": "UTC timestamp",
+  "answered_at": null,
+  "attempt_count": 0
+}
+```
+
+A transaction can create at most one PendingQuestion.
+
+## 7. Event and Storage Contract
+
+### 7.1 Event Envelope
+
+```json
+{
+  "event_id": "uuid",
+  "user_ref": "HMAC-derived pseudonym",
+  "event_type": "transaction.recorded",
+  "schema_version": 1,
+  "created_at": "UTC timestamp",
+  "source": "api",
+  "correlation_id": "uuid",
+  "idempotency_key": "client key",
+  "redacted_metadata": {},
+  "encrypted_payload": "Fernet ciphertext"
+}
+```
+
+### 7.2 Event Types
+
+- profile.upserted
+- settings.roast_changed
+- transaction.recorded
+- judgment.reason_requested
+- transaction.reason_added
+- judgment.completed
+- judgment.corrected
+- share.viewed
+- share.clicked
+- account.revoked
+- legacy.imported
+- data.deletion_requested
+
+### 7.3 Redis Keys
+
+```text
+ledger:{user_ref}:events                         Redis Stream
+ledger:{user_ref}:profile                        encrypted JSON
+ledger:{user_ref}:settings                       encrypted JSON
+ledger:{user_ref}:transactions                   sorted set by occurred_at
+ledger:{user_ref}:transaction:{transaction_id}   encrypted JSON
+ledger:{user_ref}:judgment:{judgment_id}         encrypted JSON
+ledger:{user_ref}:correction:{judgment_id}       encrypted latest correction projection
+ledger:{user_ref}:pending_question               encrypted JSON
+ledger:{user_ref}:idempotency:{key}              encrypted cached result
+ledger:{user_ref}:legacy_imported                 marker
+```
+
+Repository writes must append the event and update projections atomically with a Redis pipeline transaction where supported.
+All mutations for one user are serialized by one user-scoped Redis lock. This prevents two different idempotency keys from overwriting the single active pending question while allowing different users to proceed independently.
+
+### 7.4 Idempotency
+
+- POST and DELETE endpoints require Idempotency-Key.
+- Repeated keys return the original status and body without adding another event.
+- Production Kakao/RQ requires a verified platform request/job identifier and derives the idempotency key from it. Development/test may generate a temporary identifier only for local execution.
+- Idempotency records follow the same retention and deletion policy as user data.
+
+### 7.5 Legacy Import
+
+On first access:
+
+1. Check ledger:{user_ref}:legacy_imported.
+2. Read legacy user_state:{raw_transport_user_id} only inside the transport migration boundary.
+3. Import only category counts, emotion labels, and message-count metadata.
+4. Do not create fake monetary transactions.
+5. Emit one legacy.imported event and marker.
+6. Preserve the old key for rollback until a separately approved cleanup task.
+
+## 8. Judgment Pipeline
+
+### 8.1 Initial Signal Formula
+
+The first calibrated policy uses:
+
+```text
+risk_score = clamp(
+    0.30 * budget_usage_after
+  + 0.25 * transaction_budget_share
+  + 0.20 * goal_pressure
+  + 0.15 * normalized_baseline_deviation
+  + 0.10 * normalized_recurrence
+  - 0.25 * essentiality,
+  0,
+  1
+)
+```
+
+Initial reason-question triggers:
+
+- risk_score is between 0.35 and 0.75 inclusive; or
+- category is unknown; or
+- a high-budget-share transaction lacks a reason; or
+- profile/history completeness produces data_confidence below 0.75.
+
+Policy term definitions for `overspending-v1`:
+
+- `normalized_baseline_deviation = clamp(baseline_deviation / 2, 0, 1)`.
+- `normalized_recurrence = clamp(recurrence_30d / 5, 0, 1)`.
+- History is sparse until three prior transactions exist.
+- `data_confidence` starts at 1.0, subtracts 0.35 for an incomplete profile and 0.30 for sparse history, then clamps to 0..1.
+- `goal_pressure` is required monthly goal savings divided by disposable monthly income, clamped to 0..1. Required monthly savings is the remaining goal gap divided by remaining months. Disposable income is income minus fixed expenses and debt payments.
+- When fixed expenses plus debt payments meet or exceed income, `goal_pressure` is 1.0.
+
+Weights and thresholds may change only through a versioned policy and labeled evaluation.
+
+### 8.2 State Machine
+
+```text
+transaction.recorded
+  -> signals_computed
+  -> awaiting_reason | judged
+
+awaiting_reason
+  -> reason_added
+  -> judged
+
+judged
+  -> corrected
+```
+
+Rules:
+
+- Profile absence rejects transaction creation with profile_required.
+- Exactly one reason question is permitted per transaction.
+- At most one unanswered reason question may exist per user; concurrent attempts are serialized and cannot overwrite it.
+- A repeated reason submission is idempotent.
+- Corrections append an audit event and update a separate latest-correction projection. Reads expose original_label, effective_label, and correction while the original judgment remains immutable.
+- Roast state is read only during rendering.
+
+### 8.3 AI Input Allowlist
+
+OpenAI receives only:
+
+- transaction amount or amount bucket;
+- normalized category;
+- deterministic ratios and factor names;
+- recurrence count;
+- sanitized user reason;
+- policy version.
+
+OpenAI never receives:
+
+- raw user identifier or user_ref;
+- account number, provider token, or source reference;
+- exact asset, income, balance, debt, or fixed-expense values;
+- raw merchant name;
+- unsanitized free text;
+- unrelated chat history.
+
+### 8.4 OpenAI Responses Contract
+
+Use client.responses.create with store=false and strict JSON Schema output.
+
+Required output fields:
+
+- label
+- confidence
+- rationale
+- recommended_action
+- decision_factors
+- normal_message
+- roast_message
+
+If the response fails schema validation, retry once with the same allowlisted input. If the retry fails or OpenAI is unavailable, use deterministic-fallback-v1 and set fallback_used=true.
+
+Fallback judgments are auditable and usable for continuity, but excluded from the 85% live-AI agreement claim.
+
+## 9. Rendering and Roast Safety
+
+Both messages are generated from one JudgmentResult.
+
+Normal mode:
+
+- direct and non-shaming;
+- explains the deciding factors;
+- gives one concrete next action.
+
+Roast mode:
+
+- opt-in and default off;
+- Korean market-grandmother character;
+- household metaphors, ledger-inspection tone, and caring scolding;
+- may be provocative but cannot use credible threats, protected-trait abuse, self-harm encouragement, poverty/debt humiliation, or coercion;
+- must acknowledge justified purchases;
+- cannot reveal sensitive financial values.
+
+Rendered output validation is separate from judgment policy. A renderer failure cannot change label or recommended action.
+
+## 10. Read-only Account Adapter
+
+The domain port supports only:
+
+- list_connections
+- fetch_balances
+- fetch_transactions
+- revoke_connection
+
+No transfer, payment, withdrawal, savings execution, or order method may exist in the MVP port.
+
+Implementations in this milestone:
+
+- ManualTransactionSource
+- SyntheticReadOnlyAccountAdapter
+- DisabledProductionAccountAdapter
+
+Production provider access returns provider_unavailable until a separately approved integration task is completed.
+
+## 11. REST API Contract
+
+All JSON responses use:
+
+```json
+{"data": {}, "meta": {"correlation_id": "uuid"}}
+```
+
+Errors use:
+
+```json
+{"error": {"code": "machine_code", "message": "safe message"}, "meta": {"correlation_id": "uuid"}}
+```
+
+Routes:
+
+- GET /health: process liveness.
+- GET /ready: repository/config readiness.
+- GET /api/v1/me/profile
+- PUT /api/v1/me/profile
+- GET /api/v1/me/settings
+- PUT /api/v1/me/settings
+- GET /api/v1/me/transactions
+- POST /api/v1/me/transactions
+- GET /api/v1/me/transactions/{transaction_id}
+- POST /api/v1/me/transactions/{transaction_id}/reason
+- POST /api/v1/me/judgments/{judgment_id}/corrections
+- POST /api/v1/me/judgments/{judgment_id}/share-view
+- POST /api/v1/me/judgments/{judgment_id}/share
+- GET /api/v1/me/summary
+- GET /api/v1/me/metrics
+- POST /api/v1/me/accounts/{connection_id}/revoke
+- DELETE /api/v1/me/data
+
+Transaction creation returns:
+
+- 201 with judgment when no reason is needed.
+- 202 with pending_question when a reason is required.
+- 409 profile_required when onboarding is incomplete.
+
+### 11.1 Authentication Boundary
+
+- development/test: X-User-Id is accepted only when APP_ENV is development or test and ALLOW_DEV_AUTH=1.
+- production: X-User-Id is always rejected.
+- production web authentication uses `Authorization: Bearer <access-token>` issued by Supabase Auth.
+- Flask verifies the token against `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` using an asymmetric algorithm allowlist, the exact issuer `${SUPABASE_URL}/auth/v1`, the configured audience, expiry, and required `sub` claim.
+- Only the verified `sub` becomes input to `PrivacyService.user_ref`; email, phone, refresh token, publishable key, and unverified JWT claims never enter ledger storage.
+- Production startup fails closed when `SUPABASE_URL` or the JWT audience is missing. A missing, malformed, or invalid bearer token returns 401 without reaching a use case.
+- Shared-secret Supabase JWT verification and `service_role` keys are forbidden in this application.
+- Kakao user identity is resolved only inside the Kakao transport from the verified platform payload.
+- Production Kakao requests require `KAKAO_WEBHOOK_SECRET`, and callback URLs must match the exact host allowlist in `KAKAO_CALLBACK_HOSTS` before any outbound request is queued.
+- Production Kakao requests without a verified platform request identifier are rejected instead of receiving a generated idempotency key.
+
+## 12. Privacy, Encryption, and Retention
+
+### 12.1 Data Classes
+
+- Secrets/tokens: never logged or prompted; encrypted when storage is ever introduced.
+- Direct identifiers: converted to HMAC user_ref before domain/storage.
+- Raw financial values: encrypted at rest; excluded from external sinks.
+- Free text: sanitized before prompts; encrypted at rest.
+- Derived metrics: allowed only through an explicit sink allowlist.
+- Share fields: label, privacy-safe Roast message, generic category, recommended action.
+
+### 12.2 Encryption
+
+- Fernet encryption via cryptography>=46,<48.
+- LEDGER_ENCRYPTION_KEY is required in production.
+- LEDGER_USER_REF_SECRET is required in production for HMAC-SHA256 pseudonyms.
+- Development/test may generate ephemeral secrets with a warning.
+- Key material is never written to logs or Redis.
+- Upstash connections must use `rediss://` TLS URLs. The free tier's lack of storage-volume encryption is not treated as sufficient; sensitive event and projection payloads remain Fernet-encrypted by the application.
+
+### 12.3 Browser Origin Boundary
+
+- Production CORS uses the comma-separated exact origin allowlist in `CORS_ALLOWED_ORIGINS`.
+- `*`, reflected arbitrary origins, and credentialed cross-origin cookies are forbidden.
+- Allowed request headers are `Authorization`, `Content-Type`, `Idempotency-Key`, and `X-Correlation-Id`.
+- Health and readiness remain publicly readable but receive CORS headers only for an allowlisted browser origin.
+
+### 12.4 Retention
+
+- LEDGER_RETENTION_DAYS defaults to 365.
+- Cleanup removes expired sensitive event streams, projections, pending questions, and idempotency records.
+- User deletion overrides retention immediately.
+- Deleted or expired aggregates are ignored during replay/rebuild.
+
+### 12.5 Revocation and Deletion
+
+POST /api/v1/me/accounts/{connection_id}/revoke:
+
+- calls the provider revocation port when configured;
+- deletes stored credential references;
+- emits account.revoked;
+- returns provider_unavailable when no production provider exists.
+
+DELETE /api/v1/me/data:
+
+1. Append data.deletion_requested.
+2. Purge the user's events, projections, transactions, judgments, pending question, idempotency records, and credential references.
+3. Remove any transport-to-user mapping.
+4. Emit only a non-linkable deletion completion metric with random deletion_id and timestamp.
+5. Return 204.
+
+## 13. Telemetry and Sheets
+
+Allowed structured event fields:
+
+- event_type
+- event_id
+- pseudonymous user_ref
+- label
+- confidence_band
+- adapter_source
+- reason_question_asked
+- fallback_used
+- correction_flag
+- share_flag
+- latency_ms
+- redaction_status
+- policy_version
+
+Sheets may receive only these redacted fields. Raw user messages, assistant messages, amounts, merchants, income, assets, debt, reasons, or account identifiers are forbidden.
+
+## 14. Evaluation and Tests
+
+### 14.1 Versioned Evaluation Fixture
+
+tests/fixtures/judgment_scenarios_v1.json contains labeled cases for:
+
+- necessary high-cost purchase;
+- repeated low-cost discretionary spending;
+- emergency expense;
+- goal-threatening purchase;
+- reimbursable purchase;
+- merchant/category misclassification;
+- sparse history;
+- conflicting explanation;
+- normal/Roast parity;
+- false-positive correction.
+
+The evaluation report separates label agreement from tone quality and excludes deterministic fallback calls from a live-model claim.
+
+### 14.2 Test Matrix
+
+Unit:
+
+- domain validation;
+- signal formula and boundaries;
+- state transitions and one-question limit;
+- strict judgment schema parsing;
+- fallback marker;
+- Normal/Roast semantic parity;
+- redaction and sanitizer;
+- encryption/config fail-closed behavior;
+- idempotency;
+- legacy import.
+
+Integration:
+
+- manual profile, transaction, reason, and judgment flow;
+- local Redis event/projection behavior when Redis is available;
+- user-scoped Redis mutation serialization and pending-question concurrency;
+- app/worker Redis projection sharing and RQ storage-mode guards;
+- synthetic provider contract;
+- correction/audit flow;
+- share metrics;
+- deletion and revocation;
+- production dev-auth rejection;
+- production Supabase JWT signature, issuer, audience, expiry, and subject rejection plus valid-subject acceptance;
+- exact-origin CORS preflight and disallowed-origin behavior;
+- Sheets redaction.
+
+E2E:
+
+- Flask test-client REST flow;
+- Kakao webhook/RQ callback flow with fake judge and repository.
+
+Commands:
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 -m compileall app.py tasks.py worker.py ledger tests
+LEDGER_TEST_REDIS_URL=redis://127.0.0.1:6389/15 python3 -m unittest tests.integration.test_redis_repository -v
+```
+
+## 15. Environment
+
+- APP_ENV: development, test, or production.
+- REDIS_URL: required for Redis storage and RQ.
+- LEDGER_STORE: redis or memory; memory is forbidden in production and cannot be used by the RQ worker. Kakao runs inline when the store is memory-backed.
+- OPENAI_API_KEY: optional only when deterministic fallback is acceptable.
+- OPENAI_LEDGER_MODEL: defaults to gpt-4o for backward compatibility.
+- LEDGER_ENCRYPTION_KEY: Fernet key; required in production.
+- LEDGER_USER_REF_SECRET: HMAC secret; required in production.
+- LEDGER_RETENTION_DAYS: defaults to 365.
+- ALLOW_DEV_AUTH: must be 1 to accept X-User-Id outside production.
+- SUPABASE_URL: exact HTTPS project URL; required in production and used to derive the issuer and JWKS URL.
+- SUPABASE_JWT_AUDIENCE: expected access-token audience; required in production and set to authenticated for the selected Supabase project.
+- CORS_ALLOWED_ORIGINS: comma-separated exact browser origins; required in production for the Vercel web app.
+- KAKAO_WEBHOOK_SECRET: required to authenticate the production Kakao webhook transport.
+- KAKAO_CALLBACK_HOSTS: comma-separated exact callback hosts allowed in production.
+- GOOGLE_SHEET_ID and GOOGLE_CREDENTIALS_JSON: optional redacted telemetry sink only.
+
+## 16. Dependencies
+
+- Python 3.11.6
+- Flask
+- redis-py
+- RQ
+- OpenAI Python SDK with Responses API support
+- cryptography>=46,<48
+- requests
+- python-dotenv
+- gunicorn
+- PyJWT with cryptography support for remote JWKS verification
+- Supabase JavaScript client in the frontend for browser sessions
+- optional gspread and google-auth for redacted telemetry
+
+No Supabase service-role key or Supabase database dependency is introduced. Supabase is the identity provider only; Redis remains the ledger datastore.
+
+## 17. External Provider Constraints
+
+KFTC Open Banking documents OAuth-based account registration and balance/transaction inquiry. Production use requires an approved application, user consent, security review, and separate provider/compliance work.
+
+References:
+
+- https://developers.kftc.or.kr/dev/openapi/open-banking/oauth
+- https://developers.kftc.or.kr/dev/openapi/open-banking/transaction
+- https://developers.kftc.or.kr/dev/starter/starter
+- https://www.fsc.go.kr/no010101/84780
+
+## 18. Decisions Log
+
+| Date | Decision | Result |
+| --- | --- | --- |
+| 2026-08-01 | Product direction | Pivot from persona-first spending chatbot to AI household-ledger agent |
+| 2026-08-01 | MVP authority | Read, ask, judge, and advise only |
+| 2026-08-01 | Overspending | Hybrid deterministic signals plus AI final judgment |
+| 2026-08-01 | Roast | Opt-in renderer only; judgment parity is invariant |
+| 2026-08-01 | Account data | Production read-only linking preferred but manual entry is mandatory fallback |
+| 2026-08-01 | Storage | Redis Streams events plus projections; schema portable to Postgres |
+| 2026-08-01 | Privacy | Encrypted sensitive payloads and allowlisted external sinks |
+| 2026-08-01 | Stop boundary | Backend complete, stop before UI/UX design |
+| 2026-08-04 | Web auth | Supabase Auth JWT with asymmetric JWKS verification; verified `sub` only |
+| 2026-08-04 | Deployment | Vercel frontend, Render Flask web service, Upstash TLS Redis |
+| 2026-08-04 | Free-tier worker | RQ remains Kakao-only and is not deployed on the free web MVP |
