@@ -15,7 +15,8 @@ interface AuthContextValue {
   loading: boolean;
   session: Session | null;
   error: string | null;
-  signIn(email: string): Promise<void>;
+  signIn(email: string, password: string): Promise<void>;
+  signUp(email: string, password: string): Promise<boolean>;
   signOut(): Promise<void>;
 }
 
@@ -49,20 +50,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = useCallback(async (email: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error("auth_not_configured");
     setError(null);
-    const { error: signInError } = await supabase.auth.signInWithOtp({
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        emailRedirectTo: window.location.origin,
-        shouldCreateUser: true,
-      },
+      password,
     });
     if (signInError) {
-      setError("로그인 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.");
+      setError("이메일 또는 비밀번호를 확인해 주세요.");
       throw signInError;
     }
+  }, []);
+
+  const signUp = useCallback(async (email: string, password: string) => {
+    if (!supabase) throw new Error("auth_not_configured");
+    setError(null);
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (signUpError) {
+      setError("회원가입하지 못했어요. 입력한 정보를 확인해 주세요.");
+      throw signUpError;
+    }
+    return data.session !== null;
   }, []);
 
   const signOut = useCallback(async () => {
@@ -76,8 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ configured: authConfigured, error, loading, session, signIn, signOut }),
-    [error, loading, session, signIn, signOut],
+    () => ({ configured: authConfigured, error, loading, session, signIn, signOut, signUp }),
+    [error, loading, session, signIn, signOut, signUp],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

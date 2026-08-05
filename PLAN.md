@@ -224,7 +224,7 @@ Replace the frontend-only demo boundary with a fail-closed production web path: 
 ### Scope
 
 - This task is the dedicated authorization to revise `TECHSPEC.md` for the selected production auth and deployment architecture.
-- Add Supabase email authentication to the web app and send only the session access token to Flask.
+- Add Supabase email/password authentication to the web app and send only the session access token to Flask.
 - Verify production bearer tokens against the project JWKS, issuer, audience, expiry, and required subject before deriving the existing HMAC pseudonym.
 - Add an exact-origin CORS allowlist for the Vercel production domain.
 - Add a Render Blueprint that keeps credentials out of Git and generates application encryption/HMAC secrets inside Render.
@@ -238,6 +238,7 @@ Replace the frontend-only demo boundary with a fail-closed production web path: 
 - [x] Revise `TECHSPEC.md` and deployment documentation with the selected architecture and free-tier limitations.
 - [x] Add production JWT verification, fail-closed configuration, and exact-origin CORS tests.
 - [x] Add frontend Supabase session handling, email sign-in, bearer API client, sign-out, and production API base URL support.
+- [x] Replace the initial magic-link UX with user-approved email/password login and immediate signup.
 - [x] Add `render.yaml` with non-secret configuration, generated application secrets, and prompted provider credentials.
 - [x] Run backend/frontend tests, lint, build, compile, dependency audit, and a secret scan of the intended diff.
 - [ ] Configure and verify Supabase, Upstash, Render, and Vercel where provider authentication permits.
