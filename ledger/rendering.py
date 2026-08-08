@@ -81,9 +81,21 @@ def _safe_fallback_message(
 ) -> str:
     if not roast_enabled:
         return f"{judgment.rationale} {judgment.recommended_action}"
-    if judgment.label == "justified":
-        return f"쯧, 이건 필요한 지출로 인정한다. {judgment.recommended_action}"
-    return f"쯧, 장부부터 똑바로 보자. {judgment.rationale} {judgment.recommended_action}"
+    return grandma_mode_fallback(
+        label=judgment.label,
+        rationale=judgment.rationale,
+        recommended_action=judgment.recommended_action,
+    )
+
+
+def grandma_mode_fallback(*, label: str, rationale: str, recommended_action: str) -> str:
+    if label == "justified":
+        return f"그래, 이건 필요한 데 제대로 썼다. 지갑 닫을 일은 아니니 {recommended_action}"
+    if label == "insufficient_context":
+        return f"아이구, 장부에 이유가 비었잖아. {recommended_action}"
+    if label == "overspending":
+        return f"아이고 이 화상아, 장부 바닥이 보이는데 또 퍼 쓰면 어쩌자는 거냐. {rationale} {recommended_action}"
+    return f"쯧쯧, 냄비 넘치기 전에 불부터 줄여라. {rationale} {recommended_action}"
 
 
 def validate_normal_tone(message: str) -> tuple[bool, str]:

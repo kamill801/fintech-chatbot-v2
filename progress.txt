@@ -110,3 +110,24 @@ Why: 코드와 운영 문서가 동일한 live-mode 경로를 설명하게 하�
 Next: 의도한 파일만 스테이징해 검증한 뒤 main에 커밋·푸시하고 Vercel production을 배포해 공개 화면과 API 상태를 재검증한다.
 Issues: Render health/readiness와 Vercel 공개 URL은 HTTP 200이지만 실제 사용자 계정의 거래→이유→AI 판단 전체 흐름과 live OpenAI 품질은 아직 별도 검증 항목이다. 비밀값은 문서나 Git에 기록하지 않았다.
 ---
+
+[2026-08-05 23:21] [Phase 6 / Task 6.2] (uncommitted review)
+What: 사용자 노출 `Roast` 명칭을 `욕쟁이 할머니 모드`로 교체하고, 기본 말투와 할머니 말투의 판단 패리티를 유지한 채 근거·생활 비유·추천 행동이 포함되는 문체 규칙과 안전 fallback을 강화했다. 판단 화면의 고정 카페 농담을 제거해 backend judgment message를 제목으로 사용하고, 긴 동적 문구와 모드명이 320/390px에서 겹치지 않도록 반응형 배치를 교정했다.
+Why: 외래어 기능명이 제품 콘셉트를 바로 설명하지 못했고, 기존 예시가 실제 지출 근거보다 일반적인 농담에 가까워 과소비 판단의 신뢰와 캐릭터 품질을 함께 떨어뜨렸기 때문이다.
+Next: 사용자 검토와 승인 후에만 의도한 파일을 커밋하고 main에 푸시한 뒤 Render/Vercel을 재배포한다.
+Issues: 내부 호환 식별자 `roast_enabled`, `roast_message`, `mode=roast`는 유지했다. frontend 20개 테스트·lint·build, backend 84개 중 81개 통과·외부 Redis 3개 skip, compileall, diff/비밀값 검사, 320/390px 브라우저 오버플로·문장/캐릭터 비겹침 검증을 통과했다. 커밋·푸시·배포는 실행하지 않았다.
+---
+
+[2026-08-06 17:34] [Phase 6 / Task 6.3] (uncommitted review)
+What: 쉼표로 표시된 KRW 입력값과 충돌하던 HTML 숫자 패턴을 제거하고, 수기 지출 폼이 브라우저 기본 검증에 의해 조용히 차단되지 않도록 애플리케이션 검증 경계로 통일했다. `12,800` 표시 상태에서 실제 폼 제출을 요구하는 회귀 테스트를 추가했다.
+Why: 버튼 클릭 시 금액 입력기가 blur되며 `12,800`으로 표시됐지만 `pattern="[0-9]*"`는 쉼표를 허용하지 않아 브라우저가 React 제출 핸들러 실행 전에 폼을 차단했고, 사용자에게는 아무 반응도 없는 것처럼 보였다.
+Next: 사용자 검토와 승인 후 기존 Task 6.2 변경과 함께 의도한 파일만 커밋하고 main에 푸시한 뒤 Render/Vercel을 재배포한다.
+Issues: 회귀 테스트가 수정 전 `toBeValid()`에서 실패하는 것을 확인했고 수정 후 frontend 21개 테스트, lint, production build를 통과했다. 로컬 브라우저에서 `12,800원` 쇼핑 지출 제출 후 `/transactions/<id>/reason?demo=1` 이동, 오류 오버레이·console error·가로 오버플로 없음까지 확인했다. 커밋·푸시·배포는 실행하지 않았다.
+---
+
+[2026-08-08] [Phase 6 / Tasks 6.2-6.3] (release approved)
+What: 사용자가 욕쟁이 할머니 모드 명칭·문체 보정과 수기 지출 제출 복구 변경의 커밋, main 푸시, Render/Vercel 배포를 승인했다.
+Why: 검토 대기 중이던 말투 품질 개선과 `기록하고 판단받기` 무반응 수정 사항을 운영 환경에 반영하기 위해서다.
+Next: 의도한 추적 파일만 스테이징해 전체 검증과 비밀값 검사를 통과한 뒤 커밋·푸시하고, 공급자 배포 및 공개 URL 상태를 확인한다.
+Issues: `.agents/`와 `AGENTS.md`는 기존 로컬 작업 파일이므로 이번 릴리스에서 제외한다. 실제 인증 사용자 거래→이유→OpenAI 판단 E2E는 별도 사용자 계정이 필요한 검증 항목으로 유지한다.
+---

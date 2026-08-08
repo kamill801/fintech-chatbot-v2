@@ -70,7 +70,6 @@ export function CurrencyInput({
         id={id}
         type="text"
         inputMode="numeric"
-        pattern="[0-9]*"
         maxLength={15}
         aria-label={ariaLabel}
         value={editing ? draft : Math.round(value).toLocaleString("ko-KR")}
@@ -120,9 +119,10 @@ export function PageHeader({
 }
 
 export function ModePill({ enabled }: { enabled: boolean }) {
+  const state = enabled ? "켜짐" : "꺼짐";
   return (
-    <span className={`mode-pill ${enabled ? "is-roast" : ""}`} aria-label={`Roast ${enabled ? "켜짐" : "꺼짐"}`}>
-      <span className="mode-dot" /> Roast {enabled ? "켜짐" : "꺼짐"}
+    <span className={`mode-pill ${enabled ? "is-roast" : ""}`} aria-label={`욕쟁이 할머니 모드 ${state}`}>
+      <span className="mode-dot" /> 욕쟁이 할머니 모드 {state}
     </span>
   );
 }

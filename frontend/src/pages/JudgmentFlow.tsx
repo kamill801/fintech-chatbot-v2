@@ -71,13 +71,8 @@ export function JudgmentPage() {
       </Surface>
       <div className="judgment-meta"><JudgmentBadge label={judgment.label} /><span>{confidenceText(judgment.confidence)} · {Math.round(judgment.confidence * 100)}%</span></div>
       <section className="judgment-headline">
-        <h1>{settings.roast_enabled ? (
-          <>사정은 알겠는데,<br />카페에 <Highlight>네 이름</Highlight><br />박을 셈이냐?</>
-        ) : (
-          <>필요했지만,<br />이번 주는 <Highlight>여기까지.</Highlight></>
-        )}</h1>
+        <h1>{judgment.message}</h1>
         {settings.roast_enabled && <BookkeeperMark compact />}
-        <p className="server-message">{judgment.message}</p>
       </section>
       <h2>판단 근거</h2>
       <EvidenceList judgment={judgment} transaction={transaction} />
@@ -214,7 +209,7 @@ async function shareCardImage(
   if (options.amount) context.fillText(`금액 · ${formatWon(detail.transaction.amount_krw)}`, 150, 1105);
   if (options.merchant) context.fillText(`사용처 · ${detail.transaction.merchant || "미입력"}`, 150, 1185);
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("image export failed")), "image/png"));
-  return new File([blob], "jangbu-roast.png", { type: "image/png" });
+  return new File([blob], "jangbu-halmeoni.png", { type: "image/png" });
 }
 
 export function SharePage() {
@@ -234,7 +229,7 @@ export function SharePage() {
   async function publish(downloadOnly = false) {
     if (!detail) return;
     if (!settings.roast_enabled && !demo) {
-      setStatus("Roast 모드를 켠 판단만 공유할 수 있어요.");
+      setStatus("욕쟁이 할머니 모드를 켠 판단만 공유할 수 있어요.");
       return;
     }
     try {

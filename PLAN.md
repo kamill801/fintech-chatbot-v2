@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 6 - production hardening
-- Active task: Task 6.1 - release approved; production deployment in progress
+- Active task: Task 6.3 - manual transaction submit repair; release approved
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -14,7 +14,7 @@
 
 ### Goal
 
-Replace the persona-first spending chatbot with a privacy-first AI household-ledger backend that can store a financial profile, accept manual transactions, compute deterministic risk signals, ask exactly one reason question when context is weak, produce a structured AI judgment, and render that same judgment in Normal or opt-in Roast tone.
+Replace the persona-first spending chatbot with a privacy-first AI household-ledger backend that can store a financial profile, accept manual transactions, compute deterministic risk signals, ask exactly one reason question when context is weak, produce a structured AI judgment, and render that same judgment in a default or opt-in `욕쟁이 할머니 모드` voice.
 
 ### Stop Boundary
 
@@ -29,7 +29,7 @@ Do not add production account-provider integration, production authentication, d
 - [x] Add domain models, event contracts, repository ports, and privacy primitives.
 - [x] Add Redis Streams and in-memory repositories with encrypted projections and idempotency.
 - [x] Add deterministic signals, one-question state machine, structured OpenAI judge, and deterministic fallback.
-- [x] Add Normal/Roast parity rendering and safety validation.
+- [x] Add 기본 말투/욕쟁이 할머니 모드 parity rendering and safety validation.
 - [x] Add profile, settings, transaction, reason, correction, share, summary, metrics, revocation, and deletion use cases.
 - [x] Add versioned Flask REST API and thin Kakao/RQ transport.
 - [x] Replace raw Sheets chat logging with allowlisted redacted telemetry.
@@ -47,7 +47,7 @@ Do not add production account-provider integration, production authentication, d
 - Medium/uncertain cases ask exactly one transaction-bound reason question.
 - OpenAI receives only the explicit privacy allowlist and uses strict JSON Schema with `store=false`.
 - OpenAI/schema failure retries once and then returns an auditable deterministic fallback.
-- Roast defaults off and changes only the selected message, never label, confidence, rationale, factors, or recommendation.
+- `욕쟁이 할머니 모드` defaults off and changes only the selected message, never label, confidence, rationale, factors, or recommendation.
 - Corrections preserve the original judgment and append audit evidence.
 - Mutating API operations are idempotent.
 - Production rejects development identity headers and fails closed without trusted auth/secrets/storage.
@@ -77,7 +77,7 @@ Define the mobile-first household-ledger information architecture and a distinct
 - Research current official materials for established Korean finance and household-ledger products.
 - Translate the supplied warm-paper Notion references into a finance-appropriate visual system.
 - Define onboarding, home, ledger, manual entry, agent, judgment, reports, goals, settings, and sharing flows.
-- Define Normal/Roast mode interaction and content-safety rules without changing judgment logic.
+- Define 기본 말투/욕쟁이 할머니 모드 mode interaction and content-safety rules without changing judgment logic.
 - Create one focused mobile home-screen visual candidate for user review.
 - Stop at the visual approval gate. Do not implement frontend routes or components in this task.
 
@@ -96,7 +96,7 @@ Define the mobile-first household-ledger information architecture and a distinct
 - The primary navigation and every MVP screen have a clear user job.
 - Manual entry remains first-class while account connection remains future-facing and read-only.
 - The AI asks for context in a transaction-bound flow rather than becoming a generic chatbot.
-- Roast is visibly opt-in, instantly reversible, and presentation-only.
+- `욕쟁이 할머니 모드` is visibly opt-in, instantly reversible, and presentation-only.
 - Financial amounts and evidence remain more visually prominent than character decoration.
 - The design uses the supplied warm-paper, bold-type, flat-card references without copying Notion's marketing composition.
 - Accessibility, responsive behavior, loading/empty/error states, and Korean financial-number formatting are specified.
@@ -117,8 +117,8 @@ Create an implementation-ready image reference for every MVP screen using the us
 - Home (approved reference)
 - Manual transaction entry
 - Reason question
-- Normal judgment
-- Roast judgment
+- 기본 말투 판단
+- 욕쟁이 할머니 모드 판단
 - Ledger
 - Transaction detail and correction
 - Agent inbox
@@ -139,7 +139,7 @@ Create an implementation-ready image reference for every MVP screen using the us
 - Every screen is a separate image in the same mobile aspect ratio.
 - Home remains the visual source of truth for palette, typography, spacing, and illustration treatment.
 - Images show one primary job per screen rather than feature inventory.
-- Normal and Roast judgment screens share all financial facts and differ only in rendered message and mode state.
+- 기본 말투와 욕쟁이 할머니 모드 판단 화면은 모든 금융 사실을 공유하고 표현 문구와 모드 상태만 다르다.
 - Manual entry is live; account connection remains explicitly future/read-only.
 - Generated Korean copy is readable enough to guide implementation; any image-generation artifacts are documented rather than copied into code.
 - No frontend code is implemented in this task.
@@ -148,7 +148,7 @@ Create an implementation-ready image reference for every MVP screen using the us
 
 ### Goal
 
-Implement the user-approved 15-screen visual set as a complete mobile-first web app and installable PWA. Connect the live UI to the existing Flask ledger API while preserving backend ownership of financial judgment, confidence, evidence, recommendation, and Normal/Roast parity.
+Implement the user-approved 15-screen visual set as a complete mobile-first web app and installable PWA. Connect the live UI to the existing Flask ledger API while preserving backend ownership of financial judgment, confidence, evidence, recommendation, and 기본 말투/욕쟁이 할머니 모드 parity.
 
 ### Scope
 
@@ -164,7 +164,7 @@ Implement the user-approved 15-screen visual set as a complete mobile-first web 
 
 - [x] Lock this implementation task and verify the existing API contracts.
 - [x] Add the frontend runtime, API client, state model, routes, PWA metadata, and shared visual tokens.
-- [x] Implement onboarding, Home, manual capture, reason, and Normal/Roast judgment flows.
+- [x] Implement onboarding, Home, manual capture, reason, and default/grandma-mode judgment flows.
 - [x] Implement ledger, transaction detail/correction, agent inbox, report, settings, and privacy-safe sharing.
 - [x] Add Flask production static serving and focused backend/frontend tests.
 - [x] Run typecheck, lint, unit tests, production build, Flask tests, and real local API flow checks.
@@ -176,8 +176,8 @@ Implement the user-approved 15-screen visual set as a complete mobile-first web 
 
 - All 15 approved screen contracts exist as reachable responsive routes or states and every primary action is interactive.
 - The 390x844 implementation preserves the approved warm-paper palette, bold editorial hierarchy, flat fills, amount emphasis, and mobile navigation.
-- Live labels, confidence, evidence, recommendation, and Normal/Roast messages come from the backend judgment artifact.
-- Roast remains opt-in, immediately reversible, and presentation-only.
+- Live labels, confidence, evidence, recommendation, and 기본 말투/욕쟁이 할머니 모드 messages come from the backend judgment artifact.
+- `욕쟁이 할머니 모드` remains opt-in, immediately reversible, and presentation-only.
 - Manual transaction entry works without account connection and retains an unsent draft offline.
 - Account connection remains visibly future/read-only and cannot initiate money movement.
 - Sharing begins from a redacted preview with amount and merchant excluded by default.
@@ -282,8 +282,54 @@ Correct the first production usability defects without changing the financial ju
 - Every `BookkeeperMark` contains one avatar icon and no overlapping decorative icon.
 - Live zero spend, zero income, and empty category data remain zero or empty instead of showing demo fixtures.
 - Visible dates and month labels come from the current date or API summary outside explicit demo mode.
-- No backend judgment, Roast parity, authentication, privacy, or money-movement boundary changes.
+- No backend judgment, 욕쟁이 할머니 모드 parity, authentication, privacy, or money-movement boundary changes.
 - Release only after explicit user approval; approval was granted on 2026-08-05.
+
+## Task 6.2 - 욕쟁이 할머니 모드 Naming and Voice Correction (Release approved)
+
+### Goal
+
+Replace the foreign-facing Roast label with the exact Korean product name `욕쟁이 할머니 모드`, and make every generated or fallback line feel like evidence-based household-ledger scolding rather than a generic insult or a hard-coded cafe joke.
+
+### Scope
+
+- Replace every user-facing `Roast` or `Normal` mode label with `욕쟁이 할머니 모드` and `기본 말투`.
+- Preserve `roast_enabled`, `roast_message`, and `mode=roast` as internal API/schema identifiers for backward compatibility.
+- Render the backend judgment message as the primary headline instead of a category-specific hard-coded sentence.
+- Require the mode voice to include a recognizable grandmother marker, a household or ledger metaphor, supplied evidence, and the recommended next action.
+- Keep the same label, confidence, evidence, rationale, and recommendation in both voices.
+- Keep threats, death/self-harm language, slurs, protected-trait attacks, appearance insults, sexual humiliation, and invented personal facts blocked.
+- Update web, Kakao, fallback, OpenAI prompt, tests, and current design/release documentation.
+- Stop and report before commit, push, or deployment.
+
+### Acceptance Criteria
+
+- No user-facing web or Kakao copy uses `Roast` or `Normal` as a mode name.
+- Justified spending receives a grudging acknowledgement rather than a contradictory scolding verdict.
+- Caution and overspending copy cites supplied spending evidence and ends with the same recommended action as the structured judgment.
+- A bland, unsafe, or off-character model response falls back to a deterministic safe grandmother-mode line.
+- Judgment headlines work for every category and no longer contain a hard-coded cafe-name joke.
+- Focused mode-copy tests, the full frontend suite, lint, build, backend tests, compile checks, and responsive browser QA pass.
+
+## Task 6.3 - Manual Transaction Submit Repair (Release approved)
+
+### Goal
+
+Ensure a formatted KRW amount never triggers silent browser constraint validation and prevent the manual transaction form from appearing unresponsive when the user requests an AI judgment.
+
+### Scope
+
+- Remove the numeric-only HTML pattern that conflicts with comma-formatted currency values.
+- Keep numeric keyboard hints and digit-only input sanitization in the shared currency input.
+- Route validation through the manual transaction form's visible application error state instead of native browser blocking.
+- Add a regression test that submits a form while the amount is rendered as `12,800`.
+- Stop and report before commit, push, or deployment.
+
+### Acceptance Criteria
+
+- A comma-formatted amount is a valid form control.
+- Clicking `기록하고 판단받기` invokes the submit handler and advances to the reason or judgment route.
+- The full frontend test suite, lint, production build, and a real browser submission pass.
 
 ## Archived Work
 

@@ -1,6 +1,6 @@
 # AI Household Ledger Agent
 
-Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It combines deterministic financial signals with a structured AI judgment, asks one focused question when purchase context is insufficient, and renders the same decision in Normal or opt-in Roast tone.
+Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It combines deterministic financial signals with a structured AI judgment, asks one focused question when purchase context is insufficient, and renders the same decision in a default voice or the opt-in `욕쟁이 할머니 모드` voice.
 
 ## MVP Scope
 
@@ -36,7 +36,7 @@ deterministic signals  structured AI judge
               |
        shared judgment
               |
-       Normal / Roast
+       Default / 욕쟁이 할머니 모드
               |
    Upstash Redis + projections
 ```
@@ -122,10 +122,11 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 - Financial projections and event payloads are encrypted at rest.
 - OpenAI receives only the explicit derived-data allowlist.
 - Logs, Sheets, metrics, and shares reject raw financial or chat fields.
-- Roast is presentation-only and cannot alter a financial decision.
+- `욕쟁이 할머니 모드` is presentation-only and cannot alter a financial decision.
+- User-facing copy never calls the feature Roast. Internal compatibility fields such as `roast_enabled` and `roast_message` remain unchanged.
 
 ## Project Status
 
-The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, Normal/Roast rendering, correction, reports, settings, offline draft retention, and redacted image sharing are connected.
+The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, offline draft retention, and redacted image sharing are connected.
 
 The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Render health and Redis-backed readiness returned HTTP 200 on 2026-08-05, and the Vercel production alias serves the login build. A real authenticated transaction-to-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.

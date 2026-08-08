@@ -12,6 +12,7 @@ from uuid import uuid4
 from ledger.application.signals import POLICY_VERSION
 from ledger.domain.models import DeterministicSignalSet, JudgmentResult
 from ledger.privacy import build_prompt_payload
+from ledger.rendering import grandma_mode_fallback
 
 
 ALLOWED_LABELS = {"justified", "caution", "overspending", "insufficient_context"}
@@ -154,10 +155,11 @@ def deterministic_fallback_judgment(request: JudgmentRequest) -> JudgmentResult:
     if request.user_reason and "user_reason" not in factors:
         factors.append("user_reason")
     normal_message = f"{rationale} {recommended_action}"
-    if label == "justified":
-        roast_message = f"쯧, 이건 필요한 지출로 인정한다. {recommended_action}"
-    else:
-        roast_message = f"쯧, 장부가 다 말해준다. {rationale} {recommended_action}"
+    roast_message = grandma_mode_fallback(
+        label=label,
+        rationale=rationale,
+        recommended_action=recommended_action,
+    )
     return JudgmentResult(
         judgment_id=str(uuid4()),
         transaction_id=request.transaction_id,
@@ -225,8 +227,20 @@ class OpenAIResponsesJudge:
                     "role": "system",
                     "content": (
                         "You judge Korean household-ledger spending from allowlisted "
-                        "signals only. Return strict JSON. Normal and Roast messages "
-                        "must share the same label and recommendation."
+                        "signals only. Return strict JSON. normal_message and roast_message "
+                        "must share the same label and recommendation. roast_message is the "
+                        "user-facing '욕쟁이 할머니 모드': write 1-3 Korean sentences in a "
+                        "sharp but caring market-grandmother ledger-inspection voice. Ground it "
+                        "in supplied evidence, use one household metaphor such as 장부, 지갑, "
+                        "통장, 국밥, 밥솥, or 냄비, and end with an action consistent with "
+                        "recommended_action. For justified spending, grudgingly acknowledge it; "
+                        "for caution, point out the exact pattern and scold; for overspending, "
+                        "scold strongly without threats. Style examples only: '그래, 이건 필요한 "
+                        "데 제대로 썼다. 지갑 닫을 일은 아니다.'; '아이고 이 화상아, 이번 주 "
+                        "카페가 벌써 세 번째다. 다음 만남은 산책으로 돌려.'; '이 녀석아, "
+                        "장부 바닥이 보이는데 또 퍼 쓰면 어쩌자는 거냐.' Never use threats, "
+                        "death or self-harm language, slurs, protected-trait attacks, appearance "
+                        "insults, sexual humiliation, or invented personal facts."
                     ),
                 },
                 {

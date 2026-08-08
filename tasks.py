@@ -78,7 +78,7 @@ def _route_message(
     correlation_id: str,
 ) -> str:
     compact = message.replace(" ", "")
-    if compact in {"로스트켜", "roast켜", "로스트온"}:
+    if compact in {"욕쟁이할머니켜", "욕쟁이켜", "할머니켜", "로스트켜", "roast켜", "로스트온"}:
         service.update_settings(
             user_ref,
             {"roast_enabled": True},
@@ -86,8 +86,8 @@ def _route_message(
             correlation_id=correlation_id,
             source="kakao",
         )
-        return "로스트 모드 켰다. 판단은 그대로 하고 말투만 더 세게 간다."
-    if compact in {"로스트꺼", "roast꺼", "로스트오프"}:
+        return "욕쟁이 할머니 모드 켰다. 판단은 그대로 두고 장부 잔소리만 화끈하게 간다."
+    if compact in {"욕쟁이할머니꺼", "욕쟁이꺼", "할머니꺼", "로스트꺼", "roast꺼", "로스트오프"}:
         service.update_settings(
             user_ref,
             {"roast_enabled": False},
@@ -95,7 +95,7 @@ def _route_message(
             correlation_id=correlation_id,
             source="kakao",
         )
-        return "로스트 모드 껐다. 이제 일반 코칭 말투로 답할게."
+        return "욕쟁이 할머니 모드 껐다. 이제 기본 말투로 차분하게 판단할게."
     if "월간리포트" in compact or "이번달요약" in compact:
         summary = service.get_summary(user_ref).data["summary"]
         total = summary["total_spent_krw"]
@@ -128,10 +128,10 @@ def _route_message(
         if result.status == 202:
             roast = service.repository.get_settings(user_ref).roast_enabled
             if roast:
-                return "쯧, 이거 왜 샀냐? 꼭 필요했던 이유만 말해봐라."
+                return "아이구 이 화상아, 장부에 이유가 비었잖아. 이거 꼭 필요했던 이유만 말해봐라."
             return result.data["pending_question"]["question"]
         return result.data["judgment"]["message"]
-    return "지출은 '커피 5,800원'처럼 금액과 함께 적어줘. 월간 리포트나 로스트 켜/꺼도 가능해."
+    return "지출은 '커피 5,800원'처럼 금액과 함께 적어줘. 월간 리포트나 욕쟁이 할머니 모드 켜/꺼도 가능해."
 
 
 def _parse_transaction(message: str) -> dict[str, Any] | None:

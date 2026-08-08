@@ -29,7 +29,7 @@ VALID_MODEL_PAYLOAD = {
     "recommended_action": "이번 주 쇼핑을 한 번 쉰다.",
     "decision_factors": ["budget_usage"],
     "normal_message": "목표 달성 속도를 늦출 수 있다. 이번 주 쇼핑을 한 번 쉰다.",
-    "roast_message": "쯧, 장부가 말한다. 이번 주 쇼핑을 한 번 쉰다.",
+    "roast_message": "아이고 이 화상아, 장부가 벌써 빽빽하다. 이번 주 쇼핑을 한 번 쉰다.",
 }
 
 
@@ -123,6 +123,24 @@ class StrictOpenAIJudgeTests(unittest.TestCase):
         user_content = fake_responses.calls[0]["input"][1]["content"]
         self.assertNotIn("merchant", user_content)
 
+    def test_prompt_defines_korean_grandma_mode_voice_and_safety(self) -> None:
+        fake_responses = FakeResponses([VALID_MODEL_PAYLOAD.copy()])
+        judge = OpenAIResponsesJudge(
+            model="test-model",
+            client_factory=lambda: FakeClient(fake_responses),
+        )
+        judge.judge(request())
+        system_content = fake_responses.calls[0]["input"][0]["content"]
+        self.assertIn("욕쟁이 할머니 모드", system_content)
+        self.assertIn("장부 바닥", system_content)
+        self.assertIn("without threats", system_content)
+
+    def test_deterministic_fallback_uses_a_specific_grandma_voice(self) -> None:
+        result = deterministic_fallback_judgment(request())
+        self.assertTrue(any(marker in result.roast_message for marker in ("장부", "냄비", "지갑")))
+        self.assertTrue(any(marker in result.roast_message for marker in ("아이고", "아이구", "쯧", "그래")))
+        self.assertIn(result.recommended_action, result.roast_message)
+
 
 class RenderingTests(unittest.TestCase):
     def judgment(self) -> JudgmentResult:
@@ -135,7 +153,7 @@ class RenderingTests(unittest.TestCase):
             recommended_action="이번 주 쇼핑을 한 번 쉰다.",
             decision_factors=["budget_usage"],
             normal_message="목표 달성 속도를 늦출 수 있다. 이번 주 쇼핑을 한 번 쉰다.",
-            roast_message="쯧, 장부가 말한다. 이번 주 쇼핑을 한 번 쉰다.",
+            roast_message="아이고 이 화상아, 장부가 벌써 빽빽하다. 이번 주 쇼핑을 한 번 쉰다.",
             fallback_used=False,
             model="test-model",
             policy_version="overspending-v1",
@@ -169,6 +187,17 @@ class RenderingTests(unittest.TestCase):
         rendered = render_judgment(judgment, roast_enabled=True)
         self.assertEqual(rendered.label, "caution")
         self.assertNotIn("죽는", rendered.message)
+
+    def test_bland_roast_uses_specific_grandma_fallback(self) -> None:
+        judgment = JudgmentResult(
+            **{
+                **self.judgment().to_dict(),
+                "roast_message": "이번 주 쇼핑을 한 번 쉰다.",
+            }
+        )
+        rendered = render_judgment(judgment, roast_enabled=True)
+        self.assertIn("냄비", rendered.message)
+        self.assertIn("이번 주 쇼핑을 한 번 쉰다.", rendered.message)
 
     def test_unsafe_normal_uses_safe_message_without_changing_recommendation(self) -> None:
         judgment = JudgmentResult(

@@ -167,10 +167,10 @@ export function SettingsPage() {
       <h1>설정</h1>
       <section className="roast-setting">
         <BookkeeperMark />
-        <div><h2>Roast 모드</h2><p>말투만 바뀌고 판단과 추천은 같아요</p><button onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
-        <div className="setting-toggle"><Toggle checked={settings.roast_enabled} label="Roast 모드" onChange={(checked) => void saveSettings({ roast_enabled: checked })} /><span>{settings.roast_enabled ? "켜짐" : "꺼짐"}</span></div>
+        <div><h2>욕쟁이 할머니 모드</h2><p>장부 판단은 그대로, 말투만 화끈하게 바뀌어요</p><button onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
+        <div className="setting-toggle"><Toggle checked={settings.roast_enabled} label="욕쟁이 할머니 모드" onChange={(checked) => void saveSettings({ roast_enabled: checked })} /><span>{settings.roast_enabled ? "켜짐" : "꺼짐"}</span></div>
       </section>
-      {preview && <div className="roast-preview"><strong>Normal</strong><p>{demoJudgment(false).message}</p><strong>Roast</strong><p>{demoJudgment(true).message}</p></div>}
+      {preview && <div className="roast-preview"><strong>기본 말투</strong><p>{demoJudgment(false).message}</p><strong>욕쟁이 할머니 말투</strong><p>{demoJudgment(true).message}</p></div>}
       <Surface className="settings-list">
         <FieldRow icon={<Wallet />} label="내 자금 기준" value={profile ? `생활비 예산 ${formatWon(profile.discretionary_budget_krw)}` : "기준 미설정"} onClick={() => navigate(withDemo("/onboarding/baseline", demo))} />
         <FieldRow icon={<Target />} label="목표" value={profile ? `${profile.goal.name} · 현재 ${Math.round((profile.goal.current_amount_krw / Math.max(profile.goal.target_amount_krw, 1)) * 100)}%` : "목표 미설정"} onClick={() => navigate(withDemo("/onboarding/goal", demo))} />

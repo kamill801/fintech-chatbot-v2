@@ -75,14 +75,14 @@ The home screen must answer four questions in this order:
   - make budget position and goal impact understandable without opening a report;
   - resolve uncertain spending with exactly one focused reason question;
   - make every judgment inspectable, correctable, and actionable;
-  - make Roast entertaining enough to share without weakening trust or accuracy.
+  - make 욕쟁이 할머니 모드 entertaining enough to share without weakening trust or accuracy.
 - Non-goals:
   - payment blocking, transfer, automatic savings, investing, or any money movement;
   - an open-ended general-purpose financial chatbot;
   - a full financial-product marketplace;
   - automatic account connection in the first UI implementation.
 - Success signals:
-  - overspending agreement, four-week discretionary-spending reduction, and intentional Roast-result shares as defined in `TECHSPEC.md`;
+  - overspending agreement, four-week discretionary-spending reduction, and intentional 욕쟁이 할머니 모드-result shares as defined in `TECHSPEC.md`;
   - manual-entry completion rate and time;
   - pending-question answer rate;
   - judgment correction rate by confidence band;
@@ -98,7 +98,7 @@ The home screen must answer four questions in this order:
   - explain a purchase once when the system lacks context;
   - see a practical correction, not a moral verdict;
   - review the month by category and behavior pattern;
-  - switch Roast on or off without changing the financial decision.
+  - switch 욕쟁이 할머니 모드 on or off without changing the financial decision.
 - Key contexts: one-handed use immediately after payment, short evening review, monthly planning, private use in public places
 
 ## Information architecture
@@ -133,7 +133,7 @@ Settings, privacy, data source, profile, and mode controls open from the home he
 | Transaction detail | Correct record | Original record, reason, judgment history, append-only correction |
 | Agent | Resolve and review | Pending inbox, weekly brief, judgment history; no blank generic prompt as the hero |
 | Report | Adjust next month | Budget comparison, category bars, repeated spend, goal forecast, one recommendation |
-| Settings | Control trust | Roast, profile, goal, data source, privacy, export/delete/revoke |
+| Settings | Control trust | 욕쟁이 할머니 모드, profile, goal, data source, privacy, export/delete/revoke |
 
 ### Content hierarchy
 
@@ -148,9 +148,9 @@ Character never outranks the amount or evidence.
 
 ### First run
 
-`trust disclosure -> financial baseline -> one goal -> manual source -> Normal default -> home`
+`trust disclosure -> financial baseline -> one goal -> manual source -> 기본 말투 -> home`
 
-Roast setup is offered after the first completed judgment, not during baseline onboarding. This avoids asking for entertainment consent before the user has seen the product's financial value.
+`욕쟁이 할머니 모드` setup is offered after the first completed judgment, not during baseline onboarding. This avoids asking for entertainment consent before the user has seen the product's financial value.
 
 ### Manual transaction and judgment
 
@@ -162,15 +162,15 @@ Roast setup is offered after the first completed judgment, not during baseline o
 - After the reason: show one final judgment and one corrective action.
 - Correction: append a corrected label/reason without hiding the original.
 
-### Roast enablement
+### 욕쟁이 할머니 모드 켜기
 
-`settings or judgment teaser -> preview Normal/Roast pair -> explicit consent -> persistent visible toggle`
+`settings or judgment teaser -> preview 기본 말투/욕쟁이 할머니 모드 pair -> explicit consent -> persistent visible toggle`
 
 - Default is off.
 - First enable requires confirmation and a sample.
 - Disable is one tap and requires no confirmation.
 - The toggle changes only the rendered message.
-- A small `Roast 켜짐` stamp remains visible on Home, Agent, and Judgment surfaces.
+- A small `욕쟁이 할머니 모드 켜짐` stamp remains visible on Home, Agent, and Judgment surfaces.
 
 ### Monthly review
 
@@ -186,7 +186,7 @@ Transactions live in a stable ledger. Agent conversations link back to a specifi
 
 ### Evidence before emotion
 
-Show `budget 72% used`, `same category 3 times`, or `goal date +8 days` before a label or Roast line. Confidence is visible as plain language plus an inspectable percentage in details.
+Show `budget 72% used`, `same category 3 times`, or `goal date +8 days` before a label or 욕쟁이 할머니 모드 line. Confidence is visible as plain language plus an inspectable percentage in details.
 
 ### One question, one action
 
@@ -226,7 +226,7 @@ Translate the supplied Notion references from a marketing page into a working fi
 | `action-soft` | `#E6F3FE` | Selected and informational surfaces |
 | `goal` | `#F2B544` | Goal progress and planned money |
 | `peach` | `#F6D5B8` | Inline headline highlight and warm callout |
-| `caution` | `#E95B43` | Caution and Roast emphasis only |
+| `caution` | `#E95B43` | Caution and 욕쟁이 할머니 모드 emphasis only |
 | `safe` | `#28785D` | Justified/on-track states |
 | `midnight` | `#07113C` | High-trust emphasis and share-card ink |
 
@@ -234,7 +234,7 @@ Rules:
 
 - Regular expenses use `ink`, not `caution`.
 - Never encode a judgment with color alone; pair icon, label, and text.
-- Reserve `caution` for a true caution state or a small Roast accent.
+- Reserve `caution` for a true caution state or a small 욕쟁이 할머니 모드 accent.
 - Charts use `action`, `goal`, `peach`, `safe`, then neutral tints in that order.
 
 ### Typography
@@ -273,7 +273,7 @@ Rules:
 - 160-220ms ease-out for sheets, filters, and mode-state changes
 - One staggered reveal on first Home load: headline, budget line, agent brief
 - No count-up animation on balances or spending
-- Roast enablement may use a single stamp press; no shaking, flashing, or repeated bounce
+- Enabling `욕쟁이 할머니 모드` may use a single stamp press; no shaking, flashing, or repeated bounce
 - Respect reduced-motion preferences and replace transforms with instant opacity changes.
 
 ### Imagery and iconography
@@ -288,7 +288,7 @@ Rules:
 
 The first visual candidate should use this hierarchy at `390 x 844`:
 
-1. Header: `8월 3일 월요일`, settings avatar, quiet `Roast 꺼짐` control.
+1. Header: `8월 3일 월요일`, settings avatar, quiet `욕쟁이 할머니 모드 꺼짐` control.
 2. Editorial status line: `이번 달, 아직 괜찮아.` with `괜찮아` inside a peach inline pill.
 3. Primary amount: `이번 달 쓸 수 있는 돈 623,000원` and `예산의 52% 남음`.
 4. Thin segmented budget line: spent, fixed/committed, remaining.
@@ -316,9 +316,9 @@ The viewport should not show every report or feature. Its single hero job is und
 | `TransactionRow` | income, expense, pending, judged, corrected, manual/imported |
 | `TransactionComposer` | default, validation error, saving, duplicate detected |
 | `ReasonSheet` | question, submitting, timeout/error, answered |
-| `JudgmentSheet` | justified, caution, overspending; Normal/Roast message parity |
+| `JudgmentSheet` | justified, caution, overspending; 기본 말투/욕쟁이 할머니 모드 message parity |
 | `EvidenceList` | budget, goal pressure, recurrence, baseline, user reason |
-| `RoastToggle` | off, preview, consent, on, disabled-by-policy |
+| `GrandmaModeToggle` | off, preview, consent, on, disabled-by-policy |
 | `ReportBar` | amount and percentage, accessible text equivalent |
 | `DataSourceBadge` | manual, synthetic/demo, connected-read-only, stale, unavailable |
 
@@ -332,8 +332,8 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 - Bottom sheets trap focus, announce their title, and return focus to the invoker.
 - Charts include text summaries and data tables or accessible labels.
 - Amount, category, source, and judgment labels have explicit screen-reader names.
-- Roast status is announced as a mode setting, not inferred from color or character.
-- Dynamic judgment results use polite live-region announcements; Roast copy is not auto-read without user action if it contains strong language.
+- `욕쟁이 할머니 모드` status is announced as a mode setting, not inferred from color or character.
+- Dynamic judgment results use polite live-region announcements; strong grandma-mode copy is not auto-read without user action.
 - Reduced motion and increased text size must preserve every core action.
 
 ## Responsive behavior
@@ -360,21 +360,26 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 
 ## Content voice
 
-### Normal
+### 기본 말투
 
 - Direct, specific, non-shaming, and action-oriented.
 - Say what changed and what to do next.
 - Prefer `이번 주 카페 예산에서 18,000원을 줄여` over `소비 습관을 개선해 보세요`.
 - Do not call a person irresponsible; describe the transaction's effect.
 
-### Roast
+### 욕쟁이 할머니 모드
 
 - Same decision, same evidence, same recommendation; only the presentation changes.
-- Voice: sharp market-grandmother ledger inspection, grounded in household metaphors and care.
-- Acceptable intensity: `이 녀석아, 이번 주 카페값을 벌써 세 번 썼어. 오늘은 지갑 좀 쉬게 해.`
+- Voice: sharp market-grandmother ledger inspection, grounded in supplied evidence, household metaphors, and care.
+- Every line follows `evidence -> scolding -> one concrete action`; it never substitutes a generic insult for financial reasoning.
+- Justified: `그래, 이건 필요한 데 제대로 썼다. 지갑 닫을 일은 아니니 계획대로 기록해 둬.`
+- Caution: `아이고 이 화상아, 친구 만난 건 좋다만 이번 주 카페가 벌써 세 번째다. 이번 주 카페는 여기까지 하고, 다음 약속은 산책으로 돌려서 지갑도 숨 좀 쉬자.`
+- Overspending: `이 녀석아, 장부 바닥이 보이는데 또 퍼 쓰면 어쩌자는 거냐. 이번 주 남은 충동구매는 멈추고 그 돈은 비상금에 남겨 둬.`
 - Never use threats, death/self-harm language, slurs, sexual humiliation, protected-trait attacks, appearance insults, or attacks on family and relationships.
-- Justified purchases receive a justified Roast response, such as grudging approval; Roast never forces a scolding verdict.
+- Justified purchases receive grudging approval; the mode never forces a scolding verdict.
 - Strong language is hidden from lock-screen previews by default.
+
+The exact user-facing name is `욕쟁이 할머니 모드`. `Roast` is retained only inside compatibility-sensitive API/schema identifiers such as `roast_enabled`, `roast_message`, and `mode=roast`.
 
 ### Terminology
 
@@ -395,7 +400,7 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 ## Implementation constraints
 
 - Framework/styling system: undecided; choose during the approved-visual implementation task.
-- Existing backend remains the source for states, labels, confidence, evidence, and Roast parity.
+- Existing backend remains the source for states, labels, confidence, evidence, and 욕쟁이 할머니 모드 parity.
 - Do not calculate risk, confidence, or mode-dependent labels in the client.
 - Manual entry is the only promised live source in the first frontend MVP.
 - Korean won uses comma grouping and no decimal: `623,000원`.
@@ -411,7 +416,7 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 - Reference: `design/screens/v1/05-home-approved.png`
 - Role: visual reference only
 - Approved on: 2026-08-03
-- Prompt summary: warm-paper Korean household-ledger Home with a bold editorial monthly headline, precise budget and goal hierarchy, one transaction-bound agent question, recent activity, and secondary opt-in Roast control
+- Prompt summary: warm-paper Korean household-ledger Home with a bold editorial monthly headline, precise budget and goal hierarchy, one transaction-bound agent question, recent activity, and secondary opt-in 욕쟁이 할머니 모드 control
 - Tokens: `paper #F6F3EC`, `ink #171512`, `action #0B71D9`, `peach #F6D5B8`, `goal #F2B544`, 12px cards, 8px buttons, restrained motion
 - Implementation constraints: mobile-first, no device chrome, flat fills, readable Korean financial figures, WCAG AA, real backend states, no client-side judgment logic
 - Deliberate deviations: implementation must remove the candidate's slight surface shading and reduce the repeated bookkeeper illustration to one primary mark per viewport
@@ -435,8 +440,8 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 | Home | `design/screens/v1/05-home-approved.png` |
 | Manual transaction | `design/screens/v1/06-manual-transaction.png` |
 | Reason question | `design/screens/v1/07-reason-question.png` |
-| Normal judgment | `design/screens/v1/08-judgment-normal.png` |
-| Roast judgment | `design/screens/v1/09-judgment-roast.png` |
+| 기본 말투 판단 | `design/screens/v1/08-judgment-normal.png` |
+| 욕쟁이 할머니 모드 판단 | `design/screens/v1/09-judgment-roast.png` |
 | Ledger | `design/screens/v1/10-ledger.png` |
 | Transaction detail | `design/screens/v1/11-transaction-detail.png` |
 | Agent inbox | `design/screens/v1/12-agent-inbox.png` |
@@ -444,13 +449,13 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 | Settings | `design/screens/v1/14-settings.png` |
 | Share preview | `design/screens/v1/15-share-preview.png` |
 
-Normal and Roast references deliberately keep the same `12,000원` transaction, caution label, `81%` confidence, evidence, recommendation, and action. Only the mode stamp and headline presentation change.
+The default and `욕쟁이 할머니 모드` references deliberately keep the same `12,000원` transaction, caution label, `81%` confidence, evidence, recommendation, and action. Only the mode stamp and headline presentation change.
 
 ## Open questions
 
 - [ ] Product name and app icon direction / user / affects final brand copy only
 - [ ] Native app, responsive web, or hybrid first / user plus engineering / affects implementation stack and platform conventions
 - [ ] Whether the Home headline should be calm (`아직 괜찮아`) or more challenging (`이번 달, 정신 차릴 때야`) / user / affects brand intensity
-- [ ] Whether users can set Roast intensity or only on/off / user / affects settings and copy matrix; default recommendation is on/off only for MVP
-- [ ] Which information may appear in a shared Roast card / user plus privacy review / affects viral loop and consent
+- [ ] Whether users can set 욕쟁이 할머니 모드 intensity or only on/off / user / affects settings and copy matrix; default recommendation is on/off only for MVP
+- [ ] Which information may appear in a shared 욕쟁이 할머니 모드 card / user plus privacy review / affects viral loop and consent
 - [ ] Final Korean typeface after license, bundle size, and numeric-legibility review / engineering plus design / affects asset pipeline

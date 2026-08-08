@@ -129,7 +129,7 @@ export function demoJudgment(roast: boolean): Judgment {
     rationale: "필요한 만남이었지만 이번 주 카페 지출이 세 번째예요.",
     recommended_action: "이번 주 카페는 여기까지. 다음 만남은 산책으로 바꿔요.",
     message: roast
-      ? "사정은 알겠는데, 카페에 네 이름 박을 셈이냐?"
+      ? "아이고 이 화상아, 친구 만난 건 좋다만 이번 주 카페가 벌써 세 번째다. 이번 주 카페는 여기까지 하고, 다음 약속은 산책으로 돌려서 지갑도 숨 좀 쉬자."
       : "필요했지만, 이번 주는 여기까지.",
     fallback_used: false,
     model: "demo-artifact",

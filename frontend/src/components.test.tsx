@@ -10,12 +10,28 @@ function CurrencyHarness() {
   return <CurrencyInput ariaLabel="생활비 예산 금액" minimum={1} value={value} onChange={setValue} />;
 }
 
+function CurrencyFormHarness({ onSubmit }: { onSubmit(): void }) {
+  const [value, setValue] = useState(12_800);
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <CurrencyInput ariaLabel="지출 금액" value={value} onChange={setValue} />
+      <button type="submit">기록하기</button>
+    </form>
+  );
+}
+
 describe("shared UI", () => {
-  it("announces Roast state and toggles it", async () => {
+  it("announces the Korean grandma mode state and toggles it", async () => {
     const onChange = vi.fn();
-    render(<><ModePill enabled /><Toggle checked={false} label="Roast 모드" onChange={onChange} /></>);
-    expect(screen.getByLabelText("Roast 켜짐")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("switch", { name: "Roast 모드" }));
+    render(<><ModePill enabled /><Toggle checked={false} label="욕쟁이 할머니 모드" onChange={onChange} /></>);
+    expect(screen.getByLabelText("욕쟁이 할머니 모드 켜짐")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("switch", { name: "욕쟁이 할머니 모드" }));
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
@@ -38,6 +54,19 @@ describe("shared UI", () => {
     await user.tab();
     expect(input).toHaveValue("800,000");
     expect(input).toHaveAttribute("inputmode", "numeric");
+  });
+
+  it("submits a form after formatting the amount with commas", async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(<CurrencyFormHarness onSubmit={onSubmit} />);
+    const input = screen.getByLabelText("지출 금액");
+
+    expect(input).toHaveValue("12,800");
+    expect(input).toBeValid();
+    await user.click(screen.getByRole("button", { name: "기록하기" }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
   it("renders one clear bookkeeper symbol without stacked icons", () => {

@@ -18,16 +18,16 @@ class KakaoRoutingTests(unittest.TestCase):
         parsed = tasks._parse_transaction("커피 5,800원 마셨어")
         self.assertEqual(parsed["amount_krw"], 5800)
 
-    def test_routes_roast_toggle_to_settings(self) -> None:
+    def test_routes_grandma_mode_toggle_to_settings(self) -> None:
         service = Mock()
         reply = tasks._route_message(
             service,
             "usr_test",
-            "로스트 켜",
+            "욕쟁이 할머니 켜",
             idempotency_key="kakao:1",
             correlation_id="corr",
         )
-        self.assertIn("로스트 모드 켰다", reply)
+        self.assertIn("욕쟁이 할머니 모드 켰다", reply)
         service.update_settings.assert_called_once()
 
     def test_routes_pending_question_answer_to_reason_flow(self) -> None:

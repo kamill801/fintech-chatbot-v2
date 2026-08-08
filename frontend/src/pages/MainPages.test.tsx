@@ -1,7 +1,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter } from "../router";
-import { LedgerPage, ReportPage } from "./MainPages";
+import { LedgerPage, ReportPage, SettingsPage } from "./MainPages";
 
 const mocks = vi.hoisted(() => ({
   useLedger: vi.fn(),
@@ -9,6 +10,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../ledger-context", () => ({
   useLedger: mocks.useLedger,
+}));
+
+vi.mock("../auth-context", () => ({
+  useAuth: () => ({ signOut: vi.fn() }),
 }));
 
 describe("live ledger summaries", () => {
@@ -29,6 +34,27 @@ describe("live ledger summaries", () => {
       },
       transactions: [],
     });
+  });
+
+  it("uses the Korean grandma mode name and previews both voices", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/settings");
+    mocks.useLedger.mockReturnValue({
+      deleteData: vi.fn(),
+      demo: true,
+      profile: null,
+      saveSettings: vi.fn(),
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul" },
+    });
+
+    render(<BrowserRouter><SettingsPage /></BrowserRouter>);
+    expect(screen.getByRole("heading", { name: "욕쟁이 할머니 모드" })).toBeInTheDocument();
+    expect(screen.queryByText("Roast 모드")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /말투 미리보기/ }));
+    expect(screen.getByText("기본 말투")).toBeInTheDocument();
+    expect(screen.getByText("욕쟁이 할머니 말투")).toBeInTheDocument();
+    expect(screen.getByText(/이번 주 카페가 벌써 세 번째/)).toBeInTheDocument();
   });
 
   it("keeps a real zero balance instead of replacing it with demo spending", () => {

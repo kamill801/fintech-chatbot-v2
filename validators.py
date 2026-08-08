@@ -93,6 +93,12 @@ def validate_roast_tone(message: str, *, label: str | None = None) -> tuple[bool
         acknowledgement_markers = ("필요", "정당", "괜찮", "인정")
         if not any(marker in message for marker in acknowledgement_markers):
             return False, "justified roast must acknowledge the purchase"
+    voice_markers = ("아이고", "아이구", "에이구", "쯧", "그래", "이 녀석", "이 화상")
+    household_markers = ("장부", "지갑", "통장", "국밥", "밥솥", "냄비", "시장", "앞치마")
+    if not any(marker in message for marker in voice_markers):
+        return False, "grandma mode needs a clear voice marker"
+    if not any(marker in message for marker in household_markers):
+        return False, "grandma mode needs a household metaphor"
     return True, ""
 
 

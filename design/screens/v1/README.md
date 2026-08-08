@@ -16,9 +16,9 @@ All files are implementation references, not production image assets. The live i
 | --- | --- | --- |
 | ![Data source](./04-data-source.png) | ![Home](./05-home-approved.png) | ![Manual transaction](./06-manual-transaction.png) |
 
-| 07 Reason question | 08 Normal judgment | 09 Roast judgment |
+| 07 Reason question | 08 기본 말투 판단 | 09 욕쟁이 할머니 모드 판단 |
 | --- | --- | --- |
-| ![Reason question](./07-reason-question.png) | ![Normal judgment](./08-judgment-normal.png) | ![Roast judgment](./09-judgment-roast.png) |
+| ![Reason question](./07-reason-question.png) | ![기본 말투 판단](./08-judgment-normal.png) | ![욕쟁이 할머니 모드 판단](./09-judgment-roast.png) |
 
 | 10 Ledger | 11 Transaction detail | 12 Agent inbox |
 | --- | --- | --- |
@@ -39,24 +39,24 @@ All files are implementation references, not production image assets. The live i
 | 05 | `05-home-approved.png` | Understand this month and answer the next pending question | 이유 답하기 |
 | 06 | `06-manual-transaction.png` | Record one expense quickly | 기록하고 판단받기 |
 | 07 | `07-reason-question.png` | Add one missing piece of purchase context | 이유 보내기 |
-| 08 | `08-judgment-normal.png` | Understand a Normal judgment and apply one correction | 이번 주 계획에 반영 |
-| 09 | `09-judgment-roast.png` | See the same judgment in opt-in Roast presentation | 이번 주 계획에 반영 |
+| 08 | `08-judgment-normal.png` | Understand the judgment in the default voice and apply one correction | 이번 주 계획에 반영 |
+| 09 | `09-judgment-roast.png` | See the same judgment in opt-in `욕쟁이 할머니 모드` | 이번 주 계획에 반영 |
 | 10 | `10-ledger.png` | Scan and open chronological records | Open transaction or add |
 | 11 | `11-transaction-detail.png` | Inspect original evidence and append a correction | 판단 수정 |
 | 12 | `12-agent-inbox.png` | Resolve pending questions before reviewing advice | 이유 답하기 |
 | 13 | `13-monthly-report.png` | Identify one pattern and apply one adjustment | 다음 주 계획에 반영 |
-| 14 | `14-settings.png` | Control Roast, financial context, source, and privacy | Open a setting row |
-| 15 | `15-share-preview.png` | Review a redacted Roast share before publishing | 이미지로 공유 |
+| 14 | `14-settings.png` | Control `욕쟁이 할머니 모드`, financial context, source, and privacy | Open a setting row |
+| 15 | `15-share-preview.png` | Review a redacted grandma-mode share before publishing | 이미지로 공유 |
 
 ## Cross-screen Invariants
 
-- Normal and Roast use the same transaction, `12,000원` amount, caution label, `81%` confidence, three evidence rows, recommendation, and primary action.
-- Roast changes only the mode stamp and rendered headline.
+- The default voice and `욕쟁이 할머니 모드` use the same transaction, `12,000원` amount, caution label, `81%` confidence, three evidence rows, recommendation, and primary action.
+- `욕쟁이 할머니 모드` changes only the mode stamp and rendered headline.
 - Manual entry is available now. Account connection is shown only as a future read-only capability.
 - Financial amount and evidence outrank agent character decoration.
 - The Agent screen starts with pending work, not a generic chat composer.
 - Share preview hides amount and merchant by default.
-- Ordinary expenses use ink. Coral is reserved for caution and Roast accents.
+- Ordinary expenses use ink. Coral is reserved for caution and grandma-mode accents.
 
 ## Implementation Cleanup
 

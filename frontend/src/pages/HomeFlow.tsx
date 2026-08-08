@@ -161,7 +161,7 @@ export function ManualTransactionPage() {
   return (
     <main className="standalone-screen composer-screen">
       <PageHeader title="지출 기록" right={<span className="source-pill"><i /> 수기 입력</span>} />
-      <form onSubmit={submit}>
+      <form onSubmit={submit} noValidate>
         <section className="amount-entry">
           <h1>얼마 썼어?</h1>
           <CurrencyInput className="composer-money-input" ariaLabel="금액" value={draft.amount_krw} onChange={(amount_krw) => setDraft({ ...draft, amount_krw })} />
