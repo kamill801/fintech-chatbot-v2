@@ -16,6 +16,7 @@ from ledger.domain.events import (
     EVENT_PROFILE_UPSERTED,
     EVENT_SETTINGS_ROAST_CHANGED,
     EVENT_SHARE_CLICKED,
+    EVENT_SHARE_SUCCEEDED,
     EVENT_SHARE_VIEWED,
     EVENT_TRANSACTION_REASON_ADDED,
     EVENT_TRANSACTION_RECORDED,
@@ -56,6 +57,7 @@ class _UserStore:
             "corrections": 0,
             "share_views": 0,
             "share_clicks": 0,
+            "share_successes": 0,
             "accounts_revoked": 0,
             "legacy_imports": 0,
         }
@@ -309,6 +311,25 @@ class InMemoryLedgerRepository(LedgerRepository):
             judgment_id,
             EVENT_SHARE_CLICKED,
             "share_clicks",
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+            source=source,
+        )
+
+    def record_share_success(
+        self,
+        user_ref: str,
+        judgment_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._record_metric_event(
+            user_ref,
+            judgment_id,
+            EVENT_SHARE_SUCCEEDED,
+            "share_successes",
             idempotency_key=idempotency_key,
             correlation_id=correlation_id,
             source=source,

@@ -37,6 +37,7 @@ def service_with_memory(
     *,
     account_adapter: Any | None = None,
     telemetry_sink: Any | None = None,
+    judgment_quota: Any | None = None,
 ) -> tuple[LedgerService, InMemoryLedgerRepository, PrivacyService, FallbackJudge]:
     privacy = fixed_privacy()
     repository = InMemoryLedgerRepository(privacy)
@@ -46,6 +47,7 @@ def service_with_memory(
         judge,
         account_adapter or DisabledProductionAccountAdapter(),
         telemetry_sink=telemetry_sink,
+        judgment_quota=judgment_quota,
     )
     return service, repository, privacy, judge
 

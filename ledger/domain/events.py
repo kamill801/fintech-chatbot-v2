@@ -16,6 +16,7 @@ EVENT_JUDGMENT_COMPLETED = "judgment.completed"
 EVENT_JUDGMENT_CORRECTED = "judgment.corrected"
 EVENT_SHARE_VIEWED = "share.viewed"
 EVENT_SHARE_CLICKED = "share.clicked"
+EVENT_SHARE_SUCCEEDED = "share.succeeded"
 EVENT_ACCOUNT_REVOKED = "account.revoked"
 EVENT_LEGACY_IMPORTED = "legacy.imported"
 EVENT_DATA_DELETION_REQUESTED = "data.deletion_requested"
@@ -31,6 +32,7 @@ ALLOWED_EVENT_TYPES = frozenset(
         EVENT_JUDGMENT_CORRECTED,
         EVENT_SHARE_VIEWED,
         EVENT_SHARE_CLICKED,
+        EVENT_SHARE_SUCCEEDED,
         EVENT_ACCOUNT_REVOKED,
         EVENT_LEGACY_IMPORTED,
         EVENT_DATA_DELETION_REQUESTED,

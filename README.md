@@ -11,6 +11,8 @@ Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It 
 - Ask exactly one reason question for uncertain transactions.
 - Return a structured judgment and one corrective action.
 - Record corrections, privacy-safe shares, metrics, and audit events.
+- Keep authenticated browser drafts user-scoped, clear them on sign-out/deletion, and reuse one operation ID across ambiguous retries.
+- Bound per-user AI judgment usage and distinguish a share preview from a completed native share or image download.
 - Retain KakaoTalk as an optional thin Flask/RQ transport outside the free web deployment.
 - Provide the complete onboarding, Home, ledger, agent, report, settings, judgment, correction, and privacy-safe sharing experience as a responsive installable web app.
 
@@ -124,9 +126,21 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 - Logs, Sheets, metrics, and shares reject raw financial or chat fields.
 - `욕쟁이 할머니 모드` is presentation-only and cannot alter a financial decision.
 - User-facing copy never calls the feature Roast. Internal compatibility fields such as `roast_enabled` and `roast_message` remain unchanged.
+- Local financial drafts are keyed by a one-way browser hash of the authenticated user ID and are removed on sign-out or full data deletion.
+- Redis projections, events, idempotency records, and direct judgment indexes inherit the configured 365-day retention contract.
+
+## Production Reliability
+
+- Transaction retries reuse the same client operation ID so a lost response cannot create a second ledger entry or judgment.
+- Profile/API load failures remain visible and retryable instead of being treated as a new user onboarding state.
+- Production AI calls use explicit timeouts, at most two judgment attempts, a bounded output size, and Redis-backed daily/rate limits per pseudonymous user.
+- Quota checks fail closed with a safe `429` before a new immediately judged transaction or reason is persisted.
+- Transaction lists are newest-first and judgment lookup uses a direct Redis transaction index with legacy backfill.
+- Shared cards use the effective corrected judgment, and successful shares are counted only after native share completion or image download.
+- Visible controls that cannot perform their promised action are removed or marked unavailable.
 
 ## Project Status
 
-The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, offline draft retention, and redacted image sharing are connected.
+The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, user-scoped draft retention, and redacted image sharing are connected.
 
-The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Render health and Redis-backed readiness returned HTTP 200 on 2026-08-05, and the Vercel production alias serves the login build. A real authenticated transaction-to-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.
+The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Task 6.4 verification on 2026-08-14 passed 101 backend tests plus four isolated Redis integration tests, 32 frontend tests, lint, production build, and a production dependency audit with zero reported vulnerabilities. A real authenticated transaction-to-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.

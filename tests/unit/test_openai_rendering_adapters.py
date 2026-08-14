@@ -87,10 +87,24 @@ class StrictOpenAIJudgeTests(unittest.TestCase):
         fake_responses = FakeResponses([{"label": "caution"}, VALID_MODEL_PAYLOAD.copy()])
         judge = OpenAIResponsesJudge(
             model="test-model",
+            max_retries=2,
             client_factory=lambda: FakeClient(fake_responses),
         )
         result = judge.judge(request())
         self.assertFalse(result.fallback_used)
+        self.assertEqual(len(fake_responses.calls), 2)
+
+    def test_retry_attempts_are_capped_to_avoid_multiplicative_retries(self) -> None:
+        fake_responses = FakeResponses(
+            [{"label": "caution"}, {"label": "caution"}, VALID_MODEL_PAYLOAD.copy()]
+        )
+        judge = OpenAIResponsesJudge(
+            model="test-model",
+            max_retries=9,
+            client_factory=lambda: FakeClient(fake_responses),
+        )
+        result = judge.judge(request())
+        self.assertTrue(result.fallback_used)
         self.assertEqual(len(fake_responses.calls), 2)
 
     def test_falls_back_after_two_model_failures(self) -> None:
@@ -112,6 +126,18 @@ class StrictOpenAIJudgeTests(unittest.TestCase):
         call = fake_responses.calls[0]
         self.assertIs(call["store"], False)
         self.assertTrue(call["text"]["format"]["strict"])
+        self.assertEqual(call["max_output_tokens"], 700)
+        self.assertEqual(call["timeout"], 20.0)
+
+    def test_allows_configured_strict_output_token_cap(self) -> None:
+        fake_responses = FakeResponses([VALID_MODEL_PAYLOAD.copy()])
+        judge = OpenAIResponsesJudge(
+            model="test-model",
+            max_output_tokens=321,
+            client_factory=lambda: FakeClient(fake_responses),
+        )
+        judge.judge(request())
+        self.assertEqual(fake_responses.calls[0]["max_output_tokens"], 321)
 
     def test_omits_raw_merchant_from_model_input(self) -> None:
         fake_responses = FakeResponses([VALID_MODEL_PAYLOAD.copy()])

@@ -11,24 +11,24 @@ import {
 } from "@phosphor-icons/react";
 import { BookkeeperMark, CurrencyInput, Highlight, PrimaryButton, Surface } from "../components";
 import { demoProfile } from "../demo";
+import { useAuth } from "../auth-context";
 import { useLedger } from "../ledger-context";
+import { onboardingDraftKey } from "../local-drafts";
 import { useNavigate } from "../router";
 import type { Profile } from "../types";
 import { formatWon, withDemo } from "../utils";
 
-const DRAFT_KEY = "jangbu-onboarding-draft";
-
-function readDraft(): Profile {
+function readDraft(key: string): Profile {
   try {
-    const saved = window.localStorage.getItem(DRAFT_KEY);
+    const saved = window.sessionStorage.getItem(key);
     return saved ? (JSON.parse(saved) as Profile) : demoProfile;
   } catch {
     return demoProfile;
   }
 }
 
-function writeDraft(profile: Profile) {
-  window.localStorage.setItem(DRAFT_KEY, JSON.stringify(profile));
+function writeDraft(key: string, profile: Profile) {
+  window.sessionStorage.setItem(key, JSON.stringify(profile));
 }
 
 function StepHeader({ step }: { step: number }) {
@@ -89,8 +89,10 @@ export function OnboardingTrust() {
 
 export function OnboardingBaseline() {
   const { demo } = useLedger();
+  const { userKey } = useAuth();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState(readDraft);
+  const draftKey = onboardingDraftKey(userKey, demo);
+  const [draft, setDraft] = useState(() => readDraft(draftKey));
   const update = (key: keyof Profile, value: number) => setDraft((current) => ({ ...current, [key]: value }));
   const freeMoney = Math.max(0, draft.monthly_income_krw - draft.fixed_expenses_krw - draft.monthly_debt_payment_krw - draft.discretionary_budget_krw);
 
@@ -113,15 +115,17 @@ export function OnboardingBaseline() {
       </Surface>
       <div className="goal-callout"><Wallet size={27} /><span>매달 자유롭게 쓸 돈의 기준이에요</span><strong>{formatWon(draft.discretionary_budget_krw)}</strong></div>
       {freeMoney > 0 && <p className="baseline-note">기준을 지키면 매달 {formatWon(freeMoney)}을 남길 수 있어요.</p>}
-      <PrimaryButton onClick={() => { writeDraft(draft); navigate(withDemo("/onboarding/goal", demo)); }}>기준 저장하기</PrimaryButton>
+      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/goal", demo)); }}>기준 저장하기</PrimaryButton>
     </main>
   );
 }
 
 export function OnboardingGoal() {
   const { demo } = useLedger();
+  const { userKey } = useAuth();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState(readDraft);
+  const draftKey = onboardingDraftKey(userKey, demo);
+  const [draft, setDraft] = useState(() => readDraft(draftKey));
   const progress = Math.min(100, Math.round((draft.goal.current_amount_krw / Math.max(draft.goal.target_amount_krw, 1)) * 100));
   const months = Math.max(1, Math.ceil((new Date(draft.goal.target_date).getTime() - Date.now()) / 2_629_800_000));
   const monthly = Math.max(0, Math.ceil((draft.goal.target_amount_krw - draft.goal.current_amount_krw) / months / 1000) * 1000);
@@ -145,24 +149,26 @@ export function OnboardingGoal() {
         <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
         <div><Wallet size={27} /> 매달 <strong>{formatWon(monthly)}</strong>씩 모으면 돼</div>
       </div>
-      <PrimaryButton onClick={() => { writeDraft(draft); navigate(withDemo("/onboarding/source", demo)); }}>목표 시작하기</PrimaryButton>
+      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/source", demo)); }}>목표 시작하기</PrimaryButton>
     </main>
   );
 }
 
 export function OnboardingSource() {
   const { demo, saveProfile } = useLedger();
+  const { userKey } = useAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const draft = useMemo(readDraft, []);
+  const draftKey = onboardingDraftKey(userKey, demo);
+  const draft = useMemo(() => readDraft(draftKey), [draftKey]);
 
   async function finish() {
     setSaving(true);
     setError(null);
     try {
       await saveProfile(draft);
-      window.localStorage.removeItem(DRAFT_KEY);
+      window.sessionStorage.removeItem(draftKey);
       navigate(withDemo("/", demo));
     } catch {
       setError("기준을 저장하지 못했어요. 입력값을 확인해 주세요.");

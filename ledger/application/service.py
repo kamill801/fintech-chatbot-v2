@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Callable, Protocol
@@ -24,8 +25,11 @@ from ledger.domain.models import (
 )
 from ledger.domain.ports import LedgerRepository, ReadOnlyAccountAdapter
 from ledger.privacy import sanitize_free_text, sanitize_share_payload
+from ledger.quota import JudgmentQuotaLimiter, QuotaExceededError, QuotaUnavailableError
 from ledger.rendering import render_judgment
 from ledger.telemetry import TelemetryEvent, confidence_band
+
+logger = logging.getLogger(__name__)
 
 
 class Judge(Protocol):
@@ -37,6 +41,10 @@ class ServiceError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.status = status
+
+
+class JudgmentQuotaError(ServiceError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -53,12 +61,14 @@ class LedgerService:
         account_adapter: ReadOnlyAccountAdapter,
         *,
         telemetry_sink: Callable[[dict[str, Any]], Any] | None = None,
+        judgment_quota: JudgmentQuotaLimiter | None = None,
     ) -> None:
         self.repository = repository
         self.judge = judge
         self.account_adapter = account_adapter
         self.manual_source = ManualTransactionSource()
         self.telemetry_sink = telemetry_sink
+        self.judgment_quota = judgment_quota
 
     def get_profile(self, user_ref: str) -> ServiceResult:
         profile = self.repository.get_profile(user_ref)
@@ -138,7 +148,14 @@ class LedgerService:
         return ServiceResult(stored.status, stored.body)
 
     def list_transactions(self, user_ref: str) -> ServiceResult:
-        transactions = [item.to_dict() for item in self.repository.list_transactions(user_ref)]
+        transactions = [
+            item.to_dict()
+            for item in sorted(
+                self.repository.list_transactions(user_ref),
+                key=lambda item: (item.occurred_at, item.created_at, item.transaction_id),
+                reverse=True,
+            )
+        ]
         return ServiceResult(200, {"transactions": transactions})
 
     def get_transaction(self, user_ref: str, transaction_id: str) -> ServiceResult:
@@ -193,12 +210,20 @@ class LedgerService:
             idempotency_key=idempotency_key,
         )
         transaction = self.manual_source.create_record(draft)
-        recorded = self.repository.record_transaction(
-            transaction,
-            idempotency_key=_key("transaction-record", idempotency_key),
-            correlation_id=correlation_id,
-            source=source,
-        )
+        transaction_record_key = _key("transaction-record", idempotency_key)
+        recorded = self.repository.get_cached_result(user_ref, transaction_record_key)
+        quota_prechecked = False
+        if recorded is None:
+            signals = self._compute_signals(profile, transaction)
+            if not (signals.requires_reason and not transaction.reason):
+                self._consume_judgment_quota(user_ref)
+                quota_prechecked = True
+            recorded = self.repository.record_transaction(
+                transaction,
+                idempotency_key=transaction_record_key,
+                correlation_id=correlation_id,
+                source=source,
+            )
         transaction = Transaction.from_dict(recorded.body["transaction"])
         existing = self._existing_transaction_result(user_ref, transaction)
         if existing:
@@ -245,6 +270,7 @@ class LedgerService:
             idempotency_key=_key("judgment", idempotency_key),
             correlation_id=correlation_id,
             source=source,
+            quota_prechecked=quota_prechecked,
         )
         return self._cache_service_result(user_ref, response_key, result)
 
@@ -277,19 +303,25 @@ class LedgerService:
         reason = _optional_text(payload.get("reason"), max_length=500)
         if not reason:
             raise ServiceError("reason_required", "reason is required", 400)
-        stored = self.repository.add_transaction_reason(
-            user_ref,
-            transaction_id,
-            reason,
-            answered_at=utc_now_iso(),
-            idempotency_key=_key(f"reason:{transaction_id}", idempotency_key),
-            correlation_id=correlation_id,
-            source=source,
-        )
-        transaction = Transaction.from_dict(stored.body["transaction"])
         profile = self.repository.get_profile(user_ref)
         if profile is None:
             raise ServiceError("profile_required", "financial profile is missing", 409)
+        reason_record_key = _key(f"reason:{transaction_id}", idempotency_key)
+        stored = self.repository.get_cached_result(user_ref, reason_record_key)
+        quota_prechecked = False
+        if stored is None:
+            self._consume_judgment_quota(user_ref)
+            quota_prechecked = True
+            stored = self.repository.add_transaction_reason(
+                user_ref,
+                transaction_id,
+                reason,
+                answered_at=utc_now_iso(),
+                idempotency_key=reason_record_key,
+                correlation_id=correlation_id,
+                source=source,
+            )
+        transaction = Transaction.from_dict(stored.body["transaction"])
         signals = self._compute_signals(profile, transaction)
         result = self._complete_judgment(
             user_ref,
@@ -298,6 +330,7 @@ class LedgerService:
             idempotency_key=_key(f"reason-judgment:{transaction_id}", idempotency_key),
             correlation_id=correlation_id,
             source=source,
+            quota_prechecked=quota_prechecked,
         )
         return self._cache_service_result(user_ref, response_key, result)
 
@@ -366,6 +399,8 @@ class LedgerService:
     ) -> ServiceResult:
         judgment = self._require_roast_judgment(user_ref, judgment_id)
         transaction = self._require_transaction(user_ref, judgment.transaction_id)
+        correction = self.repository.get_judgment_correction(user_ref, judgment_id)
+        effective_label = correction.corrected_label if correction else judgment.label
         stored = self.repository.record_share_click(
             user_ref,
             judgment_id,
@@ -375,10 +410,12 @@ class LedgerService:
         )
         share = sanitize_share_payload(
             {
-                "label": judgment.label,
-                "roast_message": render_judgment(
-                    judgment, roast_enabled=True
-                ).message,
+                "label": effective_label,
+                "roast_message": (
+                    _corrected_share_message(effective_label)
+                    if correction
+                    else render_judgment(judgment, roast_enabled=True).message
+                ),
                 "category": transaction.category,
                 "recommended_action": judgment.recommended_action,
             }
@@ -387,11 +424,40 @@ class LedgerService:
             user_ref,
             event_type="share.clicked",
             event_id=str(uuid4()),
-            label=judgment.label,
+            label=effective_label,
             share_flag=True,
             policy_version=judgment.policy_version,
         )
         return ServiceResult(stored.status, {"share": share})
+
+    def record_share_success(
+        self,
+        user_ref: str,
+        judgment_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> ServiceResult:
+        judgment = self._require_roast_judgment(user_ref, judgment_id)
+        correction = self.repository.get_judgment_correction(user_ref, judgment_id)
+        effective_label = correction.corrected_label if correction else judgment.label
+        stored = self.repository.record_share_success(
+            user_ref,
+            judgment_id,
+            idempotency_key=_key(f"share-success:{judgment_id}", idempotency_key),
+            correlation_id=correlation_id,
+            source=source,
+        )
+        self._emit_telemetry(
+            user_ref,
+            event_type="share.succeeded",
+            event_id=str(uuid4()),
+            label=effective_label,
+            share_flag=True,
+            policy_version=judgment.policy_version,
+        )
+        return ServiceResult(stored.status, stored.body)
 
     def get_summary(self, user_ref: str) -> ServiceResult:
         profile = self.repository.get_profile(user_ref)
@@ -431,6 +497,10 @@ class LedgerService:
         views = int(metrics.get("share_views", 0))
         clicks = int(metrics.get("share_clicks", 0))
         metrics["roast_share_rate"] = round(clicks / views, 4) if views else 0.0
+        metrics["share_successes"] = int(metrics.get("share_successes", 0))
+        metrics["roast_share_success_rate"] = (
+            round(metrics["share_successes"] / views, 4) if views else 0.0
+        )
         return ServiceResult(200, {"metrics": metrics})
 
     def revoke_account(
@@ -503,6 +573,7 @@ class LedgerService:
         idempotency_key: str,
         correlation_id: str,
         source: str,
+        quota_prechecked: bool = False,
     ) -> ServiceResult:
         existing = self.repository.get_judgment_for_transaction(
             user_ref, transaction.transaction_id
@@ -518,6 +589,8 @@ class LedgerService:
                     "judgment": self._render(user_ref, existing),
                 },
             )
+        if not quota_prechecked:
+            self._consume_judgment_quota(user_ref)
         judgment = self.judge.judge(
             JudgmentRequest(
                 transaction_id=transaction.transaction_id,
@@ -676,6 +749,16 @@ class LedgerService:
         try:
             self.telemetry_sink(event.to_dict())
         except Exception:
+            if fallback_used:
+                logger.warning(
+                    "OpenAI fallback used and telemetry sink failed",
+                    extra={
+                        "event_type": event_type,
+                        "fallback_used": True,
+                        "policy_version": policy_version,
+                        "redaction_status": "allowlisted",
+                    },
+                )
             return
 
     def _cache_service_result(
@@ -689,6 +772,34 @@ class LedgerService:
             StoredResult(result.status, result.data or {}),
         )
         return result
+
+    def _consume_judgment_quota(self, user_ref: str) -> None:
+        if self.judgment_quota is None:
+            return
+        try:
+            self.judgment_quota.check_and_increment(user_ref)
+        except QuotaExceededError as exc:
+            raise JudgmentQuotaError(
+                "ai_judgment_quota_exceeded",
+                "오늘 사용할 수 있는 AI 판단 횟수를 모두 썼어요. 잠시 후 다시 시도해 주세요.",
+                429,
+            ) from exc
+        except QuotaUnavailableError as exc:
+            raise JudgmentQuotaError(
+                "ai_judgment_quota_unavailable",
+                "AI 판단 한도를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.",
+                429,
+            ) from exc
+
+
+def _corrected_share_message(label: str) -> str:
+    messages = {
+        "justified": "다시 장부를 보니 납득할 만한 지출이구나. 다음에도 이유와 예산을 같이 확인해라.",
+        "caution": "다시 장부를 보니 주의가 필요한 지출이구나. 다음 소비 전에는 예산부터 한 번 더 확인해라.",
+        "overspending": "다시 장부를 보니 과소비가 맞구나. 다음 지출은 멈추고 예산부터 확인해라.",
+        "insufficient_context": "다시 장부를 봐도 정보가 더 필요하구나. 판단 전에 이유를 조금 더 남겨라.",
+    }
+    return messages.get(label, messages["insufficient_context"])
 
 
 def _integer(payload: dict[str, Any], field_name: str) -> int:

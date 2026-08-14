@@ -19,13 +19,19 @@ import {
   Surface,
   TransactionRow,
 } from "../components";
+import { useAuth } from "../auth-context";
 import { useLedger } from "../ledger-context";
+import { manualDraftKey } from "../local-drafts";
 import { Link, useNavigate, useParams } from "../router";
 import type { Transaction, TransactionDraft } from "../types";
 import { categoryNames, formatCompactWon, formatDate, formatTodayLabel, formatWon, withDemo } from "../utils";
 
-const MANUAL_DRAFT_KEY = "jangbu-manual-draft";
 const categories = ["cafe", "food", "transport", "shopping", "housing", "health", "other"];
+
+interface StoredManualDraft {
+  draft: TransactionDraft;
+  operationId: string;
+}
 
 function monthlyRemaining(total: number, budget?: number): number {
   return Math.max(0, (budget ?? 0) - total);
@@ -106,33 +112,46 @@ function todayForInput(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-function manualDraftKey(demo: boolean): string {
-  return demo ? `${MANUAL_DRAFT_KEY}-demo` : MANUAL_DRAFT_KEY;
-}
-
-function readManualDraft(demo: boolean): TransactionDraft {
-  try {
-    const saved = window.localStorage.getItem(manualDraftKey(demo));
-    if (saved) return JSON.parse(saved) as TransactionDraft;
-  } catch {
-    // Start from a safe blank draft if local storage is unavailable.
-  }
+function blankManualDraft(demo: boolean): TransactionDraft {
   return demo
     ? { amount_krw: 12_000, category: "cafe", merchant: "카페 온도" }
     : { amount_krw: 0, category: "other", merchant: "" };
 }
 
+function readManualDraft(key: string, demo: boolean): StoredManualDraft {
+  try {
+    const saved = window.localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved) as Partial<StoredManualDraft> & TransactionDraft;
+      if ("draft" in parsed && parsed.draft && parsed.operationId) {
+        return { draft: parsed.draft, operationId: parsed.operationId };
+      }
+      return { draft: parsed as TransactionDraft, operationId: crypto.randomUUID() };
+    }
+  } catch {
+    // Start from a safe blank draft if local storage is unavailable.
+  }
+  return { draft: blankManualDraft(demo), operationId: crypto.randomUUID() };
+}
+
 export function ManualTransactionPage() {
   const { createTransaction, demo } = useLedger();
+  const { userKey } = useAuth();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<TransactionDraft>(() => readManualDraft(demo));
+  const draftKey = manualDraftKey(userKey, demo);
+  const [storedDraft, setStoredDraft] = useState<StoredManualDraft>(() => readManualDraft(draftKey, demo));
+  const { draft, operationId } = storedDraft;
   const [date, setDate] = useState(todayForInput);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem(manualDraftKey(demo), JSON.stringify(draft));
-  }, [demo, draft]);
+    window.localStorage.setItem(draftKey, JSON.stringify(storedDraft));
+  }, [draftKey, storedDraft]);
+
+  function updateDraft(patch: Partial<TransactionDraft>) {
+    setStoredDraft((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -144,8 +163,8 @@ export function ManualTransactionPage() {
     setError(null);
     try {
       const occurredAt = new Date(`${date}T12:00:00+09:00`).toISOString();
-      const result = await createTransaction({ ...draft, occurred_at: occurredAt });
-      window.localStorage.removeItem(manualDraftKey(demo));
+      const result = await createTransaction({ ...draft, occurred_at: occurredAt }, operationId);
+      window.localStorage.removeItem(draftKey);
       if (result.pending_question) {
         navigate(withDemo(`/transactions/${result.transaction.transaction_id}/reason`, demo));
       } else {
@@ -164,19 +183,19 @@ export function ManualTransactionPage() {
       <form onSubmit={submit} noValidate>
         <section className="amount-entry">
           <h1>얼마 썼어?</h1>
-          <CurrencyInput className="composer-money-input" ariaLabel="금액" value={draft.amount_krw} onChange={(amount_krw) => setDraft({ ...draft, amount_krw })} />
+          <CurrencyInput className="composer-money-input" ariaLabel="금액" value={draft.amount_krw} onChange={(amount_krw) => updateDraft({ amount_krw })} />
         </section>
-        <div className="transaction-type"><button type="button">수입</button><button className="selected" type="button">지출</button></div>
+        <div className="transaction-type"><button className="selected" type="button">지출</button></div>
         <Surface className="composer-fields">
           <label className="field-row">
             <span className="warm-icon"><CategoryIcon category={draft.category} /></span><strong>분류</strong>
-            <select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })}>
+            <select value={draft.category} onChange={(event) => updateDraft({ category: event.target.value })}>
               {categories.map((category) => <option key={category} value={category}>{categoryNames[category]}</option>)}
             </select><CaretRight size={19} />
           </label>
           <label className="field-row">
             <span className="warm-icon"><MapPin size={23} /></span><strong>사용처</strong>
-            <input value={draft.merchant ?? ""} placeholder="사용처 입력" onChange={(event) => setDraft({ ...draft, merchant: event.target.value })} /><CaretRight size={19} />
+            <input value={draft.merchant ?? ""} placeholder="사용처 입력" onChange={(event) => updateDraft({ merchant: event.target.value })} /><CaretRight size={19} />
           </label>
           <label className="field-row">
             <span className="warm-icon"><CalendarBlank size={23} /></span><strong>날짜</strong>
@@ -184,7 +203,7 @@ export function ManualTransactionPage() {
           </label>
           <label className="field-row">
             <span className="warm-icon"><NotePencil size={23} /></span><strong>메모</strong>
-            <input value={draft.description ?? ""} placeholder="선택 입력" onChange={(event) => setDraft({ ...draft, description: event.target.value })} /><CaretRight size={19} />
+            <input value={draft.description ?? ""} placeholder="선택 입력" onChange={(event) => updateDraft({ description: event.target.value })} /><CaretRight size={19} />
           </label>
         </Surface>
         <InfoCallout>정보가 부족하면 이유를 한 번 물어봐요</InfoCallout>

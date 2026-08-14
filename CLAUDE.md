@@ -1,6 +1,6 @@
 # fintech-chatbot V2 - AI Household Ledger Agent
 
-Korean AI household-ledger backend. The primary product is a financial agent that tracks transactions, judges likely overspending, asks for missing context, and recommends one corrective action. The opt-in Roast mode changes tone only.
+Korean AI household-ledger product. The primary product is a financial agent that tracks transactions, judges likely overspending, asks for missing context, and recommends one corrective action. The opt-in `욕쟁이 할머니 모드` changes tone only.
 
 ## Stack
 
@@ -25,9 +25,9 @@ Korean AI household-ledger backend. The primary product is a financial agent tha
 - Accuracy comes before entertainment.
 - Deterministic signals are computed before the AI judgment.
 - Uncertain transactions ask exactly one focused reason question.
-- Roast defaults off and is immediately reversible.
-- Roast can change only the rendered message, never the judgment or recommendation.
-- Necessary spending remains justified in Roast mode.
+- `욕쟁이 할머니 모드` defaults off and is immediately reversible.
+- `욕쟁이 할머니 모드` can change only the rendered message, never the judgment or recommendation.
+- Necessary spending remains justified in `욕쟁이 할머니 모드`.
 - The MVP can read, ask, judge, and advise; it cannot move money.
 - Manual transaction entry must work without an account provider.
 - Production account linkage stays disabled until separately approved.
@@ -45,7 +45,7 @@ Korean AI household-ledger backend. The primary product is a financial agent tha
 
 ## Current Stop Boundary
 
-Complete and verify the backend, then stop. UI/UX, screen hierarchy, visual language, onboarding, transaction-capture interaction, Roast controls, reports, and share-card design must be defined with the user in the next approved phase.
+Task 6.4 production hardening is complete. Start no new product, account-provider, money-movement, authentication-policy, or UI/UX scope without a dedicated approved task in `PLAN.md`.
 
 ## Source Documents
 

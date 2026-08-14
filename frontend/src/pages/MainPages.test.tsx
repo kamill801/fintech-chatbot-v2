@@ -63,6 +63,10 @@ describe("live ledger summaries", () => {
     expect(screen.getAllByText("0원").length).toBeGreaterThan(0);
     expect(screen.queryByText("377,500원")).not.toBeInTheDocument();
     expect(screen.getByText("아직 기록한 지출이 없어요.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "검색" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "필터" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "2026년 8월" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "달력" })).not.toBeInTheDocument();
   });
 
   it("shows an honest empty report instead of fabricated category advice", () => {

@@ -9,11 +9,13 @@ import {
   useState,
 } from "react";
 import { authConfigured, supabase } from "./auth-client";
+import { clearFinancialDrafts } from "./local-drafts";
 
 interface AuthContextValue {
   configured: boolean;
   loading: boolean;
   session: Session | null;
+  userKey: string | null;
   error: string | null;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string): Promise<boolean>;
@@ -80,15 +82,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     if (!supabase) return;
     setError(null);
-    const { error: signOutError } = await supabase.auth.signOut();
-    if (signOutError) {
+    const currentUserKey = session?.user?.id ?? session?.user?.email ?? null;
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        setError("로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.");
+        throw signOutError;
+      }
+      clearFinancialDrafts(currentUserKey);
+    } catch (signOutError) {
       setError("로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.");
       throw signOutError;
     }
-  }, []);
+  }, [session]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ configured: authConfigured, error, loading, session, signIn, signOut, signUp }),
+    () => ({
+      configured: authConfigured,
+      error,
+      loading,
+      session,
+      signIn,
+      signOut,
+      signUp,
+      userKey: session?.user?.id ?? session?.user?.email ?? null,
+    }),
     [error, loading, session, signIn, signOut, signUp],
   );
 

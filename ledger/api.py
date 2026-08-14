@@ -200,6 +200,18 @@ def create_api_blueprint(
             )
         )
 
+    @api.post("/api/v1/me/judgments/<judgment_id>/share-success")
+    @authenticated
+    def share_success(judgment_id: str) -> Response:
+        return _mutating(
+            lambda key: service.record_share_success(
+                g.user_ref,
+                judgment_id,
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
     @api.get("/api/v1/me/summary")
     @authenticated
     def summary() -> Response:

@@ -24,6 +24,22 @@ services:
         value: https://ijdodqldneduqeblkivo.supabase.co
       - key: OPENAI_API_KEY
         sync: false
+      - key: OPENAI_TIMEOUT_SECONDS
+        value: "20"
+      - key: OPENAI_JUDGMENT_ATTEMPTS
+        value: "2"
+      - key: OPENAI_LEDGER_MAX_OUTPUT_TOKENS
+        value: "700"
+      - key: AI_JUDGMENT_DAILY_QUOTA
+        value: "50"
+      - key: AI_JUDGMENT_DAILY_WINDOW_SECONDS
+        value: "86400"
+      - key: AI_JUDGMENT_RATE_LIMIT
+        value: "10"
+      - key: AI_JUDGMENT_RATE_WINDOW_SECONDS
+        value: "60"
+      - key: LEDGER_RETENTION_DAYS
+        value: "365"
       - key: LEDGER_ENCRYPTION_KEY
         generateValue: true
       - key: LEDGER_USER_REF_SECRET

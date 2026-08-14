@@ -80,6 +80,14 @@ class RedisRepositoryIntegrationTests(unittest.TestCase):
             correlation_id=correlation_id(),
         )
         judgment_id = judged.data["judgment"]["judgment_id"]
+        index_key = self.repository._judgment_for_transaction_key(self.user_ref, transaction_id)
+        self.assertEqual(self.redis.get(index_key), judgment_id)
+        self.assertEqual(
+            self.repository.get_judgment_for_transaction(
+                self.user_ref, transaction_id
+            ).judgment_id,
+            judgment_id,
+        )
         self.service.correct_judgment(
             self.user_ref,
             judgment_id,
@@ -98,6 +106,8 @@ class RedisRepositoryIntegrationTests(unittest.TestCase):
 
         keys = list(self.redis.scan_iter(match=f"ledger:{self.user_ref}:*"))
         self.assertTrue(keys)
+        self.assertIn(index_key, keys)
+        self.assertIn(index_key, self.redis.smembers(self.repository._registry_key(self.user_ref)))
         self.assertTrue(all(0 < self.redis.ttl(key) <= 86400 for key in keys))
         self.assertNotIn("9876543", self._stored_payload_text(keys))
 
@@ -113,6 +123,35 @@ class RedisRepositoryIntegrationTests(unittest.TestCase):
         )
         self.assertEqual((first_delete.status, second_delete.status), (204, 204))
         self.assertEqual(list(self.redis.scan_iter(match=f"ledger:{self.user_ref}:*")), [])
+
+    def test_legacy_judgment_scan_backfills_direct_transaction_index(self) -> None:
+        self.service.upsert_profile(
+            self.user_ref,
+            profile_payload(),
+            idempotency_key="profile-legacy-index",
+            correlation_id=correlation_id(),
+        )
+        pending = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 9876543, "category": "shopping"},
+            idempotency_key="tx-legacy-index",
+            correlation_id=correlation_id(),
+        )
+        transaction_id = pending.data["transaction"]["transaction_id"]
+        judged = self.service.add_reason(
+            self.user_ref,
+            transaction_id,
+            {"reason": "업무 장비"},
+            idempotency_key="reason-legacy-index",
+            correlation_id=correlation_id(),
+        )
+        index_key = self.repository._judgment_for_transaction_key(self.user_ref, transaction_id)
+        self.redis.delete(index_key)
+
+        found = self.repository.get_judgment_for_transaction(self.user_ref, transaction_id)
+
+        self.assertEqual(found.judgment_id, judged.data["judgment"]["judgment_id"])
+        self.assertEqual(self.redis.get(index_key), found.judgment_id)
 
     def test_pending_question_mutations_are_serialized_per_user(self) -> None:
         barrier = threading.Barrier(3)

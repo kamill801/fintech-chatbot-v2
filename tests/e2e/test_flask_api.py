@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from ledger.auth import AuthConfigurationError, AuthenticationError
+from ledger.quota import QuotaExceededError
 from tests.helpers import FERNET_KEY, USER_REF_SECRET, profile_payload
 
 
@@ -84,6 +85,23 @@ class FlaskLedgerE2ETests(unittest.TestCase):
         _transaction_id, judgment_id = self.create_reason_judgment()
         self.assertTrue(judgment_id)
 
+    def test_quota_limit_returns_safe_429_error(self) -> None:
+        class RejectQuota:
+            def check_and_increment(self, _user_ref: str) -> None:
+                raise QuotaExceededError("ledger:usr_secret:quota")
+
+        self.put_profile()
+        self.app.extensions["ledger_service"].judgment_quota = RejectQuota()
+        response = self.client.post(
+            "/api/v1/me/transactions",
+            json={"amount_krw": 1000, "category": "transport", "reason": "출근"},
+            headers=self.mutate_headers("tx-quota-429"),
+        )
+        payload = response.get_json()
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(payload["error"]["code"], "ai_judgment_quota_exceeded")
+        self.assertNotIn("usr_secret", payload["error"]["message"])
+
     def test_mutating_request_requires_idempotency_key(self) -> None:
         response = self.client.put(
             "/api/v1/me/profile",
@@ -159,6 +177,29 @@ class FlaskLedgerE2ETests(unittest.TestCase):
         )
         response = self.client.get("/api/v1/me/metrics", headers=self.headers)
         self.assertEqual(response.get_json()["data"]["metrics"]["roast_share_rate"], 1.0)
+
+    def test_share_success_records_separate_completion_metric(self) -> None:
+        _transaction_id, judgment_id = self.create_reason_judgment()
+        self.client.put(
+            "/api/v1/me/settings",
+            json={"roast_enabled": True},
+            headers=self.mutate_headers("settings-1"),
+        )
+        self.client.post(
+            f"/api/v1/me/judgments/{judgment_id}/share-view",
+            headers=self.mutate_headers("share-view-1"),
+        )
+        response = self.client.post(
+            f"/api/v1/me/judgments/{judgment_id}/share-success",
+            headers=self.mutate_headers("share-success-1"),
+        )
+        metrics = self.client.get("/api/v1/me/metrics", headers=self.headers).get_json()[
+            "data"
+        ]["metrics"]
+        self.assertEqual(response.get_json()["data"]["share_successes"], 1)
+        self.assertEqual(metrics["share_clicks"], 0)
+        self.assertEqual(metrics["share_successes"], 1)
+        self.assertEqual(metrics["roast_share_success_rate"], 1.0)
 
     def test_delete_data_returns_204(self) -> None:
         self.put_profile()

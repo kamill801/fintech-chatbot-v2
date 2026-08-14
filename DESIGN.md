@@ -399,15 +399,18 @@ The exact user-facing name is `욕쟁이 할머니 모드`. `Roast` is retained 
 
 ## Implementation constraints
 
-- Framework/styling system: undecided; choose during the approved-visual implementation task.
+- Framework/styling system: React, TypeScript, Vite, and the approved token-based CSS implementation under `frontend/`.
 - Existing backend remains the source for states, labels, confidence, evidence, and 욕쟁이 할머니 모드 parity.
 - Do not calculate risk, confidence, or mode-dependent labels in the client.
 - Manual entry is the only promised live source in the first frontend MVP.
 - Korean won uses comma grouping and no decimal: `623,000원`.
 - Dates use the user's `Asia/Seoul` timezone.
 - Charts must derive from backend data; visual candidates may use clearly labeled mock data.
-- No production frontend code or component dependency is added before visual approval.
-- Implementation completion later requires typecheck, lint, tests, responsive screenshots, and manual accessibility checks.
+- Financial drafts must be scoped to the authenticated user, cleared on sign-out/deletion, and never used as proof of server persistence.
+- Controls that do not perform their promised action must be removed or explicitly labeled unavailable.
+- A backend load error must preserve a retry path and must not redirect an existing user into onboarding.
+- Share preview data must come from the selected live transaction/judgment; success is recorded only after a completed share or download.
+- Production changes require typecheck, lint, tests, responsive checks, and manual accessibility checks.
 
 ## Visual approval
 

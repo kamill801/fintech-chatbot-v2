@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { ledgerApi, ApiError } from "./api";
+import { useAuth } from "./auth-context";
 import {
   demoJudgment,
   demoPending,
@@ -17,12 +18,12 @@ import {
   demoSummary,
   demoTransactions,
 } from "./demo";
+import { clearFinancialDrafts } from "./local-drafts";
 import type {
   Correction,
   JudgmentLabel,
   Profile,
   Settings,
-  SharePayload,
   Summary,
   Transaction,
   TransactionDetail,
@@ -37,11 +38,12 @@ interface LedgerContextValue {
   summary: Summary | null;
   loading: boolean;
   error: string | null;
+  profileLoadError: string | null;
   demo: boolean;
   refresh(): Promise<void>;
   saveProfile(profile: Profile): Promise<void>;
   saveSettings(patch: Partial<Settings>): Promise<void>;
-  createTransaction(draft: TransactionDraft): Promise<TransactionResult>;
+  createTransaction(draft: TransactionDraft, operationId?: string): Promise<TransactionResult>;
   answerReason(id: string, reason: string): Promise<TransactionResult>;
   getTransaction(id: string): Promise<TransactionDetail>;
   correctJudgment(
@@ -49,7 +51,8 @@ interface LedgerContextValue {
     label: JudgmentLabel,
     reason: string,
   ): Promise<Correction>;
-  share(id: string): Promise<SharePayload>;
+  recordShareView(id: string): Promise<void>;
+  recordShareSuccess(id: string): Promise<void>;
   deleteData(): Promise<void>;
 }
 
@@ -67,6 +70,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function LedgerProvider({ children }: { children: ReactNode }) {
+  const { userKey } = useAuth();
   const initialQuery = new URLSearchParams(window.location.search);
   const demo =
     initialQuery.get("demo") === "1" ||
@@ -78,14 +82,24 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const [summary, setSummary] = useState<Summary | null>(demo ? demoSummary : null);
   const [loading, setLoading] = useState(!demo);
   const [error, setError] = useState<string | null>(null);
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (demo) return;
     setLoading(true);
     setError(null);
+    setProfileLoadError(null);
     try {
-      const [nextProfile, nextSettings, nextTransactions, nextSummary] = await Promise.all([
-        ledgerApi.profile(),
+      let nextProfile: Profile | null;
+      try {
+        nextProfile = await ledgerApi.profile();
+      } catch (nextError) {
+        const message = errorMessage(nextError);
+        setProfileLoadError(message);
+        setError(message);
+        return;
+      }
+      const [nextSettings, nextTransactions, nextSummary] = await Promise.all([
         ledgerApi.settings(),
         ledgerApi.transactions(),
         ledgerApi.summary(),
@@ -95,7 +109,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       setTransactions(nextTransactions);
       setSummary(nextSummary);
     } catch (nextError) {
-      setError(errorMessage(nextError));
+      const message = errorMessage(nextError);
+      setProfileLoadError(message);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -113,10 +129,12 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       summary,
       loading,
       error,
+      profileLoadError,
       demo,
       refresh,
       async saveProfile(nextProfile) {
         setProfile(demo ? nextProfile : await ledgerApi.saveProfile(nextProfile));
+        setProfileLoadError(null);
         if (!demo) setSummary(await ledgerApi.summary());
       },
       async saveSettings(patch) {
@@ -125,7 +143,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           : await ledgerApi.saveSettings(patch);
         setSettings(next);
       },
-      async createTransaction(draft) {
+      async createTransaction(draft, operationId) {
         if (demo) {
           const transaction: Transaction = {
             transaction_id: `tx-${crypto.randomUUID()}`,
@@ -145,7 +163,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
             ? { transaction, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled) }
             : { transaction, signals: demoSignals, pending_question: { ...demoPending, transaction_id: transaction.transaction_id } };
         }
-        const result = await ledgerApi.createTransaction(draft);
+        const result = await ledgerApi.createTransaction(draft, operationId);
         setTransactions((items) => [result.transaction, ...items]);
         setSummary(await ledgerApi.summary());
         return result;
@@ -184,28 +202,23 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         }
         return ledgerApi.correctJudgment(id, label, reason);
       },
-      async share(id) {
-        if (demo) {
-          const judgment = demoJudgment(true);
-          return {
-            label: judgment.label,
-            roast_message: judgment.message,
-            category: "cafe",
-            recommended_action: judgment.recommended_action,
-          };
-        }
-        await ledgerApi.shareView(id);
-        return ledgerApi.share(id);
+      async recordShareView(id) {
+        if (!demo) await ledgerApi.shareView(id);
+      },
+      async recordShareSuccess(id) {
+        if (!demo) await ledgerApi.shareSuccess(id);
       },
       async deleteData() {
         if (!demo) await ledgerApi.deleteData();
+        clearFinancialDrafts(userKey);
         setProfile(null);
         setTransactions([]);
         setSummary(null);
         setSettings(initialSettings);
+        setProfileLoadError(null);
       },
     }),
-    [demo, error, loading, profile, refresh, settings, summary, transactions],
+    [demo, error, loading, profile, profileLoadError, refresh, settings, summary, transactions, userKey],
   );
 
   return <LedgerContext.Provider value={value}>{children}</LedgerContext.Provider>;

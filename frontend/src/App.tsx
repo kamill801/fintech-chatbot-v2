@@ -17,10 +17,25 @@ function LoadingScreen() {
   );
 }
 
+function ProfileErrorScreen({ message, onRetry }: { message: string; onRetry(): void }) {
+  return (
+    <main className="standalone-screen">
+      <section className="surface error-state">
+        <h1>장부를 불러오지 못했어요</h1>
+        <p>{message}</p>
+        <button className="primary-button" type="button" onClick={onRetry}>다시 시도</button>
+      </section>
+    </main>
+  );
+}
+
 function AppRoutes() {
-  const { loading, profile, demo } = useLedger();
+  const { loading, profile, profileLoadError, refresh, demo } = useLedger();
   const location = useLocation();
   if (loading) return <LoadingScreen />;
+  if (profileLoadError && !profile) {
+    return <ProfileErrorScreen message={profileLoadError} onRetry={() => void refresh()} />;
+  }
 
   const onboarding = location.pathname.startsWith("/onboarding");
   if (!profile && !onboarding) {

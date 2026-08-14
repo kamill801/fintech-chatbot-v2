@@ -1,4 +1,4 @@
-const CACHE = "jangbu-shell-v1";
+const CACHE = "jangbu-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -14,8 +14,22 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET" || new URL(event.request.url).pathname.startsWith("/api/")) return;
+  const url = new URL(event.request.url);
+  if (event.request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).catch(() => caches.match("/")));
+    return;
   }
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      const network = fetch(event.request).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      });
+      return cached || network;
+    }),
+  );
 });

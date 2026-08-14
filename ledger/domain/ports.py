@@ -198,6 +198,18 @@ class LedgerRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def record_share_success(
+        self,
+        user_ref: str,
+        judgment_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
     def revoke_account(
         self,
         user_ref: str,

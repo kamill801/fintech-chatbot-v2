@@ -20,6 +20,10 @@ interface ApiFailure {
   error?: { code?: string; message?: string };
 }
 
+interface RequestOptions extends RequestInit {
+  idempotencyKey?: string;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly code: string,
@@ -36,34 +40,48 @@ export function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
+async function parseResponse<T>(response: Response): Promise<(Envelope<T> & ApiFailure) | null> {
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as Envelope<T> & ApiFailure;
+  } catch {
+    return null;
+  }
+}
+
+async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
+  const { idempotencyKey, ...requestInit } = init;
+  const headers = new Headers(requestInit.headers);
   headers.set("Accept", "application/json");
   const accessToken = await getAccessToken();
   if (!accessToken) {
     throw new ApiError("unauthorized", "로그인이 필요해요.", 401);
   }
   headers.set("Authorization", `Bearer ${accessToken}`);
-  if (init.body) headers.set("Content-Type", "application/json");
-  if (init.method && init.method !== "GET") {
-    headers.set("Idempotency-Key", crypto.randomUUID());
+  if (requestInit.body) headers.set("Content-Type", "application/json");
+  if (requestInit.method && requestInit.method !== "GET") {
+    headers.set("Idempotency-Key", idempotencyKey ?? crypto.randomUUID());
   }
 
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), { ...init, headers });
+    response = await fetch(apiUrl(path), { ...requestInit, headers });
   } catch {
     throw new ApiError("offline", "네트워크에 연결할 수 없어요.", 0);
   }
   if (response.status === 204) return undefined as T;
 
-  const payload = (await response.json()) as Envelope<T> & ApiFailure;
+  const payload = await parseResponse<T>(response);
   if (!response.ok) {
     throw new ApiError(
-      payload.error?.code ?? "request_failed",
-      payload.error?.message ?? "요청을 처리하지 못했어요.",
+      payload?.error?.code ?? "request_failed",
+      payload?.error?.message ?? "요청을 처리하지 못했어요.",
       response.status,
     );
+  }
+  if (!payload?.data) {
+    throw new ApiError("invalid_response", "서버 응답을 읽지 못했어요.", response.status);
   }
   return payload.data;
 }
@@ -96,10 +114,11 @@ export const ledgerApi = {
   async transaction(id: string): Promise<TransactionDetail> {
     return request<TransactionDetail>(`/api/v1/me/transactions/${id}`);
   },
-  async createTransaction(draft: TransactionDraft): Promise<TransactionResult> {
+  async createTransaction(draft: TransactionDraft, idempotencyKey?: string): Promise<TransactionResult> {
     return request<TransactionResult>("/api/v1/me/transactions", {
       method: "POST",
       body: JSON.stringify(draft),
+      idempotencyKey,
     });
   },
   async answerReason(id: string, reason: string): Promise<TransactionResult> {
@@ -134,6 +153,9 @@ export const ledgerApi = {
         method: "POST",
       })
     ).share;
+  },
+  async shareSuccess(id: string): Promise<void> {
+    await request(`/api/v1/me/judgments/${id}/share-success`, { method: "POST" });
   },
   async deleteData(): Promise<void> {
     await request("/api/v1/me/data", { method: "DELETE" });

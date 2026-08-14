@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 6 - production hardening
-- Active task: Task 6.3 - manual transaction submit repair; release approved
+- Active task: none - Task 6.4 completed; the next product change requires a new approved task
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -330,6 +330,38 @@ Ensure a formatted KRW amount never triggers silent browser constraint validatio
 - A comma-formatted amount is a valid form control.
 - Clicking `기록하고 판단받기` invokes the submit handler and advances to the reason or judgment route.
 - The full frontend test suite, lint, production build, and a real browser submission pass.
+
+## Task 6.4 - Production Trust, Reliability, and UX Hardening (Completed)
+
+### Goal
+
+Close the highest-risk production gaps found in the full-service audit without changing the approved financial-judgment policy: isolate browser drafts per authenticated user, make retries idempotent, prevent load failures from masquerading as new accounts, bound AI cost, and remove misleading or non-functional product states.
+
+### Scope
+
+- Scope browser financial drafts to the authenticated user and clear them on sign-out and data deletion.
+- Preserve one client operation identifier across transaction retries so a lost response cannot duplicate a ledger entry or AI judgment.
+- Distinguish profile absence from API failure and provide a recoverable error state.
+- Add Redis-backed per-user judgment limits, explicit OpenAI timeout/retry bounds, and redacted fallback diagnostics.
+- Replace scan-based judgment lookup with a direct transaction index and return transactions newest-first.
+- Keep corrected judgments and live share previews consistent with the effective judgment.
+- Count share views separately from successful native shares or image downloads.
+- Remove or clearly disable UI controls that do not perform the action they promise.
+- Add a repeatable agreement evaluator for the versioned human-labeled judgment fixture without representing fallback results as live-AI quality.
+- Update deployment and operator documentation, run full verification, then create one scoped commit and deploy it to the existing Vercel and Render production path.
+
+### Acceptance Criteria
+
+- One user's local financial draft cannot be loaded by another user on the same browser and no financial draft survives that user's sign-out or full data deletion.
+- Retrying a transaction after an ambiguous network failure reuses the same idempotency key.
+- A backend load failure shows a retryable error and never redirects an existing user into onboarding.
+- Production judgment requests are bounded per pseudonymous user in Redis and return a safe `429` without invoking OpenAI after the limit.
+- OpenAI timeout/retry configuration is explicit and fallback diagnostics contain no financial values, free text, or user identifier.
+- Existing Redis records remain readable while new judgment lookups use a direct transaction index.
+- Persisted transaction lists render newest-first after reload.
+- Live share content never uses demo fixtures, corrected labels are honored, and share success is recorded only after a completed share/download action.
+- Visible production controls either work, are explicitly unavailable, or are removed; no local-only success message claims server persistence.
+- Frontend tests/lint/build, backend tests/compile, dependency audit, secret scan, local browser smoke, and public deployment health checks pass or an external credential gap is reported explicitly.
 
 ## Archived Work
 

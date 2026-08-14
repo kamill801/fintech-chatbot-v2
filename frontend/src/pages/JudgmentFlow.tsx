@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarBlank,
-  Check,
   Copy,
   DownloadSimple,
   Lightbulb,
@@ -25,7 +24,6 @@ import {
   TextButton,
   Toggle,
 } from "../components";
-import { demoJudgment } from "../demo";
 import { useLedger } from "../ledger-context";
 import { Link, useNavigate, useParams } from "../router";
 import type { Judgment, JudgmentLabel, SharePayload, TransactionDetail } from "../types";
@@ -47,16 +45,41 @@ function useTransactionDetail(transactionId: string) {
   return { detail, error, reload };
 }
 
+function correctedJudgmentMessage(label: JudgmentLabel): string {
+  const messages: Record<JudgmentLabel, string> = {
+    justified: "다시 장부를 보니 납득할 만한 지출이구나. 다음에도 이유와 예산을 같이 확인해라.",
+    caution: "다시 장부를 보니 주의가 필요한 지출이구나. 다음 소비 전에는 예산부터 한 번 더 확인해라.",
+    overspending: "다시 장부를 보니 과소비가 맞구나. 다음 지출은 멈추고 예산부터 확인해라.",
+    insufficient_context: "다시 장부를 봐도 정보가 더 필요하구나. 판단 전에 이유를 조금 더 남겨라.",
+  };
+  return messages[label];
+}
+
+function currentJudgmentMessage(judgment: Judgment): string {
+  return judgment.correction
+    ? correctedJudgmentMessage(judgment.effective_label || judgment.correction.corrected_label)
+    : judgment.message;
+}
+
 export function JudgmentPage() {
   const { transactionId = "" } = useParams();
   const { demo, saveSettings, settings } = useLedger();
   const navigate = useNavigate();
   const { detail, error, reload } = useTransactionDetail(transactionId);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [modeSaving, setModeSaving] = useState(false);
+  const [modeError, setModeError] = useState<string | null>(null);
 
   async function toggleMode() {
-    await saveSettings({ roast_enabled: !settings.roast_enabled });
-    await reload();
+    setModeSaving(true);
+    setModeError(null);
+    try {
+      await saveSettings({ roast_enabled: !settings.roast_enabled });
+      await reload();
+    } catch {
+      setModeError("말투 설정을 바꾸지 못했어요.");
+    } finally {
+      setModeSaving(false);
+    }
   }
 
   if (error) return <main className="standalone-screen"><PageHeader title="지출 판단" close /><p className="form-error">{error}</p></main>;
@@ -65,20 +88,19 @@ export function JudgmentPage() {
 
   return (
     <main className={`standalone-screen judgment-screen ${settings.roast_enabled ? "roast-view" : ""}`}>
-      <PageHeader title="지출 판단" close right={<button className="mode-button" onClick={() => void toggleMode()}><ModePill enabled={settings.roast_enabled} /></button>} />
+      <PageHeader title="지출 판단" close right={<button className="mode-button" disabled={modeSaving} onClick={() => void toggleMode()}><ModePill enabled={settings.roast_enabled} /></button>} />
       <Surface className="judgment-transaction">
         <span className="warm-icon">☕</span><strong>{transaction.merchant || categoryNames[transaction.category]}</strong><b>{formatWon(transaction.amount_krw)}</b>
       </Surface>
-      <div className="judgment-meta"><JudgmentBadge label={judgment.label} /><span>{confidenceText(judgment.confidence)} · {Math.round(judgment.confidence * 100)}%</span></div>
+      <div className="judgment-meta"><JudgmentBadge label={judgment.effective_label || judgment.label} /><span>{confidenceText(judgment.confidence)} · {Math.round(judgment.confidence * 100)}%</span></div>
       <section className="judgment-headline">
-        <h1>{judgment.message}</h1>
+        <h1>{currentJudgmentMessage(judgment)}</h1>
         {settings.roast_enabled && <BookkeeperMark compact />}
       </section>
       <h2>판단 근거</h2>
       <EvidenceList judgment={judgment} transaction={transaction} />
       <div className="recommendation"><span className="idea-icon"><Lightbulb size={28} /></span><p>{judgment.recommended_action}</p></div>
-      {notice && <p className="success-notice" role="status"><Check size={18} /> {notice}</p>}
-      <PrimaryButton onClick={() => setNotice("이번 주 계획에 반영했어요.")}>이번 주 계획에 반영</PrimaryButton>
+      {modeError && <p className="form-error" role="alert">{modeError}</p>}
       <TextButton onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))}>판단 수정</TextButton>
       <Link className="secondary-link" to={withDemo(`/share/${transaction.transaction_id}`, demo)}>결과 공유</Link>
     </main>
@@ -93,14 +115,21 @@ export function TransactionDetailPage() {
   const [label, setLabel] = useState<JudgmentLabel>("justified");
   const [reason, setReason] = useState("필요한 만남이었어요.");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function saveCorrection() {
     if (!detail?.judgment) return;
     setSaving(true);
-    await correctJudgment(detail.judgment.judgment_id, label, reason);
-    setEditing(false);
-    setSaving(false);
-    await reload();
+    setSaveError(null);
+    try {
+      await correctJudgment(detail.judgment.judgment_id, label, reason);
+      setEditing(false);
+      await reload();
+    } catch {
+      setSaveError("수정 기록을 저장하지 못했어요.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (error) return <main className="standalone-screen"><PageHeader title="거래 상세" /><p className="form-error">{error}</p></main>;
@@ -134,7 +163,6 @@ export function TransactionDetailPage() {
         {judgment && <div><Sparkle /> <time>{formatTime(transaction.occurred_at)}</time> 판단 완료</div>}
       </Surface>
       {judgment && <button className="outline-button" onClick={() => setEditing(true)}><PencilSimple size={21} /> 판단 수정</button>}
-      <TextButton onClick={() => window.alert("거래 원문 수정은 다음 버전에서 지원해요. 판단 수정은 지금 바로 남길 수 있어요.")}>거래 내용 수정</TextButton>
       <p className="muted detail-footnote">수정해도 원래 판단과 기록은 남아요</p>
 
       {editing && (
@@ -144,6 +172,7 @@ export function TransactionDetailPage() {
             <p>원래 판단은 보존되고, 수정 기록이 추가돼요.</p>
             <label>내 판단<select value={label} onChange={(event) => setLabel(event.target.value as JudgmentLabel)}><option value="justified">납득 가능한 지출</option><option value="caution">주의가 필요한 지출</option><option value="overspending">과소비</option><option value="insufficient_context">정보 부족</option></select></label>
             <label>수정 이유<textarea value={reason} onChange={(event) => setReason(event.target.value)} /></label>
+            {saveError && <p className="form-error" role="alert">{saveError}</p>}
             <PrimaryButton disabled={saving} onClick={() => void saveCorrection()}>{saving ? "저장 중" : "수정 기록 남기기"}</PrimaryButton>
             <TextButton onClick={() => setEditing(false)}>취소</TextButton>
           </section>
@@ -214,31 +243,53 @@ async function shareCardImage(
 
 export function SharePage() {
   const { transactionId = "" } = useParams();
-  const { demo, settings, share } = useLedger();
+  const { demo, recordShareSuccess, recordShareView, settings } = useLedger();
   const navigate = useNavigate();
-  const { detail } = useTransactionDetail(transactionId);
+  const { detail, error } = useTransactionDetail(transactionId);
   const [options, setOptions] = useState<ShareOptions>({ judgment: true, recommendation: true, amount: false, merchant: false });
-  const [payload, setPayload] = useState<SharePayload | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const previewJudgment: Judgment = useMemo(() => demoJudgment(true), []);
+  const [publishing, setPublishing] = useState(false);
+  const recordedViewId = useRef<string | null>(null);
+  const judgmentId = detail?.judgment?.judgment_id ?? null;
+  const payload: SharePayload | null = useMemo(() => {
+    if (!detail?.judgment) return null;
+    return {
+      label: detail.judgment.effective_label || detail.judgment.label,
+      roast_message: currentJudgmentMessage(detail.judgment),
+      category: detail.transaction.category,
+      recommended_action: detail.judgment.recommended_action,
+    };
+  }, [detail]);
 
   useEffect(() => {
-    if (demo) setPayload({ label: previewJudgment.label, roast_message: previewJudgment.message, category: "cafe", recommended_action: previewJudgment.recommended_action });
-  }, [demo, previewJudgment]);
+    if (judgmentId && recordedViewId.current !== judgmentId) {
+      recordedViewId.current = judgmentId;
+      void recordShareView(judgmentId).catch(() => setStatus("공유 조회 기록을 남기지 못했어요."));
+    }
+  }, [judgmentId, recordShareView]);
+
+  async function recordSuccess(judgmentId: string, successMessage: string) {
+    try {
+      await recordShareSuccess(judgmentId);
+      setStatus(successMessage);
+    } catch {
+      setStatus(`${successMessage} 공유 기록은 남기지 못했어요.`);
+    }
+  }
 
   async function publish(downloadOnly = false) {
-    if (!detail) return;
+    if (!detail?.judgment || !payload) return;
     if (!settings.roast_enabled && !demo) {
       setStatus("욕쟁이 할머니 모드를 켠 판단만 공유할 수 있어요.");
       return;
     }
+    setPublishing(true);
+    setStatus(null);
     try {
-      const nextPayload = payload ?? await share(detail.judgment?.judgment_id ?? "");
-      setPayload(nextPayload);
-      const file = await shareCardImage(nextPayload, detail, options);
+      const file = await shareCardImage(payload, detail, options);
       if (!downloadOnly && navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: "내 장부 판단", files: [file] });
-        setStatus("공유 창을 열었어요.");
+        await recordSuccess(detail.judgment.judgment_id, "공유했어요.");
         return;
       }
       const url = URL.createObjectURL(file);
@@ -247,14 +298,18 @@ export function SharePage() {
       anchor.download = file.name;
       anchor.click();
       URL.revokeObjectURL(url);
-      setStatus("이미지로 저장했어요.");
+      await recordSuccess(detail.judgment.judgment_id, "이미지로 저장했어요.");
     } catch {
       setStatus("공유 이미지를 만들지 못했어요.");
+    } finally {
+      setPublishing(false);
     }
   }
 
+  if (error) return <main className="standalone-screen"><PageHeader title="결과 공유" close /><p className="form-error">{error}</p></main>;
   if (!detail) return <div className="loading-screen">공유 화면을 준비하는 중</div>;
-  const copy = payload?.roast_message ?? previewJudgment.message;
+  if (!payload) return <main className="standalone-screen"><PageHeader title="결과 공유" close /><p className="form-error">공유할 판단이 없어요.</p></main>;
+  const copy = payload.roast_message;
   return (
     <main className="standalone-screen share-screen">
       <PageHeader title="결과 공유" close />
@@ -262,7 +317,7 @@ export function SharePage() {
       <section className="share-card" aria-label="공유 이미지 미리보기">
         <div className="share-stamp"><BookkeeperMark compact /><strong>장부지기의 한마디</strong></div>
         <blockquote>{copy}</blockquote>
-        <div className="share-meta"><span><CalendarBlank size={20} /> 이번 주 같은 분류 3번째</span><strong>판단 · {labelText(previewJudgment.label)}</strong><span><Copy size={22} /> 내 장부</span></div>
+        <div className="share-meta"><span><CalendarBlank size={20} /> {categoryNames[payload.category] ?? "같은 분류"} 지출</span><strong>판단 · {labelText(payload.label)}</strong><span><Copy size={22} /> 내 장부</span></div>
       </section>
       <Surface className="share-options">
         <h2>공유에 포함</h2>
@@ -277,8 +332,8 @@ export function SharePage() {
       </Surface>
       <p className="privacy-note"><LockKey size={17} /> 기본값은 민감한 정보를 가려요</p>
       {status && <p className="success-notice" role="status">{status}</p>}
-      <PrimaryButton onClick={() => void publish(false)}><ShareNetwork size={22} /> 이미지로 공유</PrimaryButton>
-      <TextButton onClick={() => void publish(true)}><DownloadSimple size={20} /> 이미지 저장</TextButton>
+      <PrimaryButton disabled={publishing} onClick={() => void publish(false)}><ShareNetwork size={22} /> {publishing ? "준비 중" : "이미지로 공유"}</PrimaryButton>
+      <TextButton disabled={publishing} onClick={() => void publish(true)}><DownloadSimple size={20} /> 이미지 저장</TextButton>
       <button className="sr-only" onClick={() => navigate(-1)}>닫기</button>
     </main>
   );

@@ -72,7 +72,11 @@ def _utc_now() -> str:
 def default_openai_client_factory() -> Any:
     from openai import OpenAI
 
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return OpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        timeout=_env_float("OPENAI_TIMEOUT_SECONDS", 20.0),
+        max_retries=0,
+    )
 
 
 def _extract_response_text(response: Any) -> str:
@@ -182,9 +186,17 @@ class OpenAIResponsesJudge:
         self,
         *,
         model: str | None = None,
+        timeout_seconds: float | None = None,
+        max_retries: int | None = None,
+        max_output_tokens: int | None = None,
         client_factory: Callable[[], Any] | None = None,
     ) -> None:
         self.model = model or os.getenv("OPENAI_LEDGER_MODEL", "gpt-4o")
+        self.timeout_seconds = timeout_seconds or _env_float("OPENAI_TIMEOUT_SECONDS", 20.0)
+        self.max_attempts = _bounded_attempts(max_retries)
+        self.max_output_tokens = max_output_tokens or _env_int(
+            "OPENAI_LEDGER_MAX_OUTPUT_TOKENS", 700
+        )
         self._client_factory = client_factory or default_openai_client_factory
         self._client: Any | None = None
 
@@ -198,7 +210,7 @@ class OpenAIResponsesJudge:
         if self._client_factory is default_openai_client_factory and not os.getenv("OPENAI_API_KEY"):
             return deterministic_fallback_judgment(request)
         last_error: Exception | None = None
-        for _attempt in range(2):
+        for _attempt in range(self.max_attempts):
             try:
                 payload = self._call_model(request)
                 parsed = parse_judgment_payload(payload)
@@ -256,5 +268,36 @@ class OpenAIResponsesJudge:
                     "strict": True,
                 }
             },
+            max_output_tokens=self.max_output_tokens,
+            timeout=self.timeout_seconds,
         )
         return json.loads(_extract_response_text(response))
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    parsed = int(value)
+    if parsed < 0:
+        raise ValueError(f"{name} must be non-negative")
+    return parsed
+
+
+def _bounded_attempts(value: int | None) -> int:
+    attempts = value
+    if attempts is None:
+        attempts = _env_int("OPENAI_JUDGMENT_ATTEMPTS", 2)
+    if attempts < 1:
+        raise ValueError("OPENAI_JUDGMENT_ATTEMPTS must be at least 1")
+    return min(attempts, 2)
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    parsed = float(value)
+    if parsed <= 0:
+        raise ValueError(f"{name} must be positive")
+    return parsed

@@ -1,15 +1,10 @@
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
-  CalendarBlank,
-  CaretDown,
   CaretRight,
   FileText,
   Lightbulb,
-  LinkSimple,
   LockKey,
-  MagnifyingGlass,
-  SlidersHorizontal,
   SignOut,
   Target,
   Trash,
@@ -48,29 +43,18 @@ function groupTransactions(transactions: Transaction[]) {
 export function LedgerPage() {
   const { demo, profile, summary, transactions } = useLedger();
   const navigate = useNavigate();
-  const [view, setView] = useState<"list" | "calendar">("list");
   const groups = useMemo(() => groupTransactions(transactions), [transactions]);
   const month = summary?.month ?? currentMonthKey();
-  const [year, monthNumber] = month.split("-").map(Number);
-  const daysInMonth = Number.isInteger(year) && Number.isInteger(monthNumber) ? new Date(year, monthNumber, 0).getDate() : 31;
   return (
     <AppShell active="/ledger" showAdd>
       <div className="screen ledger-screen">
-        <header className="ledger-header"><h1>장부</h1><button className="month-select">{formatMonthLabel(month)} <CaretDown /></button><button className="icon-button" aria-label="검색"><MagnifyingGlass size={27} /></button><button className="icon-button" aria-label="필터"><SlidersHorizontal size={27} /></button></header>
-        <div className="segmented-control"><button className={view === "list" ? "selected" : ""} onClick={() => setView("list")}>내역</button><button className={view === "calendar" ? "selected" : ""} onClick={() => setView("calendar")}>달력</button></div>
+        <header className="ledger-header"><h1>장부</h1><span className="month-select" aria-label="현재 리포트 월">{formatMonthLabel(month)}</span></header>
         <section className="ledger-summary"><h2>이번 달 <Highlight>{formatWon(summary?.total_spent_krw ?? 0)}</Highlight> 썼어요.</h2><p><span>수입 <strong>{formatWon(profile?.monthly_income_krw ?? 0)}</strong></span><i /><span>지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span></p></section>
-        {view === "calendar" ? (
-          <Surface className="calendar-placeholder">
-            <CalendarBlank size={38} /><h2>{monthNumber}월 지출 달력</h2><p>날짜를 누르면 그날의 지출을 보여줘요.</p>
-            <div className="calendar-grid">{Array.from({ length: daysInMonth }, (_, index) => <button key={index + 1}>{index + 1}</button>)}</div>
-          </Surface>
-        ) : (
-          <Surface className="ledger-list">
-            {groups.length ? groups.map(([date, items], index) => (
-              <div className="ledger-day" key={date}><h3>{index === 0 ? "오늘" : "이전"} · {date}</h3>{items.map((transaction) => <TransactionRow key={transaction.transaction_id} transaction={transaction} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))} />)}</div>
-            )) : <p className="empty-copy">아직 기록한 지출이 없어요.</p>}
-          </Surface>
-        )}
+        <Surface className="ledger-list">
+          {groups.length ? groups.map(([date, items], index) => (
+            <div className="ledger-day" key={date}><h3>{index === 0 ? "오늘" : "이전"} · {date}</h3>{items.map((transaction) => <TransactionRow key={transaction.transaction_id} transaction={transaction} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))} />)}</div>
+          )) : <p className="empty-copy">아직 기록한 지출이 없어요.</p>}
+        </Surface>
       </div>
     </AppShell>
   );
@@ -136,7 +120,7 @@ export function ReportPage() {
   return (
     <AppShell active="/report">
       <div className="screen report-screen">
-        <header><h1>{Number(month.split("-")[1])}월 리포트</h1><button className="month-select">{formatMonthLabel(month)} <CaretDown /></button></header>
+        <header><h1>{Number(month.split("-")[1])}월 리포트</h1><span className="month-select" aria-label="현재 리포트 월">{formatMonthLabel(month)}</span></header>
         <h2>{topAmount > 0 ? <>이번 달, <Highlight>{categoryNames[topCategory] ?? topCategory}</Highlight> 지출이 가장 컸어요.</> : "이번 달 지출을 기록해 보세요."}</h2>
         <div className="report-totals"><span>총 지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span><i /><span>예산 <strong>{budgetRemaining}%</strong> 남음</span></div>
         <Surface className="category-report"><h3>어디에 썼나</h3>{entries.map(([category, amount]) => <div className="report-row" key={category}><CategoryIcon category={category} /><span>{categoryNames[category] || category}</span><strong>{formatWon(amount)}</strong><div className="report-bar"><span className={barColors[category] || "blue"} style={{ width: `${Math.round((amount / max) * 66)}%` }} /></div></div>)}{entries.length === 0 && <p className="empty-copy">지출을 기록하면 카테고리별 흐름을 보여드려요.</p>}</Surface>
@@ -154,11 +138,46 @@ export function SettingsPage() {
   const [preview, setPreview] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [savingSetting, setSavingSetting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function updateMode(checked: boolean) {
+    setSavingSetting(true);
+    setStatus(null);
+    try {
+      await saveSettings({ roast_enabled: checked });
+    } catch {
+      setStatus("설정을 저장하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setSavingSetting(false);
+    }
+  }
 
   async function removeData() {
-    await deleteData();
-    setConfirmDelete(false);
-    navigate(withDemo("/onboarding/trust", demo));
+    setDeleting(true);
+    setStatus(null);
+    try {
+      await deleteData();
+      setConfirmDelete(false);
+      navigate(withDemo("/onboarding/trust", demo));
+    } catch {
+      setStatus("데이터를 삭제하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function logout() {
+    setLoggingOut(true);
+    setStatus(null);
+    try {
+      await signOut();
+    } catch {
+      setStatus("로그아웃하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   return (
@@ -168,7 +187,7 @@ export function SettingsPage() {
       <section className="roast-setting">
         <BookkeeperMark />
         <div><h2>욕쟁이 할머니 모드</h2><p>장부 판단은 그대로, 말투만 화끈하게 바뀌어요</p><button onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
-        <div className="setting-toggle"><Toggle checked={settings.roast_enabled} label="욕쟁이 할머니 모드" onChange={(checked) => void saveSettings({ roast_enabled: checked })} /><span>{settings.roast_enabled ? "켜짐" : "꺼짐"}</span></div>
+        <div className="setting-toggle"><Toggle checked={settings.roast_enabled} label="욕쟁이 할머니 모드" onChange={(checked) => void updateMode(checked)} /><span>{savingSetting ? "저장 중" : settings.roast_enabled ? "켜짐" : "꺼짐"}</span></div>
       </section>
       {preview && <div className="roast-preview"><strong>기본 말투</strong><p>{demoJudgment(false).message}</p><strong>욕쟁이 할머니 말투</strong><p>{demoJudgment(true).message}</p></div>}
       <Surface className="settings-list">
@@ -178,13 +197,13 @@ export function SettingsPage() {
       </Surface>
       <Surface className="settings-list privacy-settings"><h2>개인정보와 데이터</h2>
         <FieldRow icon={<UserCircle />} label="AI가 보는 정보" value="" onClick={() => setStatus("금액, 분류, 예산 신호와 직접 답한 이유만 판단에 사용해요.")} />
-        <FieldRow icon={<LinkSimple />} label="연결 권한 철회" value="" onClick={() => setStatus("현재 연결된 계좌가 없어요.")} />
         <button className="danger-row" onClick={() => setConfirmDelete(true)}><Trash size={25} /><span><strong>모든 데이터 삭제</strong><small>삭제한 데이터는 복구할 수 없어요</small></span><CaretRight /></button>
       </Surface>
+      <p className="data-retention-note"><LockKey size={17} /> 장부 데이터는 마지막 변경 후 최대 365일 보관되며, 직접 삭제하면 즉시 삭제돼요.</p>
       {status && <p className="settings-status" role="status">{status}</p>}
-      {!demo && <button className="logout-button" onClick={() => void signOut()}><SignOut size={21} /> 로그아웃</button>}
+      {!demo && <button className="logout-button" disabled={loggingOut} onClick={() => void logout()}><SignOut size={21} /> {loggingOut ? "로그아웃 중" : "로그아웃"}</button>}
       <p className="version">버전 0.1</p>
-      {confirmDelete && <div className="dialog-backdrop" onMouseDown={() => setConfirmDelete(false)}><section className="correction-dialog delete-dialog" role="alertdialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><LockKey size={32} /><h2>모든 데이터를 삭제할까요?</h2><p>프로필, 지출, 이유, 판단 기록이 삭제되고 복구할 수 없어요.</p><PrimaryButton onClick={() => void removeData()}>삭제하기</PrimaryButton><button className="text-button" onClick={() => setConfirmDelete(false)}>취소</button></section></div>}
+      {confirmDelete && <div className="dialog-backdrop" onMouseDown={() => !deleting && setConfirmDelete(false)}><section className="correction-dialog delete-dialog" role="alertdialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><LockKey size={32} /><h2>모든 데이터를 삭제할까요?</h2><p>프로필, 지출, 이유, 판단 기록이 삭제되고 복구할 수 없어요.</p><PrimaryButton disabled={deleting} onClick={() => void removeData()}>{deleting ? "삭제 중" : "삭제하기"}</PrimaryButton><button className="text-button" disabled={deleting} onClick={() => setConfirmDelete(false)}>취소</button></section></div>}
     </main>
   );
 }

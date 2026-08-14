@@ -15,6 +15,7 @@ from ledger.adapters.synthetic import DisabledProductionAccountAdapter
 from ledger.api import create_api_blueprint
 from ledger.application.service import LedgerService
 from ledger.privacy import PrivacyConfig, PrivacyError, PrivacyService
+from ledger.quota import JudgmentQuotaConfig, RedisJudgmentQuotaLimiter
 from ledger.web import create_web_blueprint
 from sheets_logger import save_telemetry_event
 
@@ -37,6 +38,7 @@ def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
     if store_kind == "memory":
         repository = InMemoryLedgerRepository(privacy)
         ready_check = lambda: True
+        judgment_quota = None
     elif store_kind == "redis":
         redis_url = values.get("REDIS_URL")
         if not redis_url:
@@ -45,6 +47,13 @@ def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
             raise PrivacyError("production REDIS_URL must use rediss:// TLS")
         repository = RedisLedgerRepository.from_url(redis_url, privacy)
         ready_check = lambda: bool(repository._redis.ping())
+        judgment_quota = (
+            RedisJudgmentQuotaLimiter(
+                repository._redis, JudgmentQuotaConfig.from_env(values)
+            )
+            if app_env == "production"
+            else None
+        )
     else:
         raise PrivacyError("LEDGER_STORE must be memory or redis")
 
@@ -54,6 +63,7 @@ def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
         OpenAIResponsesJudge(model=values.get("OPENAI_LEDGER_MODEL")),
         DisabledProductionAccountAdapter(),
         telemetry_sink=telemetry_sink,
+        judgment_quota=judgment_quota,
     )
     return service, privacy, repository, ready_check
 

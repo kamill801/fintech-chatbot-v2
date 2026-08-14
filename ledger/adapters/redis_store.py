@@ -14,6 +14,7 @@ from ledger.domain.events import (
     EVENT_PROFILE_UPSERTED,
     EVENT_SETTINGS_ROAST_CHANGED,
     EVENT_SHARE_CLICKED,
+    EVENT_SHARE_SUCCEEDED,
     EVENT_SHARE_VIEWED,
     EVENT_TRANSACTION_REASON_ADDED,
     EVENT_TRANSACTION_RECORDED,
@@ -64,13 +65,16 @@ class RedisLedgerRepository(LedgerRepository):
     def cache_result(
         self, user_ref: str, idempotency_key: str, result: StoredResult
     ) -> None:
+        result_key = self._idempotency_key(user_ref, idempotency_key)
         self._redis.set(
-            self._idempotency_key(user_ref, idempotency_key),
+            result_key,
             self._privacy.encrypt_json(
                 {"status": result.status, "body": result.body}
             ),
             ex=self._privacy.retention_seconds,
         )
+        self._redis.sadd(self._registry_key(user_ref), result_key)
+        self._redis.expire(self._registry_key(user_ref), self._privacy.retention_seconds)
 
     def upsert_profile(
         self,
@@ -132,7 +136,7 @@ class RedisLedgerRepository(LedgerRepository):
         return Transaction.from_dict(self._privacy.decrypt_json(encrypted))
 
     def list_transactions(self, user_ref: str) -> Sequence[Transaction]:
-        ids = self._redis.zrange(self._key(user_ref, "transactions"), 0, -1)
+        ids = self._redis.zrevrange(self._key(user_ref, "transactions"), 0, -1)
         transactions = []
         for transaction_id in ids:
             transaction = self.get_transaction(user_ref, transaction_id)
@@ -214,12 +218,24 @@ class RedisLedgerRepository(LedgerRepository):
     def get_judgment_for_transaction(
         self, user_ref: str, transaction_id: str
     ) -> JudgmentResult | None:
+        indexed_id = self._redis.get(
+            self._judgment_for_transaction_key(user_ref, transaction_id)
+        )
+        if indexed_id:
+            judgment = self.get_judgment(user_ref, indexed_id)
+            if judgment is not None:
+                return judgment
         for key in self._redis.scan_iter(match=self._key(user_ref, "judgment:*")):
             encrypted = self._redis.get(key)
             if encrypted is None:
                 continue
             judgment = JudgmentResult.from_dict(self._privacy.decrypt_json(encrypted))
             if judgment.transaction_id == transaction_id:
+                self._redis.set(
+                    self._judgment_for_transaction_key(user_ref, transaction_id),
+                    judgment.judgment_id,
+                    ex=self._privacy.retention_seconds,
+                )
                 return judgment
         return None
 
@@ -294,6 +310,25 @@ class RedisLedgerRepository(LedgerRepository):
             source=source,
         )
 
+    def record_share_success(
+        self,
+        user_ref: str,
+        judgment_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._record_metric_event(
+            user_ref,
+            judgment_id,
+            EVENT_SHARE_SUCCEEDED,
+            "share_successes",
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+            source=source,
+        )
+
     def revoke_account(
         self,
         user_ref: str,
@@ -349,6 +384,7 @@ class RedisLedgerRepository(LedgerRepository):
                 "corrections": 0,
                 "share_views": 0,
                 "share_clicks": 0,
+                "share_successes": 0,
                 "accounts_revoked": 0,
                 "legacy_imports": 0,
             }
@@ -383,6 +419,7 @@ class RedisLedgerRepository(LedgerRepository):
                 ),
                 ex=self._privacy.retention_seconds,
             )
+            self._redis.sadd(self._registry_key(user_ref), result_key)
             self._refresh_retention(user_ref)
             return result
 
@@ -415,7 +452,9 @@ class RedisLedgerRepository(LedgerRepository):
         fields["redacted_metadata"] = json.dumps(
             fields["redacted_metadata"], ensure_ascii=False, sort_keys=True
         )
-        pipe.xadd(self._key(user_ref, "events"), fields)
+        events_key = self._key(user_ref, "events")
+        pipe.xadd(events_key, fields)
+        self._track_keys(pipe, user_ref, events_key)
         return event
 
     def _upsert_profile(
@@ -436,7 +475,9 @@ class RedisLedgerRepository(LedgerRepository):
                 correlation_id=correlation_id,
                 source=source,
             )
-            pipe.set(self._key(profile.user_ref, "profile"), self._privacy.encrypt_json(payload))
+            profile_key = self._key(profile.user_ref, "profile")
+            pipe.set(profile_key, self._privacy.encrypt_json(payload))
+            self._track_keys(pipe, profile.user_ref, profile_key)
             pipe.execute()
         return StoredResult(200, {"profile": payload})
 
@@ -460,7 +501,9 @@ class RedisLedgerRepository(LedgerRepository):
                 source=source,
                 redacted_metadata={"roast_enabled": settings.roast_enabled},
             )
-            pipe.set(self._key(user_ref, "settings"), self._privacy.encrypt_json(payload))
+            settings_key = self._key(user_ref, "settings")
+            pipe.set(settings_key, self._privacy.encrypt_json(payload))
+            self._track_keys(pipe, user_ref, settings_key)
             pipe.execute()
         return StoredResult(200, {"settings": payload})
 
@@ -483,14 +526,19 @@ class RedisLedgerRepository(LedgerRepository):
                 source=source,
                 redacted_metadata={"adapter_source": transaction.source},
             )
+            transaction_key = self._transaction_key(
+                transaction.user_ref, transaction.transaction_id
+            )
+            transactions_key = self._key(transaction.user_ref, "transactions")
             pipe.set(
-                self._transaction_key(transaction.user_ref, transaction.transaction_id),
+                transaction_key,
                 self._privacy.encrypt_json(payload),
             )
             pipe.zadd(
-                self._key(transaction.user_ref, "transactions"),
+                transactions_key,
                 {transaction.transaction_id: self._score(transaction.occurred_at)},
             )
+            self._track_keys(pipe, transaction.user_ref, transaction_key, transactions_key)
             self._incr_metric(pipe, transaction.user_ref, "transactions_recorded")
             pipe.execute()
         return StoredResult(201, {"transaction": payload})
@@ -520,14 +568,18 @@ class RedisLedgerRepository(LedgerRepository):
                 source=source,
                 redacted_metadata={"reason_question_asked": True},
             )
-            pipe.set(self._key(user_ref, "pending_question"), self._privacy.encrypt_json(payload))
+            pending_key = self._key(user_ref, "pending_question")
+            pipe.set(pending_key, self._privacy.encrypt_json(payload))
+            self._track_keys(pipe, user_ref, pending_key)
             transaction = self.get_transaction(user_ref, pending_question.transaction_id)
             if transaction is not None:
                 updated = Transaction.from_dict({**transaction.to_dict(), "status": "awaiting_reason"})
+                transaction_key = self._transaction_key(user_ref, updated.transaction_id)
                 pipe.set(
-                    self._transaction_key(user_ref, updated.transaction_id),
+                    transaction_key,
                     self._privacy.encrypt_json(updated.to_dict()),
                 )
+                self._track_keys(pipe, user_ref, transaction_key)
             pipe.execute()
         return StoredResult(202, {"pending_question": payload})
 
@@ -558,10 +610,12 @@ class RedisLedgerRepository(LedgerRepository):
                 correlation_id=correlation_id,
                 source=source,
             )
+            transaction_key = self._transaction_key(user_ref, transaction_id)
             pipe.set(
-                self._transaction_key(user_ref, transaction_id),
+                transaction_key,
                 self._privacy.encrypt_json(updated.to_dict()),
             )
+            self._track_keys(pipe, user_ref, transaction_key)
             pending = self.get_pending_question(user_ref)
             if pending and pending.transaction_id == transaction_id:
                 answered = PendingQuestion.from_dict(
@@ -571,10 +625,12 @@ class RedisLedgerRepository(LedgerRepository):
                         "attempt_count": pending.attempt_count + 1,
                     }
                 )
+                pending_key = self._key(user_ref, "pending_question")
                 pipe.set(
-                    self._key(user_ref, "pending_question"),
+                    pending_key,
                     self._privacy.encrypt_json(answered.to_dict()),
                 )
+                self._track_keys(pipe, user_ref, pending_key)
             pipe.execute()
         return StoredResult(200, {"transaction": updated.to_dict()})
 
@@ -602,17 +658,25 @@ class RedisLedgerRepository(LedgerRepository):
                     "policy_version": judgment.policy_version,
                 },
             )
+            judgment_key = self._judgment_key(user_ref, judgment.judgment_id)
+            judgment_index_key = self._judgment_for_transaction_key(
+                user_ref, judgment.transaction_id
+            )
             pipe.set(
-                self._judgment_key(user_ref, judgment.judgment_id),
+                judgment_key,
                 self._privacy.encrypt_json(payload),
             )
+            pipe.set(judgment_index_key, judgment.judgment_id)
+            self._track_keys(pipe, user_ref, judgment_key, judgment_index_key)
             transaction = self.get_transaction(user_ref, judgment.transaction_id)
             if transaction is not None:
                 updated = Transaction.from_dict({**transaction.to_dict(), "status": "judged"})
+                transaction_key = self._transaction_key(user_ref, updated.transaction_id)
                 pipe.set(
-                    self._transaction_key(user_ref, updated.transaction_id),
+                    transaction_key,
                     self._privacy.encrypt_json(updated.to_dict()),
                 )
+                self._track_keys(pipe, user_ref, transaction_key)
             self._incr_metric(pipe, user_ref, "judgments_completed")
             pipe.execute()
         return StoredResult(201, {"judgment": payload})
@@ -654,14 +718,18 @@ class RedisLedgerRepository(LedgerRepository):
             transaction = self.get_transaction(user_ref, judgment.transaction_id)
             if transaction is not None:
                 updated = Transaction.from_dict({**transaction.to_dict(), "status": "corrected"})
+                transaction_key = self._transaction_key(user_ref, updated.transaction_id)
                 pipe.set(
-                    self._transaction_key(user_ref, updated.transaction_id),
+                    transaction_key,
                     self._privacy.encrypt_json(updated.to_dict()),
                 )
+                self._track_keys(pipe, user_ref, transaction_key)
+            correction_key = self._correction_key(user_ref, judgment_id)
             pipe.set(
-                self._correction_key(user_ref, judgment_id),
+                correction_key,
                 self._privacy.encrypt_json(payload),
             )
+            self._track_keys(pipe, user_ref, correction_key)
             self._incr_metric(pipe, user_ref, "corrections")
             pipe.execute()
         return StoredResult(200, {"correction": payload})
@@ -765,7 +833,9 @@ class RedisLedgerRepository(LedgerRepository):
                 correlation_id=correlation_id,
                 source=source,
             )
-            pipe.set(self._key(user_ref, "legacy_imported"), "1")
+            legacy_key = self._key(user_ref, "legacy_imported")
+            pipe.set(legacy_key, "1")
+            self._track_keys(pipe, user_ref, legacy_key)
             self._incr_metric(pipe, user_ref, "legacy_imports")
             pipe.execute()
         return StoredResult(200, {"legacy_imported": True})
@@ -800,7 +870,9 @@ class RedisLedgerRepository(LedgerRepository):
     def _incr_metric(self, pipe: Any, user_ref: str, metric_name: str) -> int:
         metrics = self.get_metrics(user_ref)
         metrics[metric_name] = int(metrics.get(metric_name, 0)) + 1
-        pipe.set(self._key(user_ref, "metrics"), self._privacy.encrypt_json(metrics))
+        metrics_key = self._key(user_ref, "metrics")
+        pipe.set(metrics_key, self._privacy.encrypt_json(metrics))
+        self._track_keys(pipe, user_ref, metrics_key)
         return metrics[metric_name]
 
     @staticmethod
@@ -819,14 +891,26 @@ class RedisLedgerRepository(LedgerRepository):
     def _judgment_key(self, user_ref: str, judgment_id: str) -> str:
         return self._key(user_ref, f"judgment:{judgment_id}")
 
+    def _judgment_for_transaction_key(self, user_ref: str, transaction_id: str) -> str:
+        return self._key(user_ref, f"transaction_judgment:{transaction_id}")
+
     def _correction_key(self, user_ref: str, judgment_id: str) -> str:
         return self._key(user_ref, f"correction:{judgment_id}")
 
     def _idempotency_key(self, user_ref: str, idempotency_key: str) -> str:
         return self._key(user_ref, f"idempotency:{idempotency_key}")
 
+    def _registry_key(self, user_ref: str) -> str:
+        return self._key(user_ref, "keys")
+
+    def _track_keys(self, pipe: Any, user_ref: str, *keys: str) -> None:
+        if not keys:
+            return
+        pipe.sadd(self._registry_key(user_ref), *keys)
+
     def _user_keys(self, user_ref: str) -> list[str]:
         explicit = [
+            self._registry_key(user_ref),
             self._key(user_ref, "events"),
             self._key(user_ref, "profile"),
             self._key(user_ref, "settings"),
@@ -834,20 +918,27 @@ class RedisLedgerRepository(LedgerRepository):
             self._key(user_ref, "pending_question"),
             self._key(user_ref, "legacy_imported"),
             self._key(user_ref, "metrics"),
+            self._key(user_ref, "quota:daily"),
+            self._key(user_ref, "quota:rate"),
         ]
         patterns = [
             self._key(user_ref, "transaction:*"),
+            self._key(user_ref, "transaction_judgment:*"),
             self._key(user_ref, "judgment:*"),
             self._key(user_ref, "correction:*"),
             self._key(user_ref, "idempotency:*"),
         ]
-        found: list[str] = []
+        found: list[str] = list(self._redis.smembers(self._registry_key(user_ref)) or [])
         for pattern in patterns:
             found.extend(self._redis.scan_iter(match=pattern))
-        return explicit + found
+        return list(dict.fromkeys(explicit + found))
 
     def _refresh_retention(self, user_ref: str) -> None:
-        keys = [key for key in self._user_keys(user_ref) if self._redis.exists(key)]
+        keys = [
+            key
+            for key in self._user_keys(user_ref)
+            if ":quota:" not in key and self._redis.exists(key)
+        ]
         if not keys:
             return
         with self._redis.pipeline(transaction=False) as pipe:

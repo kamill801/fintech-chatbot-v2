@@ -34,6 +34,16 @@ Never place these values in Git, Vercel client variables, browser code, screensh
 - `SUPABASE_URL=https://ijdodqldneduqeblkivo.supabase.co`: the selected public project URL, committed as non-secret Blueprint configuration.
 - `SUPABASE_JWT_AUDIENCE=authenticated`
 - `CORS_ALLOWED_ORIGINS=https://jangbu-ai.vercel.app`
+- `LEDGER_RETENTION_DAYS=365`
+- `OPENAI_TIMEOUT_SECONDS=20`
+- `OPENAI_JUDGMENT_ATTEMPTS=2`
+- `OPENAI_LEDGER_MAX_OUTPUT_TOKENS=700`
+- `AI_JUDGMENT_DAILY_QUOTA=50`
+- `AI_JUDGMENT_DAILY_WINDOW_SECONDS=86400`
+- `AI_JUDGMENT_RATE_LIMIT=10`
+- `AI_JUDGMENT_RATE_WINDOW_SECONDS=60`
+
+The daily and short-window limits are both enforced per pseudonymous user in Redis. When quota state is unavailable, the API fails closed with a user-safe `429` rather than issuing an unbounded OpenAI request.
 
 ### Vercel public client settings
 
@@ -61,8 +71,23 @@ Supabase `service_role`, legacy JWT shared secrets, database passwords, Redis cr
 - Vercel frontend: live-mode login is deployed at `https://jangbu-ai.vercel.app`. Production has `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_DEMO_DEFAULT` registered.
 - Supabase: project `ijdodqldneduqeblkivo` is Healthy in Seoul. Email/password authentication is enabled, email confirmation is disabled for immediate signup, and the public JWKS exposes an ES256 EC key with a key ID.
 - Upstash: the Free Redis database is provisioned in Tokyo. Credentials remain server-side in Render; a successful readiness response proves current connectivity.
-- Render: `https://jangbu-api.onrender.com` runs the Free Flask web service in Singapore. `GET /health` and `GET /ready` returned HTTP 200 on 2026-08-05.
+- Render: `https://jangbu-api.onrender.com` runs the Free Flask web service in Singapore. Each release must re-check both `GET /health` and Redis-backed `GET /ready` after auto-deploy.
 - OpenAI: the owner configured the server-side key in Render. A live model response and judgment-quality evaluation have not been independently verified.
 - Authenticated profile, transaction, reason, judgment, correction, and sign-out E2E remain a separate production verification gate.
 
 Provider dashboard state and free-tier terms can change. Re-check them at activation time and distinguish successful configuration from verified end-to-end behavior.
+
+## Release Verification
+
+```bash
+python3 -m unittest discover -s tests -v
+LEDGER_TEST_REDIS_URL=redis://127.0.0.1:6391/15 \
+  python3 -m unittest tests.integration.test_redis_repository -v
+cd frontend
+npm test -- --run
+npm run lint
+npm run build
+npm audit --omit=dev --audit-level=high
+```
+
+After pushing `main`, verify the Vercel production alias, the deployed service worker version, Render `/health`, Render `/ready`, and an authenticated owner-controlled flow. Health/readiness alone do not prove Supabase login, persistence, or live OpenAI judgment quality.
