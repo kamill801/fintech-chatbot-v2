@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
+  CalendarBlank,
+  CaretLeft,
   CaretRight,
   FileText,
   Lightbulb,
@@ -31,72 +33,190 @@ import { Link, useNavigate } from "../router";
 import type { Transaction } from "../types";
 import { categoryNames, currentMonthKey, formatKoreanDate, formatMonthLabel, formatWon, withDemo } from "../utils";
 
-function groupTransactions(transactions: Transaction[]) {
-  const groups = new Map<string, Transaction[]>();
-  for (const transaction of transactions) {
-    const key = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric" }).format(new Date(transaction.occurred_at));
-    groups.set(key, [...(groups.get(key) ?? []), transaction]);
-  }
-  return [...groups.entries()];
+function transactionDateKey(transaction: Transaction): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(transaction.occurred_at));
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function shiftMonth(month: string, delta: number): string {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, monthNumber - 1 + delta, 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function calendarDays(month: string): Array<number | null> {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const firstWeekday = new Date(Date.UTC(year, monthNumber - 1, 1)).getUTCDay();
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const cells: Array<number | null> = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: lastDay }, (_, index) => index + 1),
+  ];
+  while (cells.length % 7) cells.push(null);
+  return cells;
+}
+
+function calendarWeeks(month: string): Array<Array<number | null>> {
+  const days = calendarDays(month);
+  return Array.from({ length: days.length / 7 }, (_, index) => days.slice(index * 7, index * 7 + 7));
+}
+
+function dayHeading(dateKey: string): string {
+  const [, month, day] = dateKey.split("-").map(Number);
+  return `${month}월 ${day}일 내역`;
 }
 
 export function LedgerPage() {
   const { demo, profile, summary, transactions } = useLedger();
   const navigate = useNavigate();
-  const groups = useMemo(() => groupTransactions(transactions), [transactions]);
-  const month = summary?.month ?? currentMonthKey();
+  const initialMonth = summary?.month ?? currentMonthKey();
+  const [month, setMonth] = useState(initialMonth);
+  const monthTransactions = useMemo(
+    () => transactions.filter((transaction) => transactionDateKey(transaction).startsWith(month)),
+    [month, transactions],
+  );
+  const initialTransactionDate = monthTransactions[0] ? transactionDateKey(monthTransactions[0]) : `${month}-01`;
+  const [selectedDate, setSelectedDate] = useState(initialTransactionDate);
+  const selectedTransactions = useMemo(
+    () => monthTransactions.filter((transaction) => transactionDateKey(transaction) === selectedDate),
+    [monthTransactions, selectedDate],
+  );
+  const totalsByDate = useMemo(() => monthTransactions.reduce<Record<string, number>>((totals, transaction) => {
+    const date = transactionDateKey(transaction);
+    totals[date] = (totals[date] ?? 0) + transaction.amount_krw;
+    return totals;
+  }, {}), [monthTransactions]);
+  const monthTotal = month === summary?.month
+    ? summary.total_spent_krw
+    : monthTransactions.reduce((total, transaction) => total + transaction.amount_krw, 0);
+
+  function moveMonth(delta: number) {
+    const nextMonth = shiftMonth(month, delta);
+    setMonth(nextMonth);
+    setSelectedDate(`${nextMonth}-01`);
+  }
+
   return (
-    <AppShell active="/ledger" showAdd>
+    <AppShell active="/ledger" showAdd addTo={`/add?date=${selectedDate}`} addLabel={`${dayHeading(selectedDate).replace(" 내역", "")} 빠른 지출 추가`}>
       <div className="screen ledger-screen">
-        <header className="ledger-header"><h1>장부</h1><span className="month-select" aria-label="현재 리포트 월">{formatMonthLabel(month)}</span></header>
-        <section className="ledger-summary"><h2>이번 달 <Highlight>{formatWon(summary?.total_spent_krw ?? 0)}</Highlight> 썼어요.</h2><p><span>수입 <strong>{formatWon(profile?.monthly_income_krw ?? 0)}</strong></span><i /><span>지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span></p></section>
-        <Surface className="ledger-list">
-          {groups.length ? groups.map(([date, items], index) => (
-            <div className="ledger-day" key={date}><h3>{index === 0 ? "오늘" : "이전"} · {date}</h3>{items.map((transaction) => <TransactionRow key={transaction.transaction_id} transaction={transaction} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))} />)}</div>
-          )) : <p className="empty-copy">아직 기록한 지출이 없어요.</p>}
+        <header className="ledger-header">
+          <h1>장부</h1>
+          <div className="calendar-month-control">
+            <button type="button" onClick={() => moveMonth(-1)} aria-label="이전 달"><CaretLeft size={20} /></button>
+            <span className="month-select" aria-label="현재 장부 월">{formatMonthLabel(month)}</span>
+            <button type="button" onClick={() => moveMonth(1)} aria-label="다음 달"><CaretRight size={20} /></button>
+          </div>
+        </header>
+        <section className="ledger-summary"><h2>이번 달 <Highlight>{formatWon(monthTotal)}</Highlight> 썼어요.</h2><p><span>수입 <strong>{formatWon(profile?.monthly_income_krw ?? 0)}</strong></span><i /><span>지출 <strong>{formatWon(monthTotal)}</strong></span></p></section>
+        <Surface className="ledger-calendar">
+          <div className="ledger-calendar-grid" role="grid" aria-label={`${formatMonthLabel(month)} 지출 달력`}>
+            <div className="calendar-weekdays" role="row">{["일", "월", "화", "수", "목", "금", "토"].map((weekday) => <span key={weekday} role="columnheader">{weekday}</span>)}</div>
+            <div className="calendar-grid" role="rowgroup">
+              {calendarWeeks(month).map((week, weekIndex) => (
+                <div className="calendar-week" role="row" key={`week-${weekIndex}`}>
+                  {week.map((day, dayIndex) => {
+                    if (!day) return <span className="calendar-empty-cell" role="gridcell" key={`empty-${weekIndex}-${dayIndex}`} />;
+                    const dateKey = `${month}-${String(day).padStart(2, "0")}`;
+                    const total = totalsByDate[dateKey] ?? 0;
+                    const selected = dateKey === selectedDate;
+                    return (
+                      <div className="calendar-day-cell" role="gridcell" aria-selected={selected} key={dateKey}>
+                        <button
+                          type="button"
+                          className={`${total ? "has-spend" : ""} ${selected ? "selected" : ""}`.trim()}
+                          aria-label={`${Number(month.split("-")[1])}월 ${day}일${total ? `, 지출 ${formatWon(total)}` : ", 지출 없음"}`}
+                          aria-pressed={selected}
+                          onClick={() => setSelectedDate(dateKey)}
+                        >
+                          <span className="calendar-day-number">{day}</span>
+                          {total > 0 && <small>{formatWon(total)}</small>}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
         </Surface>
+        <section className="selected-day-section">
+          <div className="section-heading">
+            <h2>{dayHeading(selectedDate)}</h2>
+            <Link to={withDemo(`/add?date=${selectedDate}`, demo)} aria-label={`${dayHeading(selectedDate).replace(" 내역", "")}에 지출 추가`}><CalendarBlank size={17} /> 지출 추가</Link>
+          </div>
+          <Surface className="selected-day-list">
+            {selectedTransactions.length
+              ? selectedTransactions.map((transaction) => <TransactionRow key={transaction.transaction_id} transaction={transaction} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))} />)
+              : <p className="empty-copy">아직 기록한 지출이 없어요.</p>}
+          </Surface>
+        </section>
       </div>
     </AppShell>
   );
 }
 
 export function AgentPage() {
-  const { demo, profile, settings, summary, transactions } = useLedger();
+  const { demo, settings, summary, transactions } = useLedger();
   const navigate = useNavigate();
-  const pending = transactions.find((item) => item.status === "awaiting_reason") ?? (demo ? transactions[0] : undefined);
+  const pending = settings.roast_enabled
+    ? transactions.find((item) => item.status === "awaiting_reason")
+    : undefined;
   const recent = transactions.filter((item) => item.status === "judged").slice(0, 2);
-  const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
-  const budgetUsage = budget > 0 ? Math.min(100, Math.round(((summary?.total_spent_krw ?? 0) / budget) * 100)) : 0;
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const weeklyTransactions = demo ? transactions : transactions.filter((item) => new Date(item.occurred_at).getTime() >= weekAgo);
-  const weeklyCounts = weeklyTransactions.reduce<Record<string, number>>((counts, item) => ({ ...counts, [item.category]: (counts[item.category] ?? 0) + 1 }), {});
-  const weeklyTop = Object.entries(weeklyCounts).sort((a, b) => b[1] - a[1])[0];
-  const weeklyCategory = weeklyTop?.[0] ?? "other";
-  const weeklyCount = weeklyTop?.[1] ?? 0;
+  const briefing = summary?.weekly_briefing;
   return (
     <AppShell active="/agent">
       <div className="screen agent-screen">
         <header><h1>에이전트</h1><Link to={withDemo("/settings", demo)}><ModePill enabled={settings.roast_enabled} /></Link></header>
-        <section className="agent-intro"><h2>물어볼 건 <Highlight>먼저,</Highlight> 잔소리는 나중에.</h2><BookkeeperMark compact /></section>
-        <h3>답변 대기 <b>{pending ? 1 : 0}</b></h3>
-        {pending ? (
-          <section className="pending-card">
-            <div><CategoryIcon category={pending.category} /><strong>{pending.merchant || categoryNames[pending.category]}</strong><b>{formatWon(pending.amount_krw)}</b></div>
-            <p>꼭 필요했던 이유가 뭐야?</p>
-            <button onClick={() => navigate(withDemo(`/transactions/${pending.transaction_id}/reason`, demo))}>이유 답하기</button>
+        <section className="agent-intro"><h2>{settings.roast_enabled ? <>이유는 듣고, 장부는 <Highlight>매섭게.</Highlight></> : <>장부는 자동으로, 중요한 건 <Highlight>또렷하게.</Highlight></>}</h2><BookkeeperMark compact /></section>
+        {settings.roast_enabled && (
+          <section className="roast-queue">
+            <h3>답변 대기 <b>{pending ? 1 : 0}</b></h3>
+            {pending ? (
+              <section className="pending-card">
+                <div><CategoryIcon category={pending.category} /><strong>{pending.merchant || categoryNames[pending.category]}</strong><b>{formatWon(pending.amount_krw)}</b></div>
+                <p>그래, 이 돈은 왜 썼는지 한 번 말해봐.</p>
+                <button onClick={() => navigate(withDemo(`/transactions/${pending.transaction_id}/reason`, demo))}>이유 답하기</button>
+              </section>
+            ) : <InfoCallout>답할 질문이 없어요. 다음 지출은 이유까지 확인해요.</InfoCallout>}
           </section>
-        ) : <InfoCallout>답할 질문이 없어요. 다음 지출을 기록하면 먼저 확인할게요.</InfoCallout>}
-        <Surface className="weekly-word">
-          <h3>이번 주 한마디</h3>
-          <div><Wallet size={25} /> 생활비 예산 <strong>{budgetUsage}%</strong> 사용</div>
-          <div><CategoryIcon category={weeklyCategory} /> {categoryNames[weeklyCategory] ?? weeklyCategory} 지출 <strong className="caution-text">{weeklyCount}회</strong></div>
-          <div className="weekly-advice"><Lightbulb size={26} /><p>반복된 지출부터 확인하면<br />다음 소비 기준을 세우기 쉬워요.</p></div>
-        </Surface>
+        )}
+        <section className="briefing-section">
+          <div className="briefing-title">
+            <div><span>저장된 판단을 모아 정리했어요</span><h3>이번 주 AI 브리핑</h3></div>
+            {briefing && <time>{Number(briefing.period_start.split("-")[1])}월 {Number(briefing.period_start.split("-")[2])}일 - {Number(briefing.period_end.split("-")[1])}월 {Number(briefing.period_end.split("-")[2])}일</time>}
+          </div>
+          {briefing ? (
+            <Surface className="ai-briefing">
+              <h2>{briefing.headline}</h2>
+              <p className="briefing-summary">{briefing.summary}</p>
+              <div className="briefing-metrics">
+                <span><small>이번 주 지출</small><strong>{formatWon(briefing.total_spent_krw)}</strong></span>
+                <span><small>가장 큰 분류</small><strong>{briefing.top_category ? categoryNames[briefing.top_category] ?? briefing.top_category : "아직 없음"}</strong></span>
+                <span><small>주의 · 과소비</small><strong>{briefing.caution_count + briefing.overspending_count}건</strong></span>
+              </div>
+              {briefing.concern && (
+                <Link className="briefing-concern" to={withDemo(`/transactions/${briefing.concern.transaction_id}`, demo)}>
+                  <CategoryIcon category={briefing.concern.category} />
+                  <span><small>이번 주 점검할 지출</small><strong>{briefing.concern.merchant || categoryNames[briefing.concern.category]} · {formatWon(briefing.concern.amount_krw)}</strong></span>
+                  <CaretRight size={19} />
+                </Link>
+              )}
+              <div className="briefing-action"><Lightbulb size={26} /><span><small>다음 행동</small><strong>{briefing.improvement}</strong></span></div>
+            </Surface>
+          ) : <InfoCallout>지출을 기록하면 이번 주 흐름과 개선점을 정리해 드려요.</InfoCallout>}
+        </section>
         <h3>최근 판단</h3>
         <Surface className="recent-judgments">
           {recent.map((transaction) => (
             <button key={transaction.transaction_id} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))}><CategoryIcon category={transaction.category} /><span>{transaction.merchant || categoryNames[transaction.category]}</span><b>{formatWon(transaction.amount_krw)}</b><span className="judgment-state">판단 완료</span></button>
           ))}
+          {recent.length === 0 && <p className="empty-copy">아직 완료된 판단이 없어요.</p>}
         </Surface>
       </div>
     </AppShell>
@@ -125,7 +245,7 @@ export function ReportPage() {
         <div className="report-totals"><span>총 지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span><i /><span>예산 <strong>{budgetRemaining}%</strong> 남음</span></div>
         <Surface className="category-report"><h3>어디에 썼나</h3>{entries.map(([category, amount]) => <div className="report-row" key={category}><CategoryIcon category={category} /><span>{categoryNames[category] || category}</span><strong>{formatWon(amount)}</strong><div className="report-bar"><span className={barColors[category] || "blue"} style={{ width: `${Math.round((amount / max) * 66)}%` }} /></div></div>)}{entries.length === 0 && <p className="empty-copy">지출을 기록하면 카테고리별 흐름을 보여드려요.</p>}</Surface>
         {goal && <Surface className="report-goal"><Target size={28} /><strong>{goal.name} 목표</strong><div><span>현재 {goalProgress}%</span><div className="mini-progress"><span style={{ width: `${goalProgress}%` }} /></div></div><p>목표일<br /><b>{formatKoreanDate(goal.target_date)}</b></p></Surface>}
-        {entries.length > 0 ? <section className="report-advice"><Lightbulb size={28} /><p>가장 큰 지출부터 판단 근거를 확인하고<br />다음 주 기준을 정해 보세요.</p><Link to={withDemo("/agent", demo)}>판단 확인하기</Link></section> : <InfoCallout>첫 지출부터 기록하면 월간 패턴을 정리해 드려요.</InfoCallout>}
+        {entries.length > 0 ? <section className="report-advice"><Lightbulb size={28} /><p>{summary?.weekly_briefing?.improvement ?? "가장 큰 지출부터 판단 근거를 확인하고 다음 주 기준을 정해 보세요."}</p><Link to={withDemo("/agent", demo)}>AI 브리핑 보기</Link></section> : <InfoCallout>첫 지출부터 기록하면 월간 패턴을 정리해 드려요.</InfoCallout>}
       </div>
     </AppShell>
   );
@@ -186,7 +306,7 @@ export function SettingsPage() {
       <h1>설정</h1>
       <section className="roast-setting">
         <BookkeeperMark />
-        <div><h2>욕쟁이 할머니 모드</h2><p>장부 판단은 그대로, 말투만 화끈하게 바뀌어요</p><button onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
+        <div><h2>욕쟁이 할머니 모드</h2><p>켜면 모든 지출의 이유를 묻고, 할머니 말투로 판단해요</p><button onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
         <div className="setting-toggle"><Toggle checked={settings.roast_enabled} label="욕쟁이 할머니 모드" onChange={(checked) => void updateMode(checked)} /><span>{savingSetting ? "저장 중" : settings.roast_enabled ? "켜짐" : "꺼짐"}</span></div>
       </section>
       {preview && <div className="roast-preview"><strong>기본 말투</strong><p>{demoJudgment(false).message}</p><strong>욕쟁이 할머니 말투</strong><p>{demoJudgment(true).message}</p></div>}

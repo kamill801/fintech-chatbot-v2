@@ -134,24 +134,20 @@ def parse_judgment_payload(payload: dict) -> dict:
 
 def deterministic_fallback_judgment(request: JudgmentRequest) -> JudgmentResult:
     risk = request.signals.risk_score
-    if request.signals.requires_reason and not request.user_reason:
-        label = "insufficient_context"
-        confidence = 0.50
-        rationale = "지출 맥락이 부족해 아직 과소비로 단정할 수 없다."
-        recommended_action = "구매가 필요했던 이유를 한 번만 추가한다."
-    elif risk >= 0.75:
+    confidence_cap = 0.69 if request.signals.requires_reason and not request.user_reason else 0.90
+    if risk >= 0.75:
         label = "overspending"
-        confidence = min(0.90, max(0.76, risk))
+        confidence = min(confidence_cap, max(0.76, risk))
         rationale = "예산 사용량과 목표 부담 신호가 모두 높다."
         recommended_action = "이번 주 같은 카테고리의 다음 소비를 한 번 건너뛴다."
     elif risk >= 0.35:
         label = "caution"
-        confidence = min(0.80, max(0.60, risk))
+        confidence = min(confidence_cap, max(0.60, risk))
         rationale = "예산 또는 목표에 주는 부담이 중간 수준이다."
         recommended_action = "다음 유사 소비 전에 대체할 지출 하나를 정한다."
     else:
         label = "justified"
-        confidence = max(0.70, 1.0 - risk)
+        confidence = min(confidence_cap, max(0.70, 1.0 - risk))
         rationale = "현재 신호만으로는 예산이나 목표에 큰 부담이 없다."
         recommended_action = "이 소비는 유지하되 같은 카테고리를 계속 기록한다."
 
@@ -253,6 +249,9 @@ class OpenAIResponsesJudge:
                         "장부 바닥이 보이는데 또 퍼 쓰면 어쩌자는 거냐.' Never use threats, "
                         "death or self-harm language, slurs, protected-trait attacks, appearance "
                         "insults, sexual humiliation, or invented personal facts."
+                        " When user_reason is absent, make a best-effort label from the supplied "
+                        "signals and do not ask the user to add a reason. Reserve "
+                        "insufficient_context for data_confidence below 0.35."
                     ),
                 },
                 {

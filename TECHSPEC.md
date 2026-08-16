@@ -5,16 +5,16 @@
 
 ## 1. Product Goal
 
-Build a Korean AI household-ledger agent that understands a user's financial position and goal, tracks manually entered or read-only imported transactions, judges likely overspending, asks for missing purchase context, and recommends one concrete corrective action.
+Build a Korean AI household-ledger agent that understands a user's financial position and goal, tracks manually entered or read-only imported transactions, judges likely overspending, summarizes spending patterns, and recommends one concrete corrective action. Normal mode keeps recording uninterrupted; the opt-in grandma mode asks for purchase context before judging each expense.
 
 The primary outcome is behavior change, not transaction storage alone.
 
-The product has two presentation modes:
+The product has two interaction and voice modes:
 
-- Normal: direct, non-shaming financial coaching.
-- Roast: opt-in Korean market-grandmother scolding.
+- Normal: uninterrupted recording plus direct, non-shaming financial coaching and periodic briefings.
+- Roast: opt-in Korean market-grandmother scolding that asks for one reason per expense before judgment.
 
-Roast is a presentation layer. It cannot change evidence, confidence thresholds, labels, or financial recommendations.
+Roast changes the interaction gate and presentation voice only. It cannot change deterministic evidence, confidence thresholds, final labels, financial recommendations, corrections, or safety rules.
 
 ## 2. Success Criteria
 
@@ -29,9 +29,11 @@ Backend completion before design requires:
 - Financial profile and one goal can be stored and retrieved.
 - Manual transactions work without any account provider.
 - Deterministic signals are computed before every final judgment.
-- Low or medium confidence causes exactly one transaction-bound reason question.
+- Normal mode completes a best-available judgment without a reason question.
+- Roast mode causes exactly one transaction-bound reason question for every expense without a supplied reason.
 - AI returns a structured final judgment.
 - Normal and Roast modes share one judgment artifact.
+- Weekly summaries aggregate real transactions and stored AI judgment artifacts.
 - Corrections, audit events, views, and shares are recorded.
 - Sensitive data is encrypted at rest and excluded from external sinks by allowlist.
 - User data deletion and account revocation contracts exist.
@@ -49,7 +51,8 @@ Backend completion before design requires:
 - Deterministic financial signals.
 - OpenAI Responses API strict JSON Schema judgment.
 - Deterministic fallback judgment when OpenAI is unavailable.
-- One-question reason workflow.
+- Mode-aware one-question reason workflow.
+- Monthly calendar ledger and judgment-backed weekly briefing contracts.
 - Normal and Roast rendering from the same judgment.
 - User agreement/disagreement and corrected labels.
 - Privacy-safe share payload and share metrics.
@@ -80,8 +83,8 @@ Stop and report after the backend and its tests are complete. Do not begin UI/UX
 
 1. Accuracy before entertainment.
 2. Roast defaults off and is immediately reversible.
-3. Roast never changes a judgment or recommended action.
-4. Missing context triggers one focused question before a final accusation.
+3. Roast never changes deterministic evidence, a final judgment, or recommended action.
+4. Normal mode never interrupts recording for a reason; Roast mode requires exactly one focused reason per expense before a final judgment.
 5. Justified purchases remain justified in Roast mode.
 6. The MVP is read-and-advise only.
 7. User corrections append evidence; they never erase the original judgment.
@@ -107,8 +110,9 @@ ledger/application/service.py
         +--> profile and goal use cases
         +--> transaction ingestion
         +--> deterministic signals
-        +--> reason-question state machine
+        +--> mode-aware reason-question state machine
         +--> structured AI judgment
+        +--> judgment-backed weekly briefing
         +--> mode-specific rendering
         +--> correction/share/deletion use cases
         |
@@ -380,12 +384,19 @@ risk_score = clamp(
 )
 ```
 
-Initial reason-question triggers:
+Initial `requires_reason` signal triggers used for confidence calibration and evaluation:
 
 - risk_score is between 0.35 and 0.75 inclusive; or
 - category is unknown; or
 - a high-budget-share transaction lacks a reason; or
 - profile/history completeness produces data_confidence below 0.75.
+
+Interaction policy:
+
+- Normal mode does not expose a reason question. The judge uses the deterministic signals and any optional transaction context to return the best available judgment; missing optional context lowers confidence but does not block recording.
+- Roast mode asks exactly one transaction-bound reason for every expense without a supplied reason, regardless of `requires_reason`.
+- A pending Roast question must be answered or explicitly resumed before another Roast transaction can replace it.
+- The `requires_reason` signal remains versioned evidence and cannot by itself alter final thresholds between modes.
 
 Policy term definitions for `overspending-v1`:
 
@@ -403,7 +414,8 @@ Weights and thresholds may change only through a versioned policy and labeled ev
 ```text
 transaction.recorded
   -> signals_computed
-  -> awaiting_reason | judged
+  -> normal: judged
+  -> roast: awaiting_reason | judged
 
 awaiting_reason
   -> reason_added
@@ -416,11 +428,12 @@ judged
 Rules:
 
 - Profile absence rejects transaction creation with profile_required.
-- Exactly one reason question is permitted per transaction.
+- Normal mode does not create a pending reason question.
+- Exactly one reason question is permitted per Roast transaction.
 - At most one unanswered reason question may exist per user; concurrent attempts are serialized and cannot overwrite it.
 - A repeated reason submission is idempotent.
 - Corrections append an audit event and update a separate latest-correction projection. Reads expose original_label, effective_label, and correction while the original judgment remains immutable.
-- Roast state is read only during rendering.
+- Roast state is read at the interaction gate and during rendering; judgment evidence and output semantics remain mode-independent.
 
 ### 8.3 AI Input Allowlist
 

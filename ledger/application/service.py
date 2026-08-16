@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Callable, Protocol
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from ledger.adapters.manual import ManualTransactionDraft, ManualTransactionSource
 from ledger.adapters.openai_judge import JudgmentRequest
@@ -30,6 +31,17 @@ from ledger.rendering import render_judgment
 from ledger.telemetry import TelemetryEvent, confidence_band
 
 logger = logging.getLogger(__name__)
+
+CATEGORY_NAMES_KO = {
+    "cafe": "카페·간식",
+    "food": "식비",
+    "transport": "교통",
+    "shopping": "쇼핑",
+    "housing": "주거",
+    "health": "건강",
+    "other": "기타",
+    "unknown": "기타",
+}
 
 
 class Judge(Protocol):
@@ -198,6 +210,18 @@ class LedgerService:
                 "complete the financial profile before recording transactions",
                 409,
             )
+        settings = self.repository.get_settings(user_ref)
+        active_pending = self.repository.get_pending_question(user_ref)
+        if (
+            settings.roast_enabled
+            and active_pending is not None
+            and active_pending.answered_at is None
+        ):
+            raise ServiceError(
+                "pending_reason_required",
+                "먼저 이전 지출의 이유를 답해 주세요.",
+                409,
+            )
         occurred_at = str(payload.get("occurred_at") or utc_now_iso())
         draft = ManualTransactionDraft(
             user_ref=user_ref,
@@ -213,9 +237,10 @@ class LedgerService:
         transaction_record_key = _key("transaction-record", idempotency_key)
         recorded = self.repository.get_cached_result(user_ref, transaction_record_key)
         quota_prechecked = False
+        requires_interactive_reason = settings.roast_enabled and not transaction.reason
         if recorded is None:
             signals = self._compute_signals(profile, transaction)
-            if not (signals.requires_reason and not transaction.reason):
+            if not requires_interactive_reason:
                 self._consume_judgment_quota(user_ref)
                 quota_prechecked = True
             recorded = self.repository.record_transaction(
@@ -230,11 +255,11 @@ class LedgerService:
             return self._cache_service_result(user_ref, response_key, existing)
 
         signals = self._compute_signals(profile, transaction)
-        if signals.requires_reason and not transaction.reason:
+        if requires_interactive_reason:
             question = PendingQuestion(
                 question_id=str(uuid4()),
                 transaction_id=transaction.transaction_id,
-                question="이 지출이 꼭 필요했던 이유가 뭐야?",
+                question="그래, 이 돈은 왜 썼는지 한 번 말해봐.",
                 asked_at=utc_now_iso(),
             )
             pending = self.repository.save_pending_question(
@@ -462,11 +487,19 @@ class LedgerService:
     def get_summary(self, user_ref: str) -> ServiceResult:
         profile = self.repository.get_profile(user_ref)
         transactions = list(self.repository.list_transactions(user_ref))
-        now = datetime.now(UTC)
+        settings = self.repository.get_settings(user_ref)
+        try:
+            timezone = ZoneInfo(settings.timezone)
+        except Exception:
+            timezone = ZoneInfo("Asia/Seoul")
+        now = datetime.now(UTC).astimezone(timezone)
         current = [
             transaction
             for transaction in transactions
-            if _same_month(parse_utc_datetime(transaction.occurred_at, "occurred_at"), now)
+            if _same_month(
+                parse_utc_datetime(transaction.occurred_at, "occurred_at").astimezone(timezone),
+                now,
+            )
         ]
         by_category: dict[str, int] = {}
         for transaction in current:
@@ -479,6 +512,12 @@ class LedgerService:
             "total_spent_krw": total,
             "by_category_krw": by_category,
             "transaction_count": len(current),
+            "weekly_briefing": self._weekly_briefing(
+                user_ref,
+                transactions,
+                now=now,
+                timezone=timezone,
+            ),
         }
         if profile:
             summary.update(
@@ -491,6 +530,131 @@ class LedgerService:
                 }
             )
         return ServiceResult(200, {"summary": summary})
+
+    def _weekly_briefing(
+        self,
+        user_ref: str,
+        transactions: list[Transaction],
+        *,
+        now: datetime,
+        timezone: ZoneInfo,
+    ) -> dict[str, Any]:
+        week_start = now.date() - timedelta(days=now.weekday())
+        week_end = week_start + timedelta(days=6)
+        weekly = [
+            transaction
+            for transaction in transactions
+            if week_start
+            <= parse_utc_datetime(transaction.occurred_at, "occurred_at")
+            .astimezone(timezone)
+            .date()
+            <= week_end
+        ]
+        by_category: dict[str, int] = {}
+        for transaction in weekly:
+            by_category[transaction.category] = (
+                by_category.get(transaction.category, 0) + transaction.amount_krw
+            )
+        top_category, top_amount = (
+            max(by_category.items(), key=lambda item: item[1])
+            if by_category
+            else (None, 0)
+        )
+
+        reviewed: list[tuple[Transaction, JudgmentResult, str]] = []
+        label_counts = {
+            "justified": 0,
+            "caution": 0,
+            "overspending": 0,
+            "insufficient_context": 0,
+        }
+        for transaction in weekly:
+            judgment = self.repository.get_judgment_for_transaction(
+                user_ref, transaction.transaction_id
+            )
+            if judgment is None:
+                continue
+            correction = self.repository.get_judgment_correction(
+                user_ref, judgment.judgment_id
+            )
+            effective_label = (
+                correction.corrected_label if correction else judgment.label
+            )
+            label_counts[effective_label] += 1
+            reviewed.append((transaction, judgment, effective_label))
+
+        priority = {
+            "overspending": 3,
+            "caution": 2,
+            "insufficient_context": 1,
+            "justified": 0,
+        }
+        concern = max(
+            reviewed,
+            key=lambda item: (priority[item[2]], item[0].amount_krw),
+            default=None,
+        )
+        total = sum(transaction.amount_krw for transaction in weekly)
+        if label_counts["overspending"]:
+            headline = f"이번 주 과소비 {label_counts['overspending']}건을 먼저 점검해요."
+        elif label_counts["caution"]:
+            headline = f"주의가 필요한 지출 {label_counts['caution']}건이 보여요."
+        elif reviewed:
+            headline = "이번 주 지출은 대체로 계획 안에 있어요."
+        elif weekly:
+            headline = "기록은 모였고 AI 판단을 정리하고 있어요."
+        else:
+            headline = "이번 주 첫 지출을 기록해 보세요."
+
+        if weekly:
+            top_category_name = _category_name(top_category)
+            summary_text = (
+                f"이번 주 {len(weekly)}건에 {total:,}원을 썼어요."
+                + (
+                    f" 가장 큰 지출 분류는 {top_category_name} {top_amount:,}원이에요."
+                    if top_category
+                    else ""
+                )
+            )
+        else:
+            summary_text = "거래를 기록하면 이번 주 흐름을 자동으로 묶어 드려요."
+
+        concern_payload = None
+        if concern is not None and concern[2] != "justified":
+            transaction, judgment, effective_label = concern
+            concern_payload = {
+                "transaction_id": transaction.transaction_id,
+                "label": effective_label,
+                "category": transaction.category,
+                "merchant": transaction.merchant,
+                "amount_krw": transaction.amount_krw,
+                "rationale": judgment.rationale,
+            }
+            improvement = judgment.recommended_action
+        elif top_category:
+            improvement = (
+                f"다음 지출 전에는 {_category_name(top_category)} 예산이 얼마나 남았는지 먼저 확인해요."
+            )
+        else:
+            improvement = "지출 한 건을 기록하면 다음 행동을 구체적으로 제안해 드려요."
+
+        return {
+            "period_start": week_start.isoformat(),
+            "period_end": week_end.isoformat(),
+            "total_spent_krw": total,
+            "transaction_count": len(weekly),
+            "top_category": top_category,
+            "top_category_spent_krw": top_amount,
+            "judged_count": len(reviewed),
+            "justified_count": label_counts["justified"],
+            "caution_count": label_counts["caution"],
+            "overspending_count": label_counts["overspending"],
+            "insufficient_context_count": label_counts["insufficient_context"],
+            "headline": headline,
+            "summary": summary_text,
+            "improvement": improvement,
+            "concern": concern_payload,
+        }
 
     def get_metrics(self, user_ref: str) -> ServiceResult:
         metrics = self.repository.get_metrics(user_ref)
@@ -824,6 +988,12 @@ def _normalized_category(value: Any) -> str:
         raise ServiceError("invalid_request", "category must be a string", 400)
     normalized = value.strip().lower().replace(" ", "_")
     return normalized or "unknown"
+
+
+def _category_name(category: str | None) -> str:
+    if category is None:
+        return "기타"
+    return CATEGORY_NAMES_KO.get(category, category)
 
 
 def _same_month(left: datetime, right: datetime) -> bool:

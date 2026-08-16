@@ -73,7 +73,8 @@ The home screen must answer four questions in this order:
 - Goals:
   - make manual transaction capture take less than 15 seconds for common expenses;
   - make budget position and goal impact understandable without opening a report;
-  - resolve uncertain spending with exactly one focused reason question;
+  - keep normal-mode capture uninterrupted and reserve one focused reason question per expense for the explicitly enabled 욕쟁이 할머니 모드;
+  - turn stored transaction judgments into a concise weekly briefing and one practical improvement;
   - make every judgment inspectable, correctable, and actionable;
   - make 욕쟁이 할머니 모드 entertaining enough to share without weakening trust or accuracy.
 - Non-goals:
@@ -95,7 +96,7 @@ The home screen must answer four questions in this order:
 - User jobs:
   - record a purchase immediately with minimal typing;
   - understand whether the purchase threatens this month's plan or the active goal;
-  - explain a purchase once when the system lacks context;
+  - explain each purchase once only when 욕쟁이 할머니 모드 is enabled;
   - see a practical correction, not a moral verdict;
   - review the month by category and behavior pattern;
   - switch 욕쟁이 할머니 모드 on or off without changing the financial decision.
@@ -110,8 +111,8 @@ Use four bottom destinations and one global add action:
 | Destination | User job | Default content |
 | --- | --- | --- |
 | 홈 | Understand the current month and next action | Spendable amount, goal pace, agent brief, recent activity |
-| 장부 | Find and correct money records | List/calendar switch, filters, transaction detail |
-| 에이전트 | Resolve pending questions and review advice | Pending first, then judgments and check-ins |
+| 장부 | Find, add, and correct money records | Monthly calendar, daily totals, selected-day records, transaction detail |
+| 에이전트 | Review AI guidance or resolve grandma-mode questions | Weekly AI briefing by default; pending reasons first only while grandma mode is on |
 | 리포트 | Understand patterns and plan a correction | Monthly trend, category bars, repeated discretionary spend, goal forecast |
 | `+` | Record a transaction | Amount-first manual entry sheet |
 
@@ -125,13 +126,13 @@ Settings, privacy, data source, profile, and mode controls open from the home he
 | Financial baseline | Save baseline | Income, liquid assets, fixed expenses, debt payment, discretionary budget |
 | Goal setup | Start goal | One goal, current/target amount, target date |
 | Data source | Use manual entry | Manual active; account connection labeled future/read-only, never implied available |
-| Home | Answer pending question or add expense | Monthly headline, budget runway, goal pace, agent brief, recent transactions |
+| Home | Add expense or resume a grandma-mode question | Monthly headline, budget runway, goal pace, mode-aware agent brief, recent transactions |
 | Manual add | Save expense | Amount, category, merchant optional, date, memo optional, source visible |
-| Reason question | Submit one reason | Transaction summary, one question, concise answer, skip consequence explained |
+| Reason question | Submit one grandma-mode reason | Transaction summary, one question, concise answer, skip consequence explained |
 | Judgment | Take corrective action | Label, confidence, evidence, rationale, one action, correction, optional share |
-| Ledger | Inspect records | Date grouping, income/expense totals, source/status, search and filters |
+| Ledger | Inspect records | Sunday-to-Saturday monthly calendar, daily totals, selected-day records, date-aware add |
 | Transaction detail | Correct record | Original record, reason, judgment history, append-only correction |
-| Agent | Resolve and review | Pending inbox, weekly brief, judgment history; no blank generic prompt as the hero |
+| Agent | Review and improve | Judgment-backed weekly total/count, top category, caution/overspending callout, one next action; grandma-mode pending inbox when enabled |
 | Report | Adjust next month | Budget comparison, category bars, repeated spend, goal forecast, one recommendation |
 | Settings | Control trust | 욕쟁이 할머니 모드, profile, goal, data source, privacy, export/delete/revoke |
 
@@ -156,10 +157,10 @@ Character never outranks the amount or evidence.
 
 `global add -> amount -> category -> optional detail -> save -> deterministic signal`
 
-- Clear low risk: record and show a calm confirmation.
-- Clear high risk with sufficient evidence: show the final judgment.
-- Low/medium context confidence: open one transaction-bound reason question.
-- After the reason: show one final judgment and one corrective action.
+- Normal mode: record immediately, complete the best-available judgment, and return to the selected calendar date without a reason interruption.
+- 욕쟁이 할머니 모드: open exactly one transaction-bound reason question for every expense before completing judgment.
+- Missing optional context lowers judgment confidence in normal mode rather than blocking capture.
+- After a grandma-mode reason: show one final judgment and one corrective action.
 - Correction: append a corrected label/reason without hiding the original.
 
 ### 욕쟁이 할머니 모드 켜기
@@ -169,7 +170,7 @@ Character never outranks the amount or evidence.
 - Default is off.
 - First enable requires confirmation and a sample.
 - Disable is one tap and requires no confirmation.
-- The toggle changes only the rendered message.
+- The toggle changes the reason-question gate and rendered voice; deterministic evidence, labels, recommendations, and corrections stay identical.
 - A small `욕쟁이 할머니 모드 켜짐` stamp remains visible on Home, Agent, and Judgment surfaces.
 
 ### Monthly review
@@ -188,9 +189,9 @@ Transactions live in a stable ledger. Agent conversations link back to a specifi
 
 Show `budget 72% used`, `same category 3 times`, or `goal date +8 days` before a label or 욕쟁이 할머니 모드 line. Confidence is visible as plain language plus an inspectable percentage in details.
 
-### One question, one action
+### Questions only by consent, one action always
 
-Uncertain spending gets one reason question. Every final judgment ends with one concrete correction. Avoid multi-question interrogation and generic advice lists.
+Normal mode never interrupts recording with a reason question. 욕쟁이 할머니 모드 asks exactly one reason per expense, and every final judgment or weekly briefing ends with one concrete action. Avoid multi-question interrogation and generic advice lists.
 
 ### Warm does not mean vague
 
@@ -198,7 +199,7 @@ Paper color, editorial type, and hand-drawn marks create warmth. Amounts, dates,
 
 ### Familiar core, distinctive edge
 
-Keep the proven Korean ledger structure: monthly status, quick input, chronological ledger, and category report. Differentiate through the agent brief, evidence-backed judgment, and opt-in voice.
+Keep the proven Korean ledger structure: monthly status, quick input, calendar-first ledger, selected-day records, and category report. Differentiate through the judgment-backed weekly briefing, evidence-backed transaction judgment, and opt-in voice.
 
 ## Visual language
 

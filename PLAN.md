@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 6 - production hardening
-- Active task: none - Task 6.6 completed; the next UX correction requires a new approved task
+- Active task: none - Task 6.7 completed and approved for production release
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -11,6 +11,8 @@
 - Last pre-pivot commit: `64b46ae`
 
 ## Task 2.0 - AI Ledger Backend Pivot (Completed)
+
+> Historical contract. Task 6.7 supersedes the reason-question and mode-interaction rules below while preserving the evidence and judgment invariants.
 
 ### Goal
 
@@ -68,6 +70,8 @@ Local Redis integration and Flask smoke tests are also required. A live OpenAI c
 
 ## Task 3.0 - Benchmark-led UI/UX Foundation (Completed)
 
+> Historical design contract. Task 6.7 supersedes the presentation-only mode rule and list-first ledger default below.
+
 ### Goal
 
 Define the mobile-first household-ledger information architecture and a distinct visual direction before frontend implementation. Preserve familiar Korean ledger behavior while making the AI agent's pending questions, evidence, and advice visible without turning the product into a chat-first novelty.
@@ -103,6 +107,8 @@ Define the mobile-first household-ledger information architecture and a distinct
 - No frontend implementation starts before the user approves a visual direction.
 
 ## Task 3.1 - Full Visual Screen Set (Completed)
+
+> Historical implementation contract. Task 6.7 supersedes the presentation-only mode rule below.
 
 ### Goal
 
@@ -422,6 +428,47 @@ Remove the misleading half-empty transaction-type control and make the native tr
 - The full native date value remains visible and operable at 390px without a duplicate chevron.
 - The submit flow and existing draft/idempotency behavior remain unchanged.
 - No production API, judgment policy, authentication, storage, or provider configuration changes.
+
+## Task 6.7 - Mode-aware Recording, Calendar Ledger, and AI Briefing (Completed)
+
+### Goal
+
+Reduce everyday recording friction while making the opt-in `욕쟁이 할머니 모드` deliberately interactive: normal mode records and judges without a reason step, grandma mode requires one transaction-bound reason for every expense, the ledger opens as a monthly calendar, and actual AI judgment artifacts power a useful weekly briefing.
+
+### Scope
+
+- This task is the dedicated authorization to revise `TECHSPEC.md` for the mode-specific reason workflow and weekly briefing contract.
+- Preserve one deterministic signal policy, judgment labels, confidence handling, recommendations, corrections, and privacy boundaries across both modes.
+- In normal mode, record and complete the best-available AI judgment without interrupting the user for a reason.
+- In `욕쟁이 할머니 모드`, require one reason for every new expense before completing its judgment and prevent a second unanswered question from being overwritten.
+- Make the monthly calendar the default ledger view, with daily totals, date selection, selected-day transactions, and date-aware expense entry.
+- Aggregate stored transaction-level AI judgments into a weekly briefing with spend/count summary, top category, caution/overspending counts, one concrete concern, and one recommended improvement.
+- Replace copy that falsely describes grandma mode as presentation-only or implies that normal mode always asks a question.
+- Add backend and frontend regression coverage, then run full tests, lint, build, compile, and responsive browser verification.
+- Stop and report before commit, push, or deployment unless the user explicitly requests release.
+
+### Ordered Checkpoints
+
+- [x] Inspect the current mode, reason, summary, ledger, agent, report, and test paths.
+- [x] Revise `TECHSPEC.md` and add failing mode/briefing/calendar regression tests.
+- [x] Implement the backend mode gate and judgment-backed weekly briefing.
+- [x] Implement normal-mode immediate recording, grandma-mode reason UX, and date-aware entry.
+- [x] Replace the ledger list default with a responsive monthly calendar and selected-day list.
+- [x] Surface weekly AI briefing, improvement, and overspending callout in Agent and Report.
+- [x] Run focused and full verification, responsive browser QA, and a secret/diff review.
+- [x] Append `progress.txt` and mark this task complete.
+
+### Acceptance Criteria
+
+- Normal mode never returns or displays a reason question for a newly recorded expense and routes the user back to the ledger after a successful record.
+- `욕쟁이 할머니 모드` returns exactly one reason question for every expense without a supplied reason, regardless of the deterministic risk band.
+- A second unanswered grandma-mode expense cannot overwrite the first pending question.
+- Both modes use the same deterministic signals, AI judgment schema, labels, recommendations, corrections, and safety rules.
+- The ledger opens on a Korean Sunday-to-Saturday monthly calendar; selecting a date shows that day's records and adding from the selected date pre-fills the transaction date.
+- The weekly briefing is derived from the authenticated user's real transactions and stored AI judgment artifacts, never fabricated demo content in live mode.
+- Agent and Report clearly show weekly total/count, top category, AI-reviewed caution/overspending counts, one concern, and one next action when evidence exists.
+- Empty states remain honest and useful when no transactions or judgments exist.
+- Backend tests, frontend tests, lint, TypeScript/build, compile, and 390px plus desktop browser checks pass.
 
 ## Archived Work
 

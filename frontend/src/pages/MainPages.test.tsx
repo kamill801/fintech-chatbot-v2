@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter } from "../router";
-import { LedgerPage, ReportPage, SettingsPage } from "./MainPages";
+import { AgentPage, LedgerPage, ReportPage, SettingsPage } from "./MainPages";
 
 const mocks = vi.hoisted(() => ({
   useLedger: vi.fn(),
@@ -31,6 +31,23 @@ describe("live ledger summaries", () => {
         by_category_krw: {},
         transaction_count: 0,
         discretionary_budget_krw: 0,
+        weekly_briefing: {
+          period_start: "2026-08-10",
+          period_end: "2026-08-16",
+          total_spent_krw: 0,
+          transaction_count: 0,
+          top_category: null,
+          top_category_spent_krw: 0,
+          judged_count: 0,
+          justified_count: 0,
+          caution_count: 0,
+          overspending_count: 0,
+          insufficient_context_count: 0,
+          headline: "이번 주 첫 지출을 기록해 보세요.",
+          summary: "거래를 기록하면 이번 주 흐름을 자동으로 묶어 드려요.",
+          improvement: "지출 한 건을 기록하면 다음 행동을 구체적으로 제안해 드려요.",
+          concern: null,
+        },
       },
       transactions: [],
     });
@@ -65,8 +82,94 @@ describe("live ledger summaries", () => {
     expect(screen.getByText("아직 기록한 지출이 없어요.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "검색" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "필터" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "2026년 8월" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "달력" })).not.toBeInTheDocument();
+    expect(screen.getByRole("grid", { name: "2026년 8월 지출 달력" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["일", "월", "화", "수", "목", "금", "토"]);
+  });
+
+  it("uses the calendar as the default ledger and opens entry with the selected date", async () => {
+    const user = userEvent.setup();
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      profile: { monthly_income_krw: 3500000 },
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul" },
+      summary: {
+        month: "2026-08",
+        total_spent_krw: 20000,
+        by_category_krw: { other: 20000 },
+        transaction_count: 1,
+        discretionary_budget_krw: 800000,
+      },
+      transactions: [{
+        transaction_id: "tx-calendar",
+        amount_krw: 20000,
+        merchant: "문구점",
+        category: "other",
+        description: null,
+        occurred_at: "2026-08-16T03:00:00Z",
+        source: "manual",
+        source_reference: null,
+        reason: null,
+        status: "judged",
+        created_at: "2026-08-16T03:00:00Z",
+      }],
+    });
+
+    render(<BrowserRouter><LedgerPage /></BrowserRouter>);
+    await user.click(screen.getByRole("button", { name: /8월 16일.*20,000원/ }));
+
+    expect(screen.getByRole("heading", { name: "8월 16일 내역" })).toBeInTheDocument();
+    expect(screen.getByText("문구점")).toBeInTheDocument();
+    const addLink = screen.getByRole("link", { name: "8월 16일에 지출 추가" });
+    expect(addLink).toHaveAttribute("href", "/add?date=2026-08-16");
+  });
+
+  it("shows a judgment-backed weekly AI briefing in normal mode", () => {
+    window.history.replaceState({}, "", "/agent");
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      profile: { discretionary_budget_krw: 800000 },
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul" },
+      summary: {
+        month: "2026-08",
+        total_spent_krw: 120000,
+        by_category_krw: { cafe: 72000 },
+        transaction_count: 5,
+        discretionary_budget_krw: 800000,
+        weekly_briefing: {
+          period_start: "2026-08-10",
+          period_end: "2026-08-16",
+          total_spent_krw: 72000,
+          transaction_count: 3,
+          top_category: "cafe",
+          top_category_spent_krw: 72000,
+          judged_count: 3,
+          justified_count: 1,
+          caution_count: 2,
+          overspending_count: 0,
+          insufficient_context_count: 0,
+          headline: "주의가 필요한 지출 2건이 보여요.",
+          summary: "이번 주 3건에 72,000원을 썼어요.",
+          improvement: "다음 카페 약속은 산책으로 바꿔요.",
+          concern: {
+            transaction_id: "tx-cafe",
+            label: "caution",
+            category: "cafe",
+            merchant: "카페 온도",
+            amount_krw: 32000,
+            rationale: "카페 지출이 반복됐어요.",
+          },
+        },
+      },
+      transactions: [],
+    });
+
+    render(<BrowserRouter><AgentPage /></BrowserRouter>);
+
+    expect(screen.getByRole("heading", { name: "이번 주 AI 브리핑" })).toBeInTheDocument();
+    expect(screen.getByText("주의가 필요한 지출 2건이 보여요.")).toBeInTheDocument();
+    expect(screen.getByText("카페 온도 · 32,000원")).toBeInTheDocument();
+    expect(screen.getByText("다음 카페 약속은 산책으로 바꿔요.")).toBeInTheDocument();
+    expect(screen.queryByText(/답변 대기/)).not.toBeInTheDocument();
   });
 
   it("shows an honest empty report instead of fabricated category advice", () => {

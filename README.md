@@ -1,6 +1,6 @@
 # AI Household Ledger Agent
 
-Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It combines deterministic financial signals with a structured AI judgment, asks one focused question when purchase context is insufficient, and renders the same decision in a default voice or the opt-in `욕쟁이 할머니 모드` voice.
+Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It combines deterministic financial signals with a structured AI judgment, records without interruption in normal mode, and asks one focused reason per expense only in the opt-in `욕쟁이 할머니 모드`.
 
 ## MVP Scope
 
@@ -8,8 +8,9 @@ Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It 
 - Accept manual transactions without an account provider.
 - Expose a provider-neutral read-only account adapter contract.
 - Compute overspending signals before every judgment.
-- Ask exactly one reason question for uncertain transactions.
+- Record and judge immediately in normal mode; ask exactly one reason per expense in `욕쟁이 할머니 모드`.
 - Return a structured judgment and one corrective action.
+- Use a monthly calendar as the default ledger and aggregate stored judgments into a weekly AI briefing.
 - Record corrections, privacy-safe shares, metrics, and audit events.
 - Keep authenticated browser drafts user-scoped, clear them on sign-out/deletion, and reuse one operation ID across ambiguous retries.
 - Bound per-user AI judgment usage and distinguish a share preview from a completed native share or image download.
@@ -124,7 +125,7 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 - Financial projections and event payloads are encrypted at rest.
 - OpenAI receives only the explicit derived-data allowlist.
 - Logs, Sheets, metrics, and shares reject raw financial or chat fields.
-- `욕쟁이 할머니 모드` is presentation-only and cannot alter a financial decision.
+- `욕쟁이 할머니 모드` changes the reason-question gate and voice, but cannot alter deterministic evidence, labels, recommendations, corrections, or safety rules.
 - User-facing copy never calls the feature Roast. Internal compatibility fields such as `roast_enabled` and `roast_message` remain unchanged.
 - Local financial drafts are keyed by a one-way browser hash of the authenticated user ID and are removed on sign-out or full data deletion.
 - Redis projections, events, idempotency records, and direct judgment indexes inherit the configured 365-day retention contract.
@@ -141,6 +142,6 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 
 ## Project Status
 
-The approved 15-screen web/PWA is implemented and locally verified at mobile, tablet, and desktop widths. Manual entry, one-question reasoning, backend-owned judgment, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, user-scoped draft retention, and redacted image sharing are connected.
+The approved web/PWA is implemented with mode-aware manual entry, a monthly calendar ledger, backend-owned judgment, a judgment-backed weekly AI briefing, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, user-scoped draft retention, and redacted image sharing.
 
-The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Task 6.4 verification on 2026-08-14 passed 101 backend tests plus four isolated Redis integration tests, 32 frontend tests, lint, production build, and a production dependency audit with zero reported vulnerabilities. A real authenticated transaction-to-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.
+The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Task 6.7 local verification on 2026-08-16 passed 106 backend tests with four provider-dependent skips, 42 frontend tests, lint, production build, compileall, secret/diff checks, and 390px plus 1280px browser QA. A real authenticated transaction-to-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.

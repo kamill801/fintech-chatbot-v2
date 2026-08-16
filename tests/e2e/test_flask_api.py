@@ -45,6 +45,12 @@ class FlaskLedgerE2ETests(unittest.TestCase):
 
     def create_reason_judgment(self) -> tuple[str, str]:
         self.put_profile()
+        settings = self.client.put(
+            "/api/v1/me/settings",
+            json={"roast_enabled": True},
+            headers=self.mutate_headers("settings-reason-flow"),
+        )
+        self.assertEqual(settings.status_code, 200)
         tx = self.client.post(
             "/api/v1/me/transactions",
             json={"amount_krw": 50000, "category": "shopping"},
@@ -84,6 +90,18 @@ class FlaskLedgerE2ETests(unittest.TestCase):
     def test_transaction_reason_flow_returns_judgment(self) -> None:
         _transaction_id, judgment_id = self.create_reason_judgment()
         self.assertTrue(judgment_id)
+
+    def test_normal_transaction_is_judged_without_reason_question(self) -> None:
+        self.put_profile()
+        response = self.client.post(
+            "/api/v1/me/transactions",
+            json={"amount_krw": 50000, "category": "shopping"},
+            headers=self.mutate_headers("tx-normal-direct"),
+        )
+        payload = response.get_json()["data"]
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("judgment", payload)
+        self.assertNotIn("pending_question", payload)
 
     def test_quota_limit_returns_safe_429_error(self) -> None:
         class RejectQuota:
@@ -158,7 +176,10 @@ class FlaskLedgerE2ETests(unittest.TestCase):
     def test_summary_endpoint_returns_monthly_summary(self) -> None:
         self.create_reason_judgment()
         response = self.client.get("/api/v1/me/summary", headers=self.headers)
-        self.assertIn("summary", response.get_json()["data"])
+        summary = response.get_json()["data"]["summary"]
+        self.assertIn("weekly_briefing", summary)
+        self.assertIn("headline", summary["weekly_briefing"])
+        self.assertIn("improvement", summary["weekly_briefing"])
 
     def test_metrics_endpoint_reports_share_rate(self) -> None:
         _transaction_id, judgment_id = self.create_reason_judgment()

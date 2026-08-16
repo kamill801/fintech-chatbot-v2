@@ -37,6 +37,14 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
             correlation_id=correlation_id(),
         )
 
+    def enable_roast(self, key: str = "settings-roast") -> None:
+        self.service.update_settings(
+            self.user_ref,
+            {"roast_enabled": True},
+            idempotency_key=key,
+            correlation_id=correlation_id(),
+        )
+
     def test_rejects_transaction_when_profile_is_missing(self) -> None:
         with self.assertRaises(ServiceError) as caught:
             self.service.create_transaction(
@@ -47,8 +55,22 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
             )
         self.assertEqual(caught.exception.code, "profile_required")
 
-    def test_records_pending_question_for_sparse_transaction(self) -> None:
+    def test_normal_mode_judges_sparse_transaction_without_reason_question(self) -> None:
         self.upsert_profile()
+        result = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 50000, "category": "shopping"},
+            idempotency_key="tx-normal",
+            correlation_id=correlation_id(),
+        )
+        self.assertEqual(result.status, 201)
+        self.assertIn("judgment", result.data)
+        self.assertNotIn("pending_question", result.data)
+        self.assertEqual(result.data["transaction"]["status"], "judged")
+
+    def test_roast_mode_records_pending_question_for_every_transaction(self) -> None:
+        self.upsert_profile()
+        self.enable_roast()
         result = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -60,6 +82,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
 
     def test_repeated_transaction_idempotency_returns_same_pending_question(self) -> None:
         self.upsert_profile()
+        self.enable_roast()
         first = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -79,6 +102,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
 
     def test_creates_exactly_one_reason_question_event_per_transaction(self) -> None:
         self.upsert_profile()
+        self.enable_roast()
         self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -100,6 +124,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
 
     def test_reason_submission_completes_judgment(self) -> None:
         self.upsert_profile()
+        self.enable_roast()
         pending = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -141,6 +166,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
             judgment_quota=quota
         )
         self.upsert_profile()
+        self.enable_roast()
         pending = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -201,6 +227,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
             judgment_quota=quota
         )
         self.upsert_profile()
+        self.enable_roast()
         pending = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -231,6 +258,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
 
     def test_repeated_reason_submission_is_idempotent_after_judgment(self) -> None:
         self.upsert_profile()
+        self.enable_roast()
         pending = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -259,6 +287,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
 
     def test_correction_appends_event_without_removing_original_judgment(self) -> None:
         self.upsert_profile()
+        self.enable_roast()
         pending = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -293,6 +322,7 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
         telemetry_events = []
         self.service.telemetry_sink = telemetry_events.append
         self.upsert_profile()
+        self.enable_roast()
         pending = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
@@ -311,12 +341,6 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
             judged.data["judgment"]["judgment_id"],
             {"corrected_label": "justified", "correction_reason": "회사 환급"},
             idempotency_key="correction-share",
-            correlation_id=correlation_id(),
-        )
-        self.service.update_settings(
-            self.user_ref,
-            {"roast_enabled": True},
-            idempotency_key="settings-share",
             correlation_id=correlation_id(),
         )
         shared = self.service.share_judgment(
@@ -373,17 +397,10 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
 
     def test_share_requires_roast_enabled(self) -> None:
         self.upsert_profile()
-        pending = self.service.create_transaction(
+        judged = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 50000, "category": "shopping"},
             idempotency_key="tx-1",
-            correlation_id=correlation_id(),
-        )
-        judged = self.service.add_reason(
-            self.user_ref,
-            pending.data["transaction"]["transaction_id"],
-            {"reason": "업무상 필요해서 샀다"},
-            idempotency_key="reason-1",
             correlation_id=correlation_id(),
         )
         with self.assertRaises(ServiceError) as caught:
@@ -394,6 +411,28 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
                 correlation_id=correlation_id(),
             )
         self.assertEqual(caught.exception.code, "roast_required")
+
+    def test_roast_mode_does_not_overwrite_an_unanswered_question(self) -> None:
+        self.upsert_profile()
+        self.enable_roast()
+        first = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 12000, "category": "cafe"},
+            idempotency_key="tx-first-pending",
+            correlation_id=correlation_id(),
+        )
+        with self.assertRaises(ServiceError) as caught:
+            self.service.create_transaction(
+                self.user_ref,
+                {"amount_krw": 9000, "category": "food"},
+                idempotency_key="tx-second-pending",
+                correlation_id=correlation_id(),
+            )
+        self.assertEqual(caught.exception.code, "pending_reason_required")
+        self.assertEqual(
+            self.repository.get_pending_question(self.user_ref).question_id,
+            first.data["pending_question"]["question_id"],
+        )
 
     def test_deletion_purges_profile_projection(self) -> None:
         self.upsert_profile()

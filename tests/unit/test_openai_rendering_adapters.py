@@ -167,6 +167,60 @@ class StrictOpenAIJudgeTests(unittest.TestCase):
         self.assertTrue(any(marker in result.roast_message for marker in ("아이고", "아이구", "쯧", "그래")))
         self.assertIn(result.recommended_action, result.roast_message)
 
+    def test_fallback_judges_without_a_reason_in_normal_mode(self) -> None:
+        signals = compute_signal_set(
+            SignalInputs(
+                transaction_amount_krw=120000,
+                discretionary_budget_krw=800000,
+                spent_before_transaction_krw=456000,
+                category="shopping",
+                goal_pressure=0.55,
+                baseline_deviation=1.4,
+                recurrence_30d=3,
+                has_reason=False,
+                history_complete=True,
+            )
+        )
+        self.assertTrue(signals.requires_reason)
+
+        result = deterministic_fallback_judgment(
+            JudgmentRequest(
+                transaction_id="tx-no-reason",
+                amount_krw=120000,
+                category="shopping",
+                signals=signals,
+            )
+        )
+
+        self.assertIn(result.label, {"justified", "caution", "overspending"})
+        self.assertNotEqual(result.label, "insufficient_context")
+        self.assertLessEqual(result.confidence, 0.69)
+
+    def test_low_risk_missing_context_is_justified_with_bounded_confidence(self) -> None:
+        signals = compute_signal_set(
+            SignalInputs(
+                transaction_amount_krw=1000,
+                discretionary_budget_krw=800000,
+                category="unknown",
+                baseline_deviation=0,
+                has_reason=False,
+            )
+        )
+        self.assertTrue(signals.requires_reason)
+        self.assertLess(signals.risk_score, 0.35)
+
+        result = deterministic_fallback_judgment(
+            JudgmentRequest(
+                transaction_id="tx-low-risk-no-reason",
+                amount_krw=1000,
+                category="unknown",
+                signals=signals,
+            )
+        )
+
+        self.assertEqual(result.label, "justified")
+        self.assertLessEqual(result.confidence, 0.69)
+
 
 class RenderingTests(unittest.TestCase):
     def judgment(self) -> JudgmentResult:

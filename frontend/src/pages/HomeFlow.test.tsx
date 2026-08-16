@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter } from "../router";
 import { demoProfile, demoSettings, demoSummary, demoTransactions } from "../demo";
 import { manualDraftKey } from "../local-drafts";
@@ -20,6 +20,8 @@ vi.mock("../auth-context", () => ({
 }));
 
 describe("manual transaction drafts", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     window.localStorage.clear();
     window.history.replaceState({}, "", "/add");
@@ -27,6 +29,7 @@ describe("manual transaction drafts", () => {
     mocks.useLedger.mockReturnValue({
       createTransaction: mocks.createTransaction,
       demo: false,
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul" },
     });
   });
 
@@ -47,9 +50,9 @@ describe("manual transaction drafts", () => {
       });
 
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
-    await user.click(screen.getByRole("button", { name: "기록하고 판단받기" }));
+    await user.click(screen.getByRole("button", { name: "지출 기록하기" }));
     await screen.findByRole("alert");
-    await user.click(screen.getByRole("button", { name: "기록하고 판단받기" }));
+    await user.click(screen.getByRole("button", { name: "지출 기록하기" }));
 
     await waitFor(() => expect(mocks.createTransaction).toHaveBeenCalledTimes(2));
     expect(mocks.createTransaction.mock.calls[0][1]).toBe("manual-op-1");
@@ -70,9 +73,66 @@ describe("manual transaction drafts", () => {
     expect(dateInput).toHaveAttribute("type", "date");
     expect((dateInput as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+
+  it("records immediately in normal mode and returns to the ledger", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      manualDraftKey("user-a"),
+      JSON.stringify({
+        draft: { amount_krw: 12800, category: "shopping", merchant: "문구점" },
+        operationId: "normal-op",
+      }),
+    );
+    mocks.createTransaction.mockResolvedValue({
+      transaction: { transaction_id: "tx-normal" },
+      judgment: { judgment_id: "judgment-normal" },
+    });
+
+    render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
+    await user.click(screen.getByRole("button", { name: "지출 기록하기" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/ledger"));
+    expect(screen.queryByText("정보가 부족하면 이유를 한 번 물어봐요")).not.toBeInTheDocument();
+  });
+
+  it("requires the reason flow only when grandma mode is enabled", async () => {
+    const user = userEvent.setup();
+    mocks.useLedger.mockReturnValue({
+      createTransaction: mocks.createTransaction,
+      demo: false,
+      settings: { roast_enabled: true, locale: "ko-KR", timezone: "Asia/Seoul" },
+    });
+    window.localStorage.setItem(
+      manualDraftKey("user-a"),
+      JSON.stringify({
+        draft: { amount_krw: 12800, category: "shopping", merchant: "문구점" },
+        operationId: "roast-op",
+      }),
+    );
+    mocks.createTransaction.mockResolvedValue({
+      transaction: { transaction_id: "tx-roast" },
+      pending_question: { transaction_id: "tx-roast" },
+    });
+
+    render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
+    await user.click(screen.getByRole("button", { name: "기록하고 이유 답하기" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/transactions/tx-roast/reason"));
+    expect(screen.getByText("욕쟁이 할머니가 지출 이유를 한 번 확인해요")).toBeInTheDocument();
+  });
+
+  it("prefills the date selected from the ledger calendar", () => {
+    window.history.replaceState({}, "", "/add?date=2026-08-19");
+
+    render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
+
+    expect(screen.getByLabelText("날짜")).toHaveValue("2026-08-19");
+  });
 });
 
 describe("demo financial consistency", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     window.localStorage.clear();
     mocks.useLedger.mockReturnValue({

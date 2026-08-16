@@ -101,6 +101,33 @@ export interface TransactionResult extends TransactionDetail {
   signals?: Signals;
 }
 
+export interface WeeklyConcern {
+  transaction_id: string;
+  label: JudgmentLabel;
+  category: string;
+  merchant: string | null;
+  amount_krw: number;
+  rationale: string;
+}
+
+export interface WeeklyBriefing {
+  period_start: string;
+  period_end: string;
+  total_spent_krw: number;
+  transaction_count: number;
+  top_category: string | null;
+  top_category_spent_krw: number;
+  judged_count: number;
+  justified_count: number;
+  caution_count: number;
+  overspending_count: number;
+  insufficient_context_count: number;
+  headline: string;
+  summary: string;
+  improvement: string;
+  concern: WeeklyConcern | null;
+}
+
 export interface Summary {
   month: string;
   total_spent_krw: number;
@@ -109,6 +136,7 @@ export interface Summary {
   discretionary_budget_krw?: number;
   budget_usage?: number;
   goal?: Goal;
+  weekly_briefing?: WeeklyBriefing;
 }
 
 export interface SharePayload {

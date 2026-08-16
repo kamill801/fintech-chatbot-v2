@@ -146,6 +146,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       },
       async createTransaction(draft, operationId) {
         if (demo) {
+          const needsReason = settings.roast_enabled && !draft.reason;
           const transaction: Transaction = {
             transaction_id: `tx-${createClientId()}`,
             amount_krw: draft.amount_krw,
@@ -156,13 +157,13 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
             source: "manual",
             source_reference: null,
             reason: draft.reason ?? null,
-            status: draft.reason ? "judged" : "awaiting_reason",
+            status: needsReason ? "awaiting_reason" : "judged",
             created_at: new Date().toISOString(),
           };
           setTransactions((items) => [transaction, ...items]);
-          return draft.reason
-            ? { transaction, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled) }
-            : { transaction, signals: demoSignals, pending_question: { ...demoPending, transaction_id: transaction.transaction_id } };
+          return needsReason
+            ? { transaction, signals: demoSignals, pending_question: { ...demoPending, transaction_id: transaction.transaction_id } }
+            : { transaction, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled) };
         }
         const result = await ledgerApi.createTransaction(draft, operationId);
         setTransactions((items) => [result.transaction, ...items]);

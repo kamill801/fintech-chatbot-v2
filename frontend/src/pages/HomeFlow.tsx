@@ -20,6 +20,7 @@ import {
   TransactionRow,
 } from "../components";
 import { useAuth } from "../auth-context";
+import { ApiError } from "../api";
 import { useLedger } from "../ledger-context";
 import { manualDraftKey } from "../local-drafts";
 import { Link, useNavigate, useParams } from "../router";
@@ -40,7 +41,9 @@ function monthlyRemaining(total: number, budget?: number): number {
 export function HomePage() {
   const { demo, profile, settings, summary, transactions } = useLedger();
   const navigate = useNavigate();
-  const pending = transactions.find((item) => item.status === "awaiting_reason") ?? (demo ? transactions[0] : undefined);
+  const pending = settings.roast_enabled
+    ? transactions.find((item) => item.status === "awaiting_reason")
+    : undefined;
   const total = summary?.total_spent_krw ?? 0;
   const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
   const usage = budget ? Math.min(1, total / budget) : 0;
@@ -88,7 +91,10 @@ export function HomePage() {
         ) : (
           <section className="agent-brief quiet reveal-3">
             <BookkeeperMark compact />
-            <div><strong>밀린 질문이 없어</strong><p>지출을 기록하면 근거부터 확인할게.</p></div>
+            <div>
+              <strong>{settings.roast_enabled ? "밀린 질문이 없어" : "장부 정리는 맡겨 둬"}</strong>
+              <p>{settings.roast_enabled ? "다음 지출은 이유까지 듣고 판단할게." : "지출을 기록하면 이번 주 흐름과 개선점을 정리할게."}</p>
+            </div>
           </section>
         )}
 
@@ -110,6 +116,13 @@ function todayForInput(): string {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60_000;
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function initialDateForInput(): string {
+  const requested = new URLSearchParams(window.location.search).get("date");
+  return requested && /^\d{4}-\d{2}-\d{2}$/.test(requested)
+    ? requested
+    : todayForInput();
 }
 
 function blankManualDraft(demo: boolean): TransactionDraft {
@@ -135,13 +148,13 @@ function readManualDraft(key: string, demo: boolean): StoredManualDraft {
 }
 
 export function ManualTransactionPage() {
-  const { createTransaction, demo } = useLedger();
+  const { createTransaction, demo, settings } = useLedger();
   const { userKey } = useAuth();
   const navigate = useNavigate();
   const draftKey = manualDraftKey(userKey, demo);
   const [storedDraft, setStoredDraft] = useState<StoredManualDraft>(() => readManualDraft(draftKey, demo));
   const { draft, operationId } = storedDraft;
-  const [date, setDate] = useState(todayForInput);
+  const [date, setDate] = useState(initialDateForInput);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -168,10 +181,14 @@ export function ManualTransactionPage() {
       if (result.pending_question) {
         navigate(withDemo(`/transactions/${result.transaction.transaction_id}/reason`, demo));
       } else {
-        navigate(withDemo(`/judgments/${result.transaction.transaction_id}`, demo));
+        navigate(withDemo("/ledger", demo));
       }
-    } catch {
-      setError(navigator.onLine ? "지출을 저장하지 못했어요. 다시 시도해 주세요." : "오프라인이에요. 입력 내용은 이 기기에 보관했어요.");
+    } catch (nextError) {
+      if (nextError instanceof ApiError && nextError.code === "pending_reason_required") {
+        setError("먼저 이전 지출의 이유를 답해 주세요.");
+      } else {
+        setError(navigator.onLine ? "지출을 저장하지 못했어요. 다시 시도해 주세요." : "오프라인이에요. 입력 내용은 이 기기에 보관했어요.");
+      }
     } finally {
       setSaving(false);
     }
@@ -209,9 +226,9 @@ export function ManualTransactionPage() {
             <input value={draft.description ?? ""} placeholder="선택 입력" onChange={(event) => updateDraft({ description: event.target.value })} /><CaretRight size={19} />
           </label>
         </Surface>
-        <InfoCallout>정보가 부족하면 이유를 한 번 물어봐요</InfoCallout>
+        <InfoCallout>{settings.roast_enabled ? "욕쟁이 할머니가 지출 이유를 한 번 확인해요" : "기록하면 AI가 이번 주 흐름과 개선점을 정리해요"}</InfoCallout>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <PrimaryButton disabled={saving}>{saving ? "기록하는 중" : "기록하고 판단받기"}</PrimaryButton>
+        <PrimaryButton disabled={saving}>{saving ? "기록하는 중" : settings.roast_enabled ? "기록하고 이유 답하기" : "지출 기록하기"}</PrimaryButton>
       </form>
     </main>
   );
@@ -251,7 +268,7 @@ export function ReasonPage() {
   const sameCategoryCount = Math.max(1, transactions.filter((item) => item.category === transaction.category && (demo || new Date(item.occurred_at).getTime() >= weekAgo)).length);
   return (
     <main className="standalone-screen reason-screen">
-      <PageHeader title="이유 한 번만" close />
+      <PageHeader title="할머니에게 이유 답하기" close />
       <Surface className="reason-transaction">
         <CategoryIcon category={transaction.category} />
         <span><small>{categoryNames[transaction.category]}</small><strong>{transaction.merchant || "지출"}</strong></span>

@@ -230,7 +230,19 @@ const navItems = [
   { to: "/report", label: "리포트", icon: ChartBar },
 ];
 
-export function AppShell({ children, active, showAdd = false }: { children: ReactNode; active?: string; showAdd?: boolean }) {
+export function AppShell({
+  children,
+  active,
+  showAdd = false,
+  addTo = "/add",
+  addLabel = "지출 기록 추가",
+}: {
+  children: ReactNode;
+  active?: string;
+  showAdd?: boolean;
+  addTo?: string;
+  addLabel?: string;
+}) {
   const { demo } = useLedger();
   return (
     <div className="app-shell">
@@ -247,10 +259,10 @@ export function AppShell({ children, active, showAdd = false }: { children: Reac
           })}
           <NavLink to={withDemo("/settings", demo)}><Gear size={23} /> 설정</NavLink>
         </nav>
-        <NavLink className="rail-add" to={withDemo("/add", demo)}><Plus size={22} /> 지출 기록</NavLink>
+        <NavLink className="rail-add" to={withDemo(addTo, demo)}><Plus size={22} /> 지출 기록</NavLink>
       </aside>
       <main className="app-content">{children}</main>
-      {showAdd && <NavLink className="floating-add" to={withDemo("/add", demo)} aria-label="지출 기록 추가"><Plus size={32} /></NavLink>}
+      {showAdd && <NavLink className="floating-add" to={withDemo(addTo, demo)} aria-label={addLabel}><Plus size={32} /></NavLink>}
       <nav className="bottom-nav" aria-label="주요 메뉴">
         {navItems.map((item) => {
           const Icon = item.icon;

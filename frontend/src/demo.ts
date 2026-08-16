@@ -139,6 +139,30 @@ export const demoSummary: Summary = {
   discretionary_budget_krw: demoProfile.discretionary_budget_krw,
   budget_usage: demoBudgetUsage,
   goal: demoProfile.goal,
+  weekly_briefing: {
+    period_start: "2026-08-03",
+    period_end: "2026-08-09",
+    total_spent_krw: 22_500,
+    transaction_count: 3,
+    top_category: "cafe",
+    top_category_spent_krw: 12_000,
+    judged_count: 3,
+    justified_count: 2,
+    caution_count: 1,
+    overspending_count: 0,
+    insufficient_context_count: 0,
+    headline: "주의해서 볼 지출 1건이 있어요.",
+    summary: "이번 주 3건에 22,500원을 썼어요.",
+    improvement: "이번 주 카페는 여기까지 하고 다음 만남은 산책으로 바꿔요.",
+    concern: {
+      transaction_id: "tx-cafe",
+      label: "caution",
+      category: "cafe",
+      merchant: "카페 온도",
+      amount_krw: 12_000,
+      rationale: "이번 주 카페 지출이 반복됐어요.",
+    },
+  },
 };
 
 export const demoSignals: Signals = {
