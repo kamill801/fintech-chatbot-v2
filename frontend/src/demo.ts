@@ -29,6 +29,9 @@ export const demoSettings: Settings = {
   timezone: "Asia/Seoul",
 };
 
+const demoTotalSpentKrw = 377_500;
+export const demoBudgetUsage = demoTotalSpentKrw / demoProfile.discretionary_budget_krw;
+
 export const demoTransactions: Transaction[] = [
   {
     transaction_id: "tx-cafe",
@@ -95,14 +98,55 @@ export const demoTransactions: Transaction[] = [
     status: "judged",
     created_at: "2026-08-01T12:10:00Z",
   },
+  {
+    transaction_id: "tx-cafe-previous-1",
+    amount_krw: 28_000,
+    merchant: "브루클린 커피",
+    category: "cafe",
+    description: null,
+    occurred_at: "2026-08-01T06:20:00Z",
+    source: "manual",
+    source_reference: null,
+    reason: null,
+    status: "judged",
+    created_at: "2026-08-01T06:20:00Z",
+  },
+  {
+    transaction_id: "tx-cafe-previous-2",
+    amount_krw: 32_000,
+    merchant: "카페 정원",
+    category: "cafe",
+    description: null,
+    occurred_at: "2026-08-01T01:30:00Z",
+    source: "manual",
+    source_reference: null,
+    reason: null,
+    status: "judged",
+    created_at: "2026-08-01T01:30:00Z",
+  },
 ];
 
+export const demoSummary: Summary = {
+  month: "2026-08",
+  total_spent_krw: demoTotalSpentKrw,
+  by_category_krw: {
+    food: 160_000,
+    shopping: 95_000,
+    cafe: 72_000,
+    transport: 50_500,
+  },
+  transaction_count: 14,
+  discretionary_budget_krw: demoProfile.discretionary_budget_krw,
+  budget_usage: demoBudgetUsage,
+  goal: demoProfile.goal,
+};
+
 export const demoSignals: Signals = {
-  budget_usage_after: 0.62,
+  budget_usage_after: demoBudgetUsage,
   transaction_budget_share: 0.015,
   goal_pressure: 0.7,
   baseline_deviation: 1.4,
-  recurrence_30d: 3,
+  recurrence_30d: demoTransactions.filter((transaction) => transaction.category === "cafe").length,
   essentiality: 0.2,
   risk_score: 0.66,
   data_confidence: 0.81,
@@ -119,18 +163,24 @@ export const demoPending: PendingQuestion = {
   attempt_count: 0,
 };
 
+function occurrenceText(count: number): string {
+  return ({ 1: "첫 번째", 2: "두 번째", 3: "세 번째" } as Record<number, string>)[count] ?? `${count}번째`;
+}
+
 export function demoJudgment(roast: boolean): Judgment {
+  const recurrence = occurrenceText(demoSignals.recurrence_30d);
+  const budgetUsage = Math.round(demoSignals.budget_usage_after * 100);
   return {
     judgment_id: "judgment-cafe",
     transaction_id: "tx-cafe",
     mode: roast ? "roast" : "normal",
     label: "caution",
     confidence: 0.81,
-    rationale: "필요한 만남이었지만 이번 주 카페 지출이 세 번째예요.",
+    rationale: `생활비 예산 ${budgetUsage}%를 사용했고, 이번 주 카페 지출이 ${recurrence}예요.`,
     recommended_action: "이번 주 카페는 여기까지. 다음 만남은 산책으로 바꿔요.",
     message: roast
-      ? "아이고 이 화상아, 친구 만난 건 좋다만 이번 주 카페가 벌써 세 번째다. 이번 주 카페는 여기까지 하고, 다음 약속은 산책으로 돌려서 지갑도 숨 좀 쉬자."
-      : "필요했지만, 이번 주는 여기까지.",
+      ? `아이고 이 화상아, 친구 만난 건 좋다만 이번 주 카페가 벌써 ${recurrence}다. 이번 주 카페는 여기까지 하고, 다음 약속은 산책으로 돌려서 지갑도 숨 좀 쉬자.`
+      : `필요한 만남이었지만, 이번 주 카페는 ${recurrence}라 여기까지가 좋아요.`,
     fallback_used: false,
     model: "demo-artifact",
     policy_version: "overspending-v1",
@@ -139,18 +189,3 @@ export function demoJudgment(roast: boolean): Judgment {
     correction: null,
   };
 }
-
-export const demoSummary: Summary = {
-  month: "2026-08",
-  total_spent_krw: 377_500,
-  by_category_krw: {
-    food: 160_000,
-    shopping: 95_000,
-    cafe: 72_000,
-    transport: 50_500,
-  },
-  transaction_count: 14,
-  discretionary_budget_krw: 800_000,
-  budget_usage: 0.4719,
-  goal: demoProfile.goal,
-};

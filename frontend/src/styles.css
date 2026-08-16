@@ -413,10 +413,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .amount-entry .composer-money-input { border-bottom: 2px solid var(--action); }
 .amount-entry .composer-money-input input { font-size: clamp(58px, 18vw, 74px); font-weight: 800; letter-spacing: -.055em; }
 .amount-entry .composer-money-input > span { font-size: 29px; font-weight: 800; }
-.transaction-type, .segmented-control { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
-.transaction-type button, .segmented-control button { min-height: 50px; border: 0; background: transparent; font-weight: 650; }
-.transaction-type button.selected, .segmented-control button.selected { background: var(--peach); }
+.transaction-kind {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 50px;
+  padding: 0 16px;
+  border: 1px solid #efc39a;
+  border-radius: 12px;
+  background: #fff1e3;
+}
+.transaction-kind span { color: var(--muted); font-size: 14px; }
+.transaction-kind strong { color: #9b3d12; font-size: 16px; }
+.segmented-control { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
+.segmented-control button { min-height: 50px; border: 0; background: transparent; font-weight: 650; }
+.segmented-control button.selected { background: var(--peach); }
 .composer-fields { overflow: hidden; }
+.date-field-row { grid-template-columns: auto minmax(72px, auto) minmax(0, 1fr); }
+.date-field-row input[type="date"] {
+  width: min(100%, 180px);
+  min-width: 0;
+  justify-self: end;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
 .composer-screen .info-callout { margin-top: 0; }
 .reason-transaction { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 15px; padding: 17px 14px; }
 .reason-transaction > span:nth-child(2) { display: flex; flex-direction: column; }

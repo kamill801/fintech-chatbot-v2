@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confidenceText, currentMonthKey, formatCompactWon, formatMonthLabel, formatTodayLabel, formatWon, labelText, withDemo } from "./utils";
+import { confidenceText, createClientId, currentMonthKey, formatCompactWon, formatMonthLabel, formatTodayLabel, formatWon, labelText, withDemo } from "./utils";
 
 describe("Korean ledger formatting", () => {
   it("formats won without decimals", () => {
@@ -22,5 +22,16 @@ describe("Korean ledger formatting", () => {
     expect(currentMonthKey(date)).toBe("2026-08");
     expect(formatMonthLabel("2026-08")).toBe("2026년 8월");
     expect(formatTodayLabel(date)).toBe("8월 5일 수요일");
+  });
+
+  it("creates a UUID when randomUUID is unavailable on a local origin", () => {
+    const localCrypto = {
+      getRandomValues(array: Uint8Array) {
+        array.forEach((_, index) => { array[index] = index; });
+        return array;
+      },
+    } as unknown as Crypto;
+
+    expect(createClientId(localCrypto)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 });

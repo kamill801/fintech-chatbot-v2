@@ -19,6 +19,7 @@ import {
   demoTransactions,
 } from "./demo";
 import { clearFinancialDrafts } from "./local-drafts";
+import { createClientId } from "./utils";
 import type {
   Correction,
   JudgmentLabel,
@@ -146,7 +147,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       async createTransaction(draft, operationId) {
         if (demo) {
           const transaction: Transaction = {
-            transaction_id: `tx-${crypto.randomUUID()}`,
+            transaction_id: `tx-${createClientId()}`,
             amount_krw: draft.amount_krw,
             merchant: draft.merchant ?? null,
             category: draft.category,

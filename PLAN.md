@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 6 - production hardening
-- Active task: none - Task 6.4 completed; the next product change requires a new approved task
+- Active task: none - Task 6.6 completed; the next UX correction requires a new approved task
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -362,6 +362,66 @@ Close the highest-risk production gaps found in the full-service audit without c
 - Live share content never uses demo fixtures, corrected labels are honored, and share success is recorded only after a completed share/download action.
 - Visible production controls either work, are explicitly unavailable, or are removed; no local-only success message claims server persistence.
 - Frontend tests/lint/build, backend tests/compile, dependency audit, secret scan, local browser smoke, and public deployment health checks pass or an external credential gap is reported explicitly.
+
+## Task 6.5 - Demo and Cross-screen Data Consistency (Completed)
+
+### Goal
+
+Eliminate contradictory financial values and judgment evidence across the demo Home, reason, judgment, report, and settings flows so one underlying fixture always produces one user-visible truth.
+
+### Scope
+
+- Derive Home budget usage, remaining budget, and goal progress from the same profile and summary records used by Report and Settings.
+- Keep the demo reason-question recurrence count aligned with the judgment artifact's recurrence evidence.
+- Align the demo judgment budget evidence with the current demo monthly summary.
+- Add focused regression coverage for budget, goal, and recurrence consistency.
+- Do not change the production API, deterministic judgment policy, authentication, storage, or provider configuration.
+
+### Ordered Checkpoints
+
+- [x] Record this user-approved consistency task and inspect every affected demo data path.
+- [x] Add failing regression tests for the contradictory values.
+- [x] Replace screen-specific demo constants with shared derived values.
+- [x] Run the focused frontend tests, full frontend suite, lint, and production build.
+- [x] Append the verified result to `progress.txt` and mark this task complete.
+
+### Acceptance Criteria
+
+- Home remaining budget equals discretionary budget minus monthly spending and its percentage matches Report.
+- Home, Report, Settings, and onboarding show the same goal progress for the same profile.
+- The reason-question recurrence count and judgment rationale describe the same occurrence number.
+- The judgment budget-usage evidence matches the current demo summary instead of a separate hard-coded percentage.
+- No production financial, security, privacy, or deployment behavior changes.
+
+## Task 6.6 - Manual Transaction Form Clarity and Mobile Layout (Completed)
+
+### Goal
+
+Remove the misleading half-empty transaction-type control and make the native transaction date fully readable on narrow mobile screens without expanding the MVP beyond manual expense entry.
+
+### Scope
+
+- Replace the two-column transaction-type visual with a compact, non-interactive summary that clearly states the supported transaction type is `지출`.
+- Give the native date input the full value column and remove the duplicate trailing chevron that competes with the browser calendar control.
+- Preserve transaction creation, draft persistence, validation, routing, and backend contracts.
+- Add focused regression coverage and verify the form at the 390px mobile viewport.
+- Stop and report before commit, push, or deployment.
+
+### Ordered Checkpoints
+
+- [x] Record this resumed user-approved UI correction and inspect the current form structure.
+- [x] Add regression coverage for the fixed expense type and accessible date field.
+- [x] Implement the semantic form and responsive style changes.
+- [x] Run the focused frontend tests, full frontend suite, lint, TypeScript, production build, and mobile browser check.
+- [x] Append the verified result to `progress.txt` and mark this task complete.
+
+### Acceptance Criteria
+
+- The transaction form no longer resembles a two-option selector with one blank option.
+- Users can immediately identify that the current manual entry records an expense.
+- The full native date value remains visible and operable at 390px without a duplicate chevron.
+- The submit flow and existing draft/idempotency behavior remain unchanged.
+- No production API, judgment policy, authentication, storage, or provider configuration changes.
 
 ## Archived Work
 

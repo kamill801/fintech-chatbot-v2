@@ -24,7 +24,7 @@ import { useLedger } from "../ledger-context";
 import { manualDraftKey } from "../local-drafts";
 import { Link, useNavigate, useParams } from "../router";
 import type { Transaction, TransactionDraft } from "../types";
-import { categoryNames, formatCompactWon, formatDate, formatTodayLabel, formatWon, withDemo } from "../utils";
+import { categoryNames, createClientId, formatCompactWon, formatDate, formatTodayLabel, formatWon, withDemo } from "../utils";
 
 const categories = ["cafe", "food", "transport", "shopping", "housing", "health", "other"];
 
@@ -43,10 +43,10 @@ export function HomePage() {
   const pending = transactions.find((item) => item.status === "awaiting_reason") ?? (demo ? transactions[0] : undefined);
   const total = summary?.total_spent_krw ?? 0;
   const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
-  const usage = demo ? 0.48 : budget ? Math.min(1, total / budget) : 0;
-  const remaining = demo ? 623_000 : monthlyRemaining(total, budget);
+  const usage = budget ? Math.min(1, total / budget) : 0;
+  const remaining = monthlyRemaining(total, budget);
   const goal = summary?.goal ?? profile?.goal;
-  const goalProgress = demo ? 70 : goal ? Math.min(100, Math.round((goal.current_amount_krw / Math.max(goal.target_amount_krw, 1)) * 100)) : 0;
+  const goalProgress = goal ? Math.min(100, Math.round((goal.current_amount_krw / Math.max(goal.target_amount_krw, 1)) * 100)) : 0;
 
   return (
     <AppShell active="/" showAdd>
@@ -126,12 +126,12 @@ function readManualDraft(key: string, demo: boolean): StoredManualDraft {
       if ("draft" in parsed && parsed.draft && parsed.operationId) {
         return { draft: parsed.draft, operationId: parsed.operationId };
       }
-      return { draft: parsed as TransactionDraft, operationId: crypto.randomUUID() };
+      return { draft: parsed as TransactionDraft, operationId: createClientId() };
     }
   } catch {
     // Start from a safe blank draft if local storage is unavailable.
   }
-  return { draft: blankManualDraft(demo), operationId: crypto.randomUUID() };
+  return { draft: blankManualDraft(demo), operationId: createClientId() };
 }
 
 export function ManualTransactionPage() {
@@ -185,7 +185,10 @@ export function ManualTransactionPage() {
           <h1>얼마 썼어?</h1>
           <CurrencyInput className="composer-money-input" ariaLabel="금액" value={draft.amount_krw} onChange={(amount_krw) => updateDraft({ amount_krw })} />
         </section>
-        <div className="transaction-type"><button className="selected" type="button">지출</button></div>
+        <div className="transaction-kind" aria-label="거래 유형: 지출">
+          <span>거래 유형</span>
+          <strong>지출</strong>
+        </div>
         <Surface className="composer-fields">
           <label className="field-row">
             <span className="warm-icon"><CategoryIcon category={draft.category} /></span><strong>분류</strong>
@@ -197,9 +200,9 @@ export function ManualTransactionPage() {
             <span className="warm-icon"><MapPin size={23} /></span><strong>사용처</strong>
             <input value={draft.merchant ?? ""} placeholder="사용처 입력" onChange={(event) => updateDraft({ merchant: event.target.value })} /><CaretRight size={19} />
           </label>
-          <label className="field-row">
+          <label className="field-row date-field-row">
             <span className="warm-icon"><CalendarBlank size={23} /></span><strong>날짜</strong>
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><CaretRight size={19} />
+            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           </label>
           <label className="field-row">
             <span className="warm-icon"><NotePencil size={23} /></span><strong>메모</strong>

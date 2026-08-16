@@ -10,6 +10,7 @@ import type {
   TransactionResult,
 } from "./types";
 import { getAccessToken } from "./auth-client";
+import { createClientId } from "./utils";
 
 interface Envelope<T> {
   data: T;
@@ -61,7 +62,7 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
   headers.set("Authorization", `Bearer ${accessToken}`);
   if (requestInit.body) headers.set("Content-Type", "application/json");
   if (requestInit.method && requestInit.method !== "GET") {
-    headers.set("Idempotency-Key", idempotencyKey ?? crypto.randomUUID());
+    headers.set("Idempotency-Key", idempotencyKey ?? createClientId());
   }
 
   let response: Response;
