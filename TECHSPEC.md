@@ -5,9 +5,9 @@
 
 ## 1. Product Goal
 
-Build a Korean AI household-ledger agent that understands a user's financial position and goal, tracks manually entered or read-only imported transactions, judges likely overspending, summarizes spending patterns, and recommends one concrete corrective action. Normal mode keeps recording uninterrupted; the opt-in grandma mode asks for purchase context before judging each expense.
+Build a Korean AI household-ledger agent that understands a user's financial position, goal, and own definition of a worthwhile purchase; tracks manually entered or read-only imported transactions; judges likely overspending; learns from later spend reflections; and recommends one concrete corrective action. Normal mode keeps recording uninterrupted; the opt-in grandma mode asks for purchase context before judging each expense.
 
-The primary outcome is behavior change, not transaction storage alone.
+The primary outcome is fewer regretted purchases and measurable behavior change, not transaction storage alone.
 
 The product has two interaction and voice modes:
 
@@ -23,6 +23,8 @@ The MVP is successful only when all three product metrics can be measured:
 1. Overspending judgment agreement is at least 85% on a versioned, human-labeled scenario set.
 2. Four-week pilot users reduce discretionary spending by at least 10% against their defined baseline.
 3. Intentional Roast-result shares are at least 10% of eligible Roast-result views.
+4. Reflected regretted-spend amount decreases over a four-week pilot baseline.
+5. At least 30% of weekly suggested actions are explicitly completed or produce a measurable category reduction.
 
 Backend completion before design requires:
 
@@ -55,6 +57,9 @@ Backend completion before design requires:
 - Monthly calendar ledger and judgment-backed weekly briefing contracts.
 - Normal and Roast rendering from the same judgment.
 - User agreement/disagreement and corrected labels.
+- Post-purchase reflection: well spent, unsure, or regretted.
+- Up to eight encrypted, user-editable personal spending rules.
+- Regret-aware weekly coaching and deterministic goal-delay estimates.
 - Privacy-safe share payload and share metrics.
 - Append-only audit events and current-state projections.
 - Legacy Redis state import without creating fake monetary transactions.
@@ -91,6 +96,8 @@ Stop and report after the backend and its tests are complete. Do not begin UI/UX
 8. Production startup fails closed when encryption, pseudonymization, or authentication trust is missing.
 9. Production account linkage remains disabled until separately approved.
 10. Raw sensitive financial data never enters Sheets, structured logs, metrics, or share payloads.
+11. A reflection updates a current projection but never erases the original transaction, AI judgment, or correction history.
+12. Regret patterns and goal impact are computed only from stored user evidence and deterministic arithmetic; the model cannot invent them.
 
 ## 5. Architecture
 
@@ -208,11 +215,14 @@ Validation:
 ```json
 {
   "roast_enabled": false,
+  "spending_rules": ["배달은 주 2회까지", "친구와의 만남은 우선순위가 높음"],
   "locale": "ko-KR",
   "timezone": "Asia/Seoul",
   "schema_version": 1
 }
 ```
+
+`spending_rules` contains at most eight sanitized strings of at most 120 characters each. Existing settings without this field load as an empty list.
 
 ### 6.3 Transaction
 
@@ -228,6 +238,9 @@ Validation:
   "source": "manual",
   "source_reference": null,
   "reason": null,
+  "reflection": null,
+  "reflection_note": null,
+  "reflected_at": null,
   "status": "recorded",
   "created_at": "UTC timestamp",
   "schema_version": 1
@@ -237,6 +250,8 @@ Validation:
 Allowed source values: manual, synthetic, provider_readonly, legacy.
 
 Allowed status values: recorded, awaiting_reason, judged, corrected.
+
+Allowed reflection values: well_spent, unsure, regretted. Reflection is optional and may be replaced by a later user submission. Each replacement appends a new `transaction.reflected` event while the current transaction projection exposes only the latest value.
 
 ### 6.4 DeterministicSignalSet
 
@@ -318,7 +333,9 @@ A transaction can create at most one PendingQuestion.
 
 - profile.upserted
 - settings.roast_changed
+- settings.updated
 - transaction.recorded
+- transaction.reflected
 - judgment.reason_requested
 - transaction.reason_added
 - judgment.completed
@@ -433,6 +450,7 @@ Rules:
 - At most one unanswered reason question may exist per user; concurrent attempts are serialized and cannot overwrite it.
 - A repeated reason submission is idempotent.
 - Corrections append an audit event and update a separate latest-correction projection. Reads expose original_label, effective_label, and correction while the original judgment remains immutable.
+- Spend reflections append an audit event and update only the current reflection fields on the transaction projection. They do not alter judgment labels.
 - Roast state is read at the interaction gate and during rendering; judgment evidence and output semantics remain mode-independent.
 
 ### 8.3 AI Input Allowlist
@@ -444,6 +462,7 @@ OpenAI receives only:
 - deterministic ratios and factor names;
 - recurrence count;
 - sanitized user reason;
+- up to eight sanitized personal spending rules;
 - policy version.
 
 OpenAI never receives:
@@ -538,6 +557,7 @@ Routes:
 - GET /api/v1/me/transactions
 - POST /api/v1/me/transactions
 - GET /api/v1/me/transactions/{transaction_id}
+- PUT /api/v1/me/transactions/{transaction_id}/reflection
 - POST /api/v1/me/transactions/{transaction_id}/reason
 - POST /api/v1/me/judgments/{judgment_id}/corrections
 - POST /api/v1/me/judgments/{judgment_id}/share-view
@@ -553,7 +573,20 @@ Transaction creation returns:
 - 202 with pending_question when a reason is required.
 - 409 profile_required when onboarding is incomplete.
 
-### 11.1 Authentication Boundary
+### 11.1 Regret-aware summary contract
+
+`GET /api/v1/me/summary` exposes a deterministic reflection summary and weekly coach:
+
+- reflected_count, well_spent_count, unsure_count, regretted_count;
+- regretted_spent_krw and regret_rate among reflected expenses;
+- strongest regret category only when at least one regretted expense exists;
+- goal_delay_days computed from regretted spend divided by the remaining daily savings requirement, never from a model estimate;
+- one suggested action grounded first in regret evidence, then in corrected AI judgment evidence;
+- an explicit evidence state so sparse feedback is never described as a learned pattern.
+
+The model may explain these values but cannot calculate, replace, or fabricate them.
+
+### 11.2 Authentication Boundary
 
 - development/test: X-User-Id is accepted only when APP_ENV is development or test and ALLOW_DEV_AUTH=1.
 - production: X-User-Id is always rejected.

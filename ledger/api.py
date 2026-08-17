@@ -163,6 +163,19 @@ def create_api_blueprint(
             )
         )
 
+    @api.put("/api/v1/me/transactions/<transaction_id>/reflection")
+    @authenticated
+    def reflect_transaction(transaction_id: str) -> Response:
+        return _mutating(
+            lambda key: service.reflect_transaction(
+                g.user_ref,
+                transaction_id,
+                _json_body(),
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
     @api.post("/api/v1/me/judgments/<judgment_id>/corrections")
     @authenticated
     def correct_judgment(judgment_id: str) -> Response:

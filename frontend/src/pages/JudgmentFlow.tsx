@@ -26,7 +26,7 @@ import {
 } from "../components";
 import { useLedger } from "../ledger-context";
 import { Link, useNavigate, useParams } from "../router";
-import type { Judgment, JudgmentLabel, SharePayload, TransactionDetail } from "../types";
+import type { Judgment, JudgmentLabel, SharePayload, SpendingReflection, TransactionDetail } from "../types";
 import { categoryNames, confidenceText, formatDate, formatTime, formatWon, labelText, withDemo } from "../utils";
 
 function useTransactionDetail(transactionId: string) {
@@ -109,13 +109,23 @@ export function JudgmentPage() {
 
 export function TransactionDetailPage() {
   const { transactionId = "" } = useParams();
-  const { correctJudgment, demo } = useLedger();
+  const { correctJudgment, demo, reflectTransaction } = useLedger();
   const { detail, error, reload } = useTransactionDetail(transactionId);
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState<JudgmentLabel>("justified");
   const [reason, setReason] = useState("필요한 만남이었어요.");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [reflection, setReflection] = useState<SpendingReflection | null>(null);
+  const [reflectionNote, setReflectionNote] = useState("");
+  const [reflectionSaving, setReflectionSaving] = useState(false);
+  const [reflectionStatus, setReflectionStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!detail) return;
+    setReflection(detail.transaction.reflection ?? null);
+    setReflectionNote(detail.transaction.reflection_note ?? "");
+  }, [detail]);
 
   async function saveCorrection() {
     if (!detail?.judgment) return;
@@ -129,6 +139,21 @@ export function TransactionDetailPage() {
       setSaveError("수정 기록을 저장하지 못했어요.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveReflection() {
+    if (!reflection) return;
+    setReflectionSaving(true);
+    setReflectionStatus(null);
+    try {
+      await reflectTransaction(transactionId, reflection, reflectionNote);
+      await reload();
+      setReflectionStatus("내 소비 기준에 반영했어요.");
+    } catch {
+      setReflectionStatus("평가를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setReflectionSaving(false);
     }
   }
 
@@ -156,11 +181,51 @@ export function TransactionDetailPage() {
         </Surface>
       )}
       {transaction.reason && <div className="my-reason"><strong>내가 답한 이유</strong><p>{transaction.reason}</p></div>}
+      <Surface className="spend-reflection">
+        <div className="reflection-heading">
+          <div><span>소비 돌아보기</span><h2>지금 생각하면 이 소비 어땠나요?</h2></div>
+          {transaction.reflection && <small>저장됨</small>}
+        </div>
+        <p>AI가 일반적인 과소비가 아니라, 내가 실제로 후회하는 패턴을 배우는 기준이에요.</p>
+        <div className="reflection-options" role="group" aria-label="소비 평가">
+          {([
+            ["well_spent", "잘 쓴 돈", "만족했어요"],
+            ["unsure", "애매함", "조금 더 볼래요"],
+            ["regretted", "후회함", "다음엔 줄일래요"],
+          ] as const).map(([value, title, caption]) => (
+            <button
+              type="button"
+              className={reflection === value ? "selected" : ""}
+              aria-pressed={reflection === value}
+              key={value}
+              onClick={() => setReflection(value)}
+            >
+              <strong>{title}</strong><small>{caption}</small>
+            </button>
+          ))}
+        </div>
+        {reflection && (
+          <label className="reflection-note">
+            한 줄 메모 <span>선택</span>
+            <textarea
+              maxLength={160}
+              placeholder="왜 그렇게 느꼈는지 남기면 다음 조언이 더 정확해져요."
+              value={reflectionNote}
+              onChange={(event) => setReflectionNote(event.target.value)}
+            />
+          </label>
+        )}
+        {reflectionStatus && <p className="reflection-status" role="status">{reflectionStatus}</p>}
+        <button className="reflection-save" disabled={!reflection || reflectionSaving} onClick={() => void saveReflection()}>
+          {reflectionSaving ? "저장 중" : transaction.reflection ? "평가 수정" : "내 소비 기준에 반영"}
+        </button>
+      </Surface>
       <Surface className="history-card">
         <h2>기록</h2>
         <div><PencilSimple /> <time>{formatTime(transaction.created_at)}</time> 지출 기록</div>
         {transaction.reason && <div><NotePencil /> <time>{formatTime(transaction.occurred_at)}</time> 이유 답변</div>}
         {judgment && <div><Sparkle /> <time>{formatTime(transaction.occurred_at)}</time> 판단 완료</div>}
+        {transaction.reflected_at && <div><Lightbulb /> <time>{formatTime(transaction.reflected_at)}</time> 소비 평가</div>}
       </Surface>
       {judgment && <button className="outline-button" onClick={() => setEditing(true)}><PencilSimple size={21} /> 판단 수정</button>}
       <p className="muted detail-footnote">수정해도 원래 판단과 기록은 남아요</p>

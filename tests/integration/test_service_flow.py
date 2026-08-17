@@ -8,9 +8,10 @@ from ledger.domain.events import (
     EVENT_JUDGMENT_CORRECTED,
     EVENT_JUDGMENT_REASON_REQUESTED,
     EVENT_TRANSACTION_RECORDED,
+    EVENT_TRANSACTION_REFLECTED,
 )
 from ledger.quota import QuotaExceededError, QuotaUnavailableError
-from tests.helpers import correlation_id, profile_payload, service_with_memory
+from tests.helpers import correlation_id, now_iso, profile_payload, service_with_memory
 
 
 class FakeQuota:
@@ -317,6 +318,138 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
         self.assertNotEqual(current["original_label"], "")
         self.assertEqual(current["effective_label"], "justified")
         self.assertEqual(current["correction"]["correction_reason"], "환급 예정")
+
+    def test_spending_rules_are_sanitized_persisted_and_sent_to_judge(self) -> None:
+        self.upsert_profile()
+        updated = self.service.update_settings(
+            self.user_ref,
+            {
+                "spending_rules": [
+                    "  배달은 주 2회까지  ",
+                    "",
+                    "친구와의 만남은 우선순위가 높음",
+                ]
+            },
+            idempotency_key="settings-rules",
+            correlation_id=correlation_id(),
+        )
+        self.assertEqual(
+            updated.data["settings"]["spending_rules"],
+            ["배달은 주 2회까지", "친구와의 만남은 우선순위가 높음"],
+        )
+
+        self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 18000, "category": "food_delivery"},
+            idempotency_key="tx-with-rules",
+            correlation_id=correlation_id(),
+        )
+        self.assertEqual(
+            self.judge.requests[-1].spending_rules,
+            ["배달은 주 2회까지", "친구와의 만남은 우선순위가 높음"],
+        )
+
+    def test_reflection_replaces_projection_and_appends_audit_events(self) -> None:
+        self.upsert_profile()
+        created = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 18000, "category": "food_delivery"},
+            idempotency_key="tx-reflection",
+            correlation_id=correlation_id(),
+        )
+        transaction_id = created.data["transaction"]["transaction_id"]
+
+        self.service.reflect_transaction(
+            self.user_ref,
+            transaction_id,
+            {"reflection": "unsure", "reflection_note": "편하긴 했어요"},
+            idempotency_key="reflection-1",
+            correlation_id=correlation_id(),
+        )
+        replaced = self.service.reflect_transaction(
+            self.user_ref,
+            transaction_id,
+            {"reflection": "regretted", "reflection_note": "집에 먹을 게 있었어요"},
+            idempotency_key="reflection-2",
+            correlation_id=correlation_id(),
+        )
+
+        self.assertEqual(replaced.data["transaction"]["reflection"], "regretted")
+        self.assertEqual(
+            replaced.data["transaction"]["reflection_note"],
+            "집에 먹을 게 있었어요",
+        )
+        self.assertIn("judgment", self.service.get_transaction(self.user_ref, transaction_id).data)
+        reflection_events = [
+            event
+            for event in self.repository.list_events(self.user_ref)
+            if event.event_type == EVENT_TRANSACTION_REFLECTED
+        ]
+        self.assertEqual(len(reflection_events), 2)
+
+    def test_next_judgment_receives_category_regret_history(self) -> None:
+        self.upsert_profile()
+        created = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 18000, "category": "food_delivery"},
+            idempotency_key="tx-regret-history",
+            correlation_id=correlation_id(),
+        )
+        self.service.reflect_transaction(
+            self.user_ref,
+            created.data["transaction"]["transaction_id"],
+            {"reflection": "regretted", "reflection_note": "습관적으로 주문"},
+            idempotency_key="reflection-history",
+            correlation_id=correlation_id(),
+        )
+
+        self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 21000, "category": "food_delivery"},
+            idempotency_key="tx-after-regret",
+            correlation_id=correlation_id(),
+        )
+
+        self.assertEqual(
+            self.judge.requests[-1].reflection_context,
+            {
+                "category_reflected_count": 1,
+                "category_regretted_count": 1,
+                "category_regret_rate": 1.0,
+            },
+        )
+
+    def test_weekly_briefing_prioritizes_real_regret_pattern_and_goal_impact(self) -> None:
+        self.upsert_profile()
+        for index, amount in enumerate((18000, 22000), start=1):
+            created = self.service.create_transaction(
+                self.user_ref,
+                {
+                    "amount_krw": amount,
+                    "category": "food_delivery",
+                    "occurred_at": now_iso(),
+                },
+                idempotency_key=f"tx-regret-{index}",
+                correlation_id=correlation_id(),
+            )
+            self.service.reflect_transaction(
+                self.user_ref,
+                created.data["transaction"]["transaction_id"],
+                {"reflection": "regretted", "reflection_note": "습관적으로 주문"},
+                idempotency_key=f"reflection-regret-{index}",
+                correlation_id=correlation_id(),
+            )
+
+        summary = self.service.get_summary(self.user_ref).data["summary"]
+        reflections = summary["reflection_summary"]
+        briefing = summary["weekly_briefing"]
+        self.assertEqual(reflections["regretted_count"], 2)
+        self.assertEqual(reflections["regretted_spent_krw"], 40000)
+        self.assertEqual(reflections["regret_rate"], 1.0)
+        self.assertGreaterEqual(reflections["goal_delay_days"], 1)
+        self.assertEqual(briefing["regret_pattern"]["category"], "food_delivery")
+        self.assertEqual(briefing["evidence_state"], "learned")
+        self.assertIn("배달", briefing["improvement"])
 
     def test_share_payload_uses_corrected_effective_label(self) -> None:
         telemetry_events = []

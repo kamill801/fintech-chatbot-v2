@@ -27,6 +27,7 @@ export const demoSettings: Settings = {
   roast_enabled: false,
   locale: "ko-KR",
   timezone: "Asia/Seoul",
+  spending_rules: ["배달은 주 2회까지", "친구와의 만남 비용은 월 4회까지 괜찮음"],
 };
 
 const demoTotalSpentKrw = 377_500;
@@ -45,6 +46,9 @@ export const demoTransactions: Transaction[] = [
     reason: "친구와 오랜만에 만나서 이야기할 곳이 필요했어.",
     status: "judged",
     created_at: "2026-08-03T02:45:00Z",
+    reflection: "well_spent",
+    reflection_note: "친구와 좋은 시간을 보냈어요.",
+    reflected_at: "2026-08-04T02:45:00Z",
   },
   {
     transaction_id: "tx-lunch",
@@ -58,6 +62,9 @@ export const demoTransactions: Transaction[] = [
     reason: null,
     status: "judged",
     created_at: "2026-08-03T03:34:00Z",
+    reflection: "regretted",
+    reflection_note: "습관적으로 사 먹었어요.",
+    reflected_at: "2026-08-04T03:34:00Z",
   },
   {
     transaction_id: "tx-transit",
@@ -97,6 +104,9 @@ export const demoTransactions: Transaction[] = [
     reason: null,
     status: "judged",
     created_at: "2026-08-01T12:10:00Z",
+    reflection: "regretted",
+    reflection_note: "습관적으로 들렀어요.",
+    reflected_at: "2026-08-02T12:10:00Z",
   },
   {
     transaction_id: "tx-cafe-previous-1",
@@ -139,6 +149,16 @@ export const demoSummary: Summary = {
   discretionary_budget_krw: demoProfile.discretionary_budget_krw,
   budget_usage: demoBudgetUsage,
   goal: demoProfile.goal,
+  reflection_summary: {
+    reflected_count: 3,
+    well_spent_count: 1,
+    unsure_count: 0,
+    regretted_count: 2,
+    regretted_spent_krw: 27_500,
+    regret_rate: 0.6667,
+    strongest_regret_category: "shopping",
+    goal_delay_days: 1,
+  },
   weekly_briefing: {
     period_start: "2026-08-03",
     period_end: "2026-08-09",
@@ -151,9 +171,9 @@ export const demoSummary: Summary = {
     caution_count: 1,
     overspending_count: 0,
     insufficient_context_count: 0,
-    headline: "주의해서 볼 지출 1건이 있어요.",
+    headline: "이번 주 식비에서 후회한 소비 1건이 보여요.",
     summary: "이번 주 3건에 22,500원을 썼어요.",
-    improvement: "이번 주 카페는 여기까지 하고 다음 만남은 산책으로 바꿔요.",
+    improvement: "이번 주 식비 지출을 1회 줄이고, 절약한 금액을 비상금에 남겨둬요.",
     concern: {
       transaction_id: "tx-cafe",
       label: "caution",
@@ -162,6 +182,14 @@ export const demoSummary: Summary = {
       amount_krw: 12_000,
       rationale: "이번 주 카페 지출이 반복됐어요.",
     },
+    evidence_state: "learned",
+    regret_pattern: {
+      category: "food",
+      category_name: "식비",
+      count: 1,
+      spent_krw: 9_000,
+    },
+    goal_impact_days: 1,
   },
 };
 

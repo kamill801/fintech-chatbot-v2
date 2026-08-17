@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
@@ -53,6 +53,8 @@ class JudgmentRequest:
     category: str
     signals: DeterministicSignalSet
     user_reason: str | None = None
+    spending_rules: list[str] = field(default_factory=list)
+    reflection_context: dict[str, int | float] = field(default_factory=dict)
     policy_version: str = POLICY_VERSION
 
     def allowlisted_payload(self) -> dict:
@@ -61,6 +63,8 @@ class JudgmentRequest:
             category=self.category,
             signals=self.signals.to_dict(),
             user_reason=self.user_reason,
+            spending_rules=self.spending_rules,
+            reflection_context=self.reflection_context,
             policy_version=self.policy_version,
         )
 
@@ -154,6 +158,8 @@ def deterministic_fallback_judgment(request: JudgmentRequest) -> JudgmentResult:
     factors = list(request.signals.factors or ["risk_score"])
     if request.user_reason and "user_reason" not in factors:
         factors.append("user_reason")
+    if request.reflection_context and "reflection_history" not in factors:
+        factors.append("reflection_history")
     normal_message = f"{rationale} {recommended_action}"
     roast_message = grandma_mode_fallback(
         label=label,
@@ -235,8 +241,12 @@ class OpenAIResponsesJudge:
                     "role": "system",
                     "content": (
                         "You judge Korean household-ledger spending from allowlisted "
-                        "signals only. Return strict JSON. normal_message and roast_message "
-                        "must share the same label and recommendation. roast_message is the "
+                        "signals only. Return strict JSON. "
+                        "Use spending_rules as user-stated preferences, not as proof by itself. "
+                        "Treat reflection_context as the user's observed category feedback and "
+                        "explain any conflict with budget or goal signals. "
+                        "normal_message and roast_message must share the same label and "
+                        "recommendation. roast_message is the "
                         "user-facing '욕쟁이 할머니 모드': write 1-3 Korean sentences in a "
                         "sharp but caring market-grandmother ledger-inspection voice. Ground it "
                         "in supplied evidence, use one household metaphor such as 장부, 지갑, "

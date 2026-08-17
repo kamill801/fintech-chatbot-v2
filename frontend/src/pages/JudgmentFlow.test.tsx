@@ -2,13 +2,15 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter, Route, Routes } from "../router";
-import { JudgmentPage, SharePage } from "./JudgmentFlow";
+import { JudgmentPage, SharePage, TransactionDetailPage } from "./JudgmentFlow";
 
 const mocks = vi.hoisted(() => ({
   getTransaction: vi.fn(),
   recordShareSuccess: vi.fn(),
   recordShareView: vi.fn(),
   saveSettings: vi.fn(),
+  correctJudgment: vi.fn(),
+  reflectTransaction: vi.fn(),
   useLedger: vi.fn(),
 }));
 
@@ -28,6 +30,8 @@ describe("judgment voice", () => {
     mocks.recordShareSuccess.mockReset().mockResolvedValue(undefined);
     mocks.recordShareView.mockReset().mockResolvedValue(undefined);
     mocks.saveSettings.mockReset().mockResolvedValue(undefined);
+    mocks.correctJudgment.mockReset().mockResolvedValue(undefined);
+    mocks.reflectTransaction.mockReset().mockResolvedValue(undefined);
     mocks.getTransaction.mockResolvedValue({
       transaction: {
         transaction_id: "tx-shopping",
@@ -66,6 +70,8 @@ describe("judgment voice", () => {
       recordShareSuccess: mocks.recordShareSuccess,
       recordShareView: mocks.recordShareView,
       saveSettings: mocks.saveSettings,
+      correctJudgment: mocks.correctJudgment,
+      reflectTransaction: mocks.reflectTransaction,
       settings: { roast_enabled: true, locale: "ko-KR", timezone: "Asia/Seoul" },
     });
   });
@@ -80,6 +86,24 @@ describe("judgment voice", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /장부 바닥이 보이는데/ })).toBeInTheDocument());
     expect(screen.queryByText(/카페에 네 이름/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("욕쟁이 할머니 모드 켜짐")).toBeInTheDocument();
+  });
+
+  it("saves the user's post-purchase reflection from transaction detail", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/transactions/tx-shopping");
+    render(
+      <BrowserRouter>
+        <Routes><Route path="/transactions/:transactionId" element={<TransactionDetailPage />} /></Routes>
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "지금 생각하면 이 소비 어땠나요?" })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /후회함/ }));
+    await user.type(screen.getByPlaceholderText(/왜 그렇게 느꼈는지/), "충동적으로 샀어요");
+    await user.click(screen.getByRole("button", { name: "내 소비 기준에 반영" }));
+
+    await waitFor(() => expect(mocks.reflectTransaction).toHaveBeenCalledWith("tx-shopping", "regretted", "충동적으로 샀어요"));
+    expect(screen.getByText("내 소비 기준에 반영했어요.")).toBeInTheDocument();
   });
 
   it("derives share preview from the loaded judgment and records success after download", async () => {

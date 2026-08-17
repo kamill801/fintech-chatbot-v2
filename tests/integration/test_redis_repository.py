@@ -56,6 +56,12 @@ class RedisRepositoryIntegrationTests(unittest.TestCase):
             idempotency_key="profile-1",
             correlation_id=correlation_id(),
         )
+        self.service.update_settings(
+            self.user_ref,
+            {"roast_enabled": True},
+            idempotency_key="settings-roast",
+            correlation_id=correlation_id(),
+        )
         first = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 9876543, "category": "shopping"},

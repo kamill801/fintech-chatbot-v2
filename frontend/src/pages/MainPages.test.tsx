@@ -172,6 +172,38 @@ describe("live ledger summaries", () => {
     expect(screen.queryByText(/답변 대기/)).not.toBeInTheDocument();
   });
 
+  it("prioritizes learned regret patterns and one concrete next action", () => {
+    window.history.replaceState({}, "", "/agent");
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      profile: { discretionary_budget_krw: 800000 },
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul", spending_rules: ["배달은 주 2회까지"] },
+      summary: {
+        month: "2026-08",
+        total_spent_krw: 40000,
+        by_category_krw: { food_delivery: 40000 },
+        transaction_count: 2,
+        reflection_summary: { reflected_count: 2, well_spent_count: 0, unsure_count: 0, regretted_count: 2, regretted_spent_krw: 40000, regret_rate: 1, strongest_regret_category: "food_delivery", goal_delay_days: 3 },
+        weekly_briefing: {
+          period_start: "2026-08-10", period_end: "2026-08-16", total_spent_krw: 40000, transaction_count: 2,
+          top_category: "food_delivery", top_category_spent_krw: 40000, judged_count: 2, justified_count: 0,
+          caution_count: 2, overspending_count: 0, insufficient_context_count: 0,
+          headline: "이번 주 배달에서 후회한 소비 2건이 보여요.", summary: "이번 주 2건에 40,000원을 썼어요.",
+          improvement: "이번 주 배달 지출을 1회 줄이고, 절약한 금액을 비상금에 남겨둬요.", concern: null,
+          evidence_state: "learned", regret_pattern: { category: "food_delivery", category_name: "배달", count: 2, spent_krw: 40000 }, goal_impact_days: 3,
+        },
+        goal: { goal_id: "goal", name: "비상금", target_amount_krw: 10000000, current_amount_krw: 3000000, target_date: "2027-08-03" },
+      },
+      transactions: [],
+    });
+
+    render(<BrowserRouter><AgentPage /></BrowserRouter>);
+    expect(screen.getByText("배달 2건 · 40,000원")).toBeInTheDocument();
+    expect(screen.getByText(/비상금 예상일에 약 3일/)).toBeInTheDocument();
+    expect(screen.getByText("배달은 주 2회까지")).toBeInTheDocument();
+    expect(screen.getByText(/이번 주 배달 지출을 1회 줄이고/)).toBeInTheDocument();
+  });
+
   it("shows an honest empty report instead of fabricated category advice", () => {
     window.history.replaceState({}, "", "/report");
     render(<BrowserRouter><ReportPage /></BrowserRouter>);

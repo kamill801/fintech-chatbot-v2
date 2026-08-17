@@ -16,6 +16,7 @@ ALLOWED_TRANSACTION_STATUSES = frozenset(
 ALLOWED_JUDGMENT_LABELS = frozenset(
     {"justified", "caution", "overspending", "insufficient_context"}
 )
+ALLOWED_SPENDING_REFLECTIONS = frozenset({"well_spent", "unsure", "regretted"})
 
 
 class DomainValidationError(ValueError):
@@ -154,6 +155,7 @@ class UserSettings:
     roast_enabled: bool = False
     locale: str = "ko-KR"
     timezone: str = "Asia/Seoul"
+    spending_rules: list[str] = field(default_factory=list)
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -163,6 +165,10 @@ class UserSettings:
             raise DomainValidationError("locale is required")
         if not self.timezone:
             raise DomainValidationError("timezone is required")
+        if not isinstance(self.spending_rules, list) or len(self.spending_rules) > 8:
+            raise DomainValidationError("spending_rules must contain at most 8 items")
+        if any(not rule or len(rule) > 120 for rule in self.spending_rules):
+            raise DomainValidationError("each spending rule must be 1 to 120 characters")
         if self.schema_version != SCHEMA_VERSION:
             raise DomainValidationError("unsupported settings schema_version")
 
@@ -172,6 +178,7 @@ class UserSettings:
             roast_enabled=bool(payload.get("roast_enabled", False)),
             locale=str(payload.get("locale", "ko-KR")),
             timezone=str(payload.get("timezone", "Asia/Seoul")),
+            spending_rules=[str(rule) for rule in payload.get("spending_rules", [])],
             schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
         )
 
@@ -193,6 +200,9 @@ class Transaction:
     reason: str | None
     status: str
     created_at: str
+    reflection: str | None = None
+    reflection_note: str | None = None
+    reflected_at: str | None = None
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -209,6 +219,10 @@ class Transaction:
             raise DomainValidationError("unsupported transaction source")
         if self.status not in ALLOWED_TRANSACTION_STATUSES:
             raise DomainValidationError("unsupported transaction status")
+        if self.reflection is not None and self.reflection not in ALLOWED_SPENDING_REFLECTIONS:
+            raise DomainValidationError("unsupported spending reflection")
+        if self.reflected_at is not None:
+            parse_utc_datetime(self.reflected_at, "reflected_at")
         if self.schema_version != SCHEMA_VERSION:
             raise DomainValidationError("unsupported transaction schema_version")
 
@@ -227,6 +241,9 @@ class Transaction:
             reason=payload.get("reason"),
             status=str(payload["status"]),
             created_at=str(payload["created_at"]),
+            reflection=payload.get("reflection"),
+            reflection_note=payload.get("reflection_note"),
+            reflected_at=payload.get("reflected_at"),
             schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
         )
 

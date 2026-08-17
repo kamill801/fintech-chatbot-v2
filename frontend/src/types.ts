@@ -28,7 +28,10 @@ export interface Settings {
   roast_enabled: boolean;
   locale: string;
   timezone: string;
+  spending_rules?: string[];
 }
+
+export type SpendingReflection = "well_spent" | "unsure" | "regretted";
 
 export interface Transaction {
   transaction_id: string;
@@ -42,6 +45,9 @@ export interface Transaction {
   reason: string | null;
   status: "recorded" | "awaiting_reason" | "judged" | "corrected";
   created_at: string;
+  reflection?: SpendingReflection | null;
+  reflection_note?: string | null;
+  reflected_at?: string | null;
 }
 
 export interface Signals {
@@ -126,6 +132,25 @@ export interface WeeklyBriefing {
   summary: string;
   improvement: string;
   concern: WeeklyConcern | null;
+  evidence_state?: "learned" | "feedback_sparse" | "judgment_only" | "empty";
+  regret_pattern?: {
+    category: string;
+    category_name: string;
+    count: number;
+    spent_krw: number;
+  } | null;
+  goal_impact_days?: number;
+}
+
+export interface ReflectionSummary {
+  reflected_count: number;
+  well_spent_count: number;
+  unsure_count: number;
+  regretted_count: number;
+  regretted_spent_krw: number;
+  regret_rate: number;
+  strongest_regret_category: string | null;
+  goal_delay_days: number;
 }
 
 export interface Summary {
@@ -137,6 +162,7 @@ export interface Summary {
   budget_usage?: number;
   goal?: Goal;
   weekly_briefing?: WeeklyBriefing;
+  reflection_summary?: ReflectionSummary;
 }
 
 export interface SharePayload {

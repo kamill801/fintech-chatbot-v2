@@ -8,6 +8,7 @@ import type {
   TransactionDetail,
   TransactionDraft,
   TransactionResult,
+  SpendingReflection,
 } from "./types";
 import { getAccessToken } from "./auth-client";
 import { createClientId } from "./utils";
@@ -127,6 +128,20 @@ export const ledgerApi = {
       method: "POST",
       body: JSON.stringify({ reason }),
     });
+  },
+  async reflectTransaction(
+    id: string,
+    reflection: SpendingReflection,
+    reflection_note: string,
+  ): Promise<Transaction> {
+    const data = await request<{ transaction: Transaction }>(
+      `/api/v1/me/transactions/${id}/reflection`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ reflection, reflection_note }),
+      },
+    );
+    return data.transaction;
   },
   async correctJudgment(
     id: string,

@@ -169,6 +169,8 @@ export function AgentPage() {
     : undefined;
   const recent = transactions.filter((item) => item.status === "judged").slice(0, 2);
   const briefing = summary?.weekly_briefing;
+  const reflections = summary?.reflection_summary;
+  const spendingRules = settings.spending_rules ?? [];
   return (
     <AppShell active="/agent">
       <div className="screen agent-screen">
@@ -188,7 +190,7 @@ export function AgentPage() {
         )}
         <section className="briefing-section">
           <div className="briefing-title">
-            <div><span>저장된 판단을 모아 정리했어요</span><h3>이번 주 AI 브리핑</h3></div>
+            <div><span>내 평가와 저장된 판단을 함께 봤어요</span><h3>이번 주 AI 브리핑</h3></div>
             {briefing && <time>{Number(briefing.period_start.split("-")[1])}월 {Number(briefing.period_start.split("-")[2])}일 - {Number(briefing.period_end.split("-")[1])}월 {Number(briefing.period_end.split("-")[2])}일</time>}
           </div>
           {briefing ? (
@@ -198,8 +200,16 @@ export function AgentPage() {
               <div className="briefing-metrics">
                 <span><small>이번 주 지출</small><strong>{formatWon(briefing.total_spent_krw)}</strong></span>
                 <span><small>가장 큰 분류</small><strong>{briefing.top_category ? categoryNames[briefing.top_category] ?? briefing.top_category : "아직 없음"}</strong></span>
-                <span><small>주의 · 과소비</small><strong>{briefing.caution_count + briefing.overspending_count}건</strong></span>
+                <span><small>후회한 소비</small><strong>{reflections?.regretted_count ?? 0}건</strong></span>
               </div>
+              {briefing.regret_pattern && (
+                <div className="regret-pattern">
+                  <span>내 피드백에서 찾은 패턴</span>
+                  <strong>{briefing.regret_pattern.category_name} {briefing.regret_pattern.count}건 · {formatWon(briefing.regret_pattern.spent_krw)}</strong>
+                  <small>{briefing.goal_impact_days ? `${summary?.goal?.name ?? "목표"} 예상일에 약 ${briefing.goal_impact_days}일의 영향을 줬어요.` : "목표 영향은 데이터가 더 쌓이면 계산해요."}</small>
+                </div>
+              )}
+              {briefing.evidence_state === "feedback_sparse" && <p className="learning-note">소비 평가가 더 쌓이면 반복되는 후회 패턴을 찾을 수 있어요.</p>}
               {briefing.concern && (
                 <Link className="briefing-concern" to={withDemo(`/transactions/${briefing.concern.transaction_id}`, demo)}>
                   <CategoryIcon category={briefing.concern.category} />
@@ -211,6 +221,11 @@ export function AgentPage() {
             </Surface>
           ) : <InfoCallout>지출을 기록하면 이번 주 흐름과 개선점을 정리해 드려요.</InfoCallout>}
         </section>
+        <Surface className="personal-rules-card">
+          <div><span>AI가 기억하는 기준</span><h3>내 소비 기준</h3></div>
+          {spendingRules.length ? <ul>{spendingRules.slice(0, 3).map((rule) => <li key={rule}>{rule}</li>)}</ul> : <p>내가 중요하게 생각하는 소비 기준을 알려주면 판단과 브리핑에 반영해요.</p>}
+          <Link to={withDemo("/settings", demo)}>{spendingRules.length ? "기준 관리" : "기준 만들기"}</Link>
+        </Surface>
         <h3>최근 판단</h3>
         <Surface className="recent-judgments">
           {recent.map((transaction) => (
@@ -237,6 +252,7 @@ export function ReportPage() {
   const topAmount = topEntry?.[1] ?? 0;
   const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
   const budgetRemaining = budget > 0 ? Math.max(0, Math.round((1 - ((summary?.total_spent_krw ?? 0) / budget)) * 100)) : 0;
+  const reflections = summary?.reflection_summary;
   return (
     <AppShell active="/report">
       <div className="screen report-screen">
@@ -244,6 +260,13 @@ export function ReportPage() {
         <h2>{topAmount > 0 ? <>이번 달, <Highlight>{categoryNames[topCategory] ?? topCategory}</Highlight> 지출이 가장 컸어요.</> : "이번 달 지출을 기록해 보세요."}</h2>
         <div className="report-totals"><span>총 지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span><i /><span>예산 <strong>{budgetRemaining}%</strong> 남음</span></div>
         <Surface className="category-report"><h3>어디에 썼나</h3>{entries.map(([category, amount]) => <div className="report-row" key={category}><CategoryIcon category={category} /><span>{categoryNames[category] || category}</span><strong>{formatWon(amount)}</strong><div className="report-bar"><span className={barColors[category] || "blue"} style={{ width: `${Math.round((amount / max) * 66)}%` }} /></div></div>)}{entries.length === 0 && <p className="empty-copy">지출을 기록하면 카테고리별 흐름을 보여드려요.</p>}</Surface>
+        <Surface className="reflection-report">
+          <div><span>이번 달 소비 회고</span><h3>{reflections?.reflected_count ? `${reflections.reflected_count}건을 돌아봤어요` : "내 기준을 학습할 준비가 됐어요"}</h3></div>
+          {reflections?.reflected_count ? <>
+            <div className="reflection-report-metrics"><span><small>잘 쓴 돈</small><strong>{reflections.well_spent_count}건</strong></span><span><small>후회한 돈</small><strong>{formatWon(reflections.regretted_spent_krw)}</strong></span><span><small>목표 영향</small><strong>{reflections.goal_delay_days ? `약 ${reflections.goal_delay_days}일` : "영향 없음"}</strong></span></div>
+            <p>{reflections.strongest_regret_category ? `${categoryNames[reflections.strongest_regret_category] ?? reflections.strongest_regret_category}에서 후회한 소비가 가장 많이 보였어요.` : "아직 반복되는 후회 패턴은 없어요."}</p>
+          </> : <p>거래 상세에서 ‘잘 쓴 돈·애매함·후회함’을 남기면 나만의 소비 기준과 변화가 보여요.</p>}
+        </Surface>
         {goal && <Surface className="report-goal"><Target size={28} /><strong>{goal.name} 목표</strong><div><span>현재 {goalProgress}%</span><div className="mini-progress"><span style={{ width: `${goalProgress}%` }} /></div></div><p>목표일<br /><b>{formatKoreanDate(goal.target_date)}</b></p></Surface>}
         {entries.length > 0 ? <section className="report-advice"><Lightbulb size={28} /><p>{summary?.weekly_briefing?.improvement ?? "가장 큰 지출부터 판단 근거를 확인하고 다음 주 기준을 정해 보세요."}</p><Link to={withDemo("/agent", demo)}>AI 브리핑 보기</Link></section> : <InfoCallout>첫 지출부터 기록하면 월간 패턴을 정리해 드려요.</InfoCallout>}
       </div>
@@ -261,6 +284,8 @@ export function SettingsPage() {
   const [savingSetting, setSavingSetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [editingRules, setEditingRules] = useState(false);
+  const [ruleDraft, setRuleDraft] = useState((settings.spending_rules ?? []).join("\n"));
 
   async function updateMode(checked: boolean) {
     setSavingSetting(true);
@@ -285,6 +310,21 @@ export function SettingsPage() {
       setStatus("데이터를 삭제하지 못했어요. 다시 시도해 주세요.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function saveRules() {
+    const rules = ruleDraft.split("\n").map((rule) => rule.trim()).filter(Boolean).slice(0, 8);
+    setSavingSetting(true);
+    setStatus(null);
+    try {
+      await saveSettings({ spending_rules: rules });
+      setEditingRules(false);
+      setStatus("내 소비 기준을 저장했어요.");
+    } catch {
+      setStatus("소비 기준을 저장하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setSavingSetting(false);
     }
   }
 
@@ -313,17 +353,19 @@ export function SettingsPage() {
       <Surface className="settings-list">
         <FieldRow icon={<Wallet />} label="내 자금 기준" value={profile ? `생활비 예산 ${formatWon(profile.discretionary_budget_krw)}` : "기준 미설정"} onClick={() => navigate(withDemo("/onboarding/baseline", demo))} />
         <FieldRow icon={<Target />} label="목표" value={profile ? `${profile.goal.name} · 현재 ${Math.round((profile.goal.current_amount_krw / Math.max(profile.goal.target_amount_krw, 1)) * 100)}%` : "목표 미설정"} onClick={() => navigate(withDemo("/onboarding/goal", demo))} />
+        <FieldRow icon={<Lightbulb />} label="내 소비 기준" value={(settings.spending_rules ?? []).length ? `${(settings.spending_rules ?? []).length}개 기준 학습 중` : "기준 추가"} onClick={() => { setRuleDraft((settings.spending_rules ?? []).join("\n")); setEditingRules(true); }} />
         <FieldRow icon={<FileText />} label="데이터 방식" value="수기 입력 중 · 계좌 연결 준비 중" onClick={() => navigate(withDemo("/onboarding/source", demo))} />
       </Surface>
       <Surface className="settings-list privacy-settings"><h2>개인정보와 데이터</h2>
-        <FieldRow icon={<UserCircle />} label="AI가 보는 정보" value="" onClick={() => setStatus("금액, 분류, 예산 신호와 직접 답한 이유만 판단에 사용해요.")} />
+        <FieldRow icon={<UserCircle />} label="AI가 보는 정보" value="" onClick={() => setStatus("금액, 분류, 예산 신호, 직접 남긴 이유와 소비 기준만 판단에 사용해요. 만족·후회 평가는 패턴 요약에 사용해요.")} />
         <button className="danger-row" onClick={() => setConfirmDelete(true)}><Trash size={25} /><span><strong>모든 데이터 삭제</strong><small>삭제한 데이터는 복구할 수 없어요</small></span><CaretRight /></button>
       </Surface>
       <p className="data-retention-note"><LockKey size={17} /> 장부 데이터는 마지막 변경 후 최대 365일 보관되며, 직접 삭제하면 즉시 삭제돼요.</p>
       {status && <p className="settings-status" role="status">{status}</p>}
       {!demo && <button className="logout-button" disabled={loggingOut} onClick={() => void logout()}><SignOut size={21} /> {loggingOut ? "로그아웃 중" : "로그아웃"}</button>}
       <p className="version">버전 0.1</p>
-      {confirmDelete && <div className="dialog-backdrop" onMouseDown={() => !deleting && setConfirmDelete(false)}><section className="correction-dialog delete-dialog" role="alertdialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><LockKey size={32} /><h2>모든 데이터를 삭제할까요?</h2><p>프로필, 지출, 이유, 판단 기록이 삭제되고 복구할 수 없어요.</p><PrimaryButton disabled={deleting} onClick={() => void removeData()}>{deleting ? "삭제 중" : "삭제하기"}</PrimaryButton><button className="text-button" disabled={deleting} onClick={() => setConfirmDelete(false)}>취소</button></section></div>}
+      {editingRules && <div className="dialog-backdrop" onMouseDown={() => !savingSetting && setEditingRules(false)}><section className="correction-dialog rules-dialog" role="dialog" aria-modal="true" aria-labelledby="rules-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="rules-title">내 소비 기준</h2><p>한 줄에 하나씩, 최대 8개까지 적어 주세요. AI가 판단과 주간 브리핑에 참고해요.</p><label>소비 기준<textarea maxLength={960} placeholder={"배달은 주 2회까지\n친구와의 만남은 월 4회까지 괜찮음\n건강 관련 지출은 우선순위가 높음"} value={ruleDraft} onChange={(event) => setRuleDraft(event.target.value)} /></label><small>{ruleDraft.split("\n").filter((rule) => rule.trim()).length}/8개</small><PrimaryButton disabled={savingSetting || ruleDraft.split("\n").filter((rule) => rule.trim()).length > 8} onClick={() => void saveRules()}>{savingSetting ? "저장 중" : "기준 저장"}</PrimaryButton><button className="text-button" disabled={savingSetting} onClick={() => setEditingRules(false)}>취소</button></section></div>}
+      {confirmDelete && <div className="dialog-backdrop" onMouseDown={() => !deleting && setConfirmDelete(false)}><section className="correction-dialog delete-dialog" role="alertdialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><LockKey size={32} /><h2>모든 데이터를 삭제할까요?</h2><p>프로필, 지출, 이유, 판단, 소비 평가와 개인 기준이 삭제되고 복구할 수 없어요.</p><PrimaryButton disabled={deleting} onClick={() => void removeData()}>{deleting ? "삭제 중" : "삭제하기"}</PrimaryButton><button className="text-button" disabled={deleting} onClick={() => setConfirmDelete(false)}>취소</button></section></div>}
     </main>
   );
 }

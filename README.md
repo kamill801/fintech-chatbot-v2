@@ -1,6 +1,6 @@
 # AI Household Ledger Agent
 
-Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It combines deterministic financial signals with a structured AI judgment, records without interruption in normal mode, and asks one focused reason per expense only in the opt-in `욕쟁이 할머니 모드`.
+Responsive web/PWA and Flask backend for a Korean AI household-ledger agent that helps users reduce purchases they later regret. It combines deterministic financial signals, structured AI judgment, and the user's own post-purchase feedback to learn a personal spending standard. Normal mode records without interruption; the opt-in `욕쟁이 할머니 모드` asks one focused reason per expense and changes the interaction style without changing the underlying financial evidence.
 
 ## MVP Scope
 
@@ -10,7 +10,10 @@ Responsive web/PWA and Flask backend for a Korean AI household-ledger agent. It 
 - Compute overspending signals before every judgment.
 - Record and judge immediately in normal mode; ask exactly one reason per expense in `욕쟁이 할머니 모드`.
 - Return a structured judgment and one corrective action.
-- Use a monthly calendar as the default ledger and aggregate stored judgments into a weekly AI briefing.
+- Let users mark each purchase as `잘 쓴 돈`, `애매함`, or `후회함` and optionally explain why.
+- Store up to eight editable personal spending rules as encrypted user data.
+- Use a monthly calendar as the default ledger and combine stored judgments with post-purchase feedback in a weekly AI briefing.
+- Prioritize one seven-day behavior change, show its estimated goal-date impact, and measure the result in the next briefing.
 - Record corrections, privacy-safe shares, metrics, and audit events.
 - Keep authenticated browser drafts user-scoped, clear them on sign-out/deletion, and reuse one operation ID across ambiguous retries.
 - Bound per-user AI judgment usage and distinguish a share preview from a completed native share or image download.
@@ -40,6 +43,10 @@ deterministic signals  structured AI judge
        shared judgment
               |
        Default / 욕쟁이 할머니 모드
+              |
+ post-purchase reflection loop
+              |
+ personal rules + weekly action
               |
    Upstash Redis + projections
 ```
@@ -124,7 +131,9 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 - Direct user identifiers are converted to HMAC pseudonyms.
 - Financial projections and event payloads are encrypted at rest.
 - OpenAI receives only the explicit derived-data allowlist.
+- Personal spending rules and category-level reflection history are sanitized before they enter that allowlist.
 - Logs, Sheets, metrics, and shares reject raw financial or chat fields.
+- Post-purchase reflections are encrypted at rest, excluded from telemetry and shares, and never rewrite the original transaction or AI judgment.
 - `욕쟁이 할머니 모드` changes the reason-question gate and voice, but cannot alter deterministic evidence, labels, recommendations, corrections, or safety rules.
 - User-facing copy never calls the feature Roast. Internal compatibility fields such as `roast_enabled` and `roast_message` remain unchanged.
 - Local financial drafts are keyed by a one-way browser hash of the authenticated user ID and are removed on sign-out or full data deletion.
@@ -142,6 +151,6 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 
 ## Project Status
 
-The approved web/PWA is implemented with mode-aware manual entry, a monthly calendar ledger, backend-owned judgment, a judgment-backed weekly AI briefing, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, user-scoped draft retention, and redacted image sharing.
+The approved web/PWA is implemented as a regret-aware spending coach: mode-aware manual entry, a monthly calendar ledger, backend-owned judgment, editable personal spending rules, post-purchase reflection, regret-aware weekly coaching with one action and goal impact, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, user-scoped draft retention, and redacted image sharing.
 
-The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Task 6.7 local verification on 2026-08-16 passed 106 backend tests with four provider-dependent skips, 42 frontend tests, lint, production build, compileall, secret/diff checks, and 390px plus 1280px browser QA. A real authenticated transaction-to-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.
+The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. Task 6.8 local verification on 2026-08-17 passed 107 backend tests with four environment-gated skips, all four Redis integration tests against an isolated local Redis, 44 frontend tests, lint, production build, compileall, diff/secret checks, and mobile plus desktop browser QA. A real authenticated reflection-to-next-judgment E2E and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.

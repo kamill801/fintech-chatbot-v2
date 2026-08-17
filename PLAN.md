@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 6 - production hardening
-- Active task: none - Task 6.7 completed and approved for production release
+- Active task: none - Task 6.8 completed and approved for production release
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -469,6 +469,44 @@ Reduce everyday recording friction while making the opt-in `욕쟁이 할머니 
 - Agent and Report clearly show weekly total/count, top category, AI-reviewed caution/overspending counts, one concern, and one next action when evidence exists.
 - Empty states remain honest and useful when no transactions or judgments exist.
 - Backend tests, frontend tests, lint, TypeScript/build, compile, and 390px plus desktop browser checks pass.
+
+## Task 6.8 - Regret-aware Personal Spending Coach (Completed - release approved)
+
+### Goal
+
+Differentiate the product from a generic AI ledger by learning each user's own definition of a worthwhile or regretted purchase, then turning those reflections and stored AI judgments into one measurable weekly behavior change.
+
+### Scope
+
+- This task is the dedicated user authorization to revise `TECHSPEC.md` for regret reflection, editable spending rules, regret-aware briefings, and behavior-change metrics.
+- Let users reflect on a judged expense as `well_spent`, `unsure`, or `regretted`, with an optional short note, without deleting or rewriting the original transaction or AI judgment.
+- Store up to eight editable personal spending rules in the existing encrypted settings projection and include them in the allowlisted AI judgment context.
+- Aggregate reflected transactions into regret count, regret amount, regret rate, the strongest repeated regret category, and a deterministic goal-delay estimate.
+- Make the weekly coach prioritize one concrete action from actual regret evidence, falling back to judgment evidence only when reflections are sparse.
+- Surface the reflection control in transaction detail and the learned pattern, goal impact, one action, and personal rules in Agent, Report, and Settings.
+- Keep normal recording uninterrupted and preserve the exact same labels, evidence, recommendations, and safety policy across 기본 말투 and 욕쟁이 할머니 모드.
+- Add backward-compatible storage defaults so existing Redis records remain readable and user deletion purges every new projection and event.
+
+### Ordered Checkpoints
+
+- [x] Inspect the current transaction, settings, repository, summary, API, and frontend contracts.
+- [x] Record the approved product contract in this plan and `TECHSPEC.md`.
+- [x] Add failing backend and frontend regression tests for reflection, rules, and regret-aware coaching.
+- [x] Implement domain, memory/Redis storage, service, API, and OpenAI allowlist changes.
+- [x] Implement transaction reflection and Agent, Report, and Settings UI changes.
+- [x] Run focused and full verification, responsive browser QA, and secret/diff review.
+- [x] Update release documentation and append `progress.txt`; stop before commit, push, or deployment unless explicitly requested.
+
+### Acceptance Criteria
+
+- A user can set or replace one reflection per expense and the original transaction, AI judgment, and any judgment correction remain auditable.
+- Existing transactions and settings written before Task 6.8 load with no reflection and no personal rules.
+- Personal rules are user-editable, encrypted at rest, excluded from telemetry and shares, and sent to OpenAI only as sanitized allowlisted context.
+- Weekly and monthly summaries never invent regret patterns; regret rates and goal impact are derived from reflected transactions and deterministic arithmetic.
+- With enough reflections, the coach prioritizes the category with the most regretted transactions and proposes one bounded action for the next seven days.
+- With sparse or no reflections, the UI explicitly asks for feedback or uses existing judgment evidence without presenting it as learned regret behavior.
+- Normal recording remains uninterrupted and 욕쟁이 할머니 모드 remains optional and immediately reversible.
+- Backend tests, Redis integration, frontend tests, lint, TypeScript/build, compile, and responsive browser checks pass.
 
 ## Archived Work
 

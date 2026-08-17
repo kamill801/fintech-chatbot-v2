@@ -132,6 +132,21 @@ class LedgerRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def reflect_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        reflection: str,
+        *,
+        reflection_note: str | None,
+        reflected_at: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
     def save_judgment(
         self,
         user_ref: str,

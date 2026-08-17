@@ -9,7 +9,9 @@ from ledger.domain.models import SCHEMA_VERSION, DomainValidationError, parse_ut
 
 EVENT_PROFILE_UPSERTED = "profile.upserted"
 EVENT_SETTINGS_ROAST_CHANGED = "settings.roast_changed"
+EVENT_SETTINGS_UPDATED = "settings.updated"
 EVENT_TRANSACTION_RECORDED = "transaction.recorded"
+EVENT_TRANSACTION_REFLECTED = "transaction.reflected"
 EVENT_JUDGMENT_REASON_REQUESTED = "judgment.reason_requested"
 EVENT_TRANSACTION_REASON_ADDED = "transaction.reason_added"
 EVENT_JUDGMENT_COMPLETED = "judgment.completed"
@@ -25,7 +27,9 @@ ALLOWED_EVENT_TYPES = frozenset(
     {
         EVENT_PROFILE_UPSERTED,
         EVENT_SETTINGS_ROAST_CHANGED,
+        EVENT_SETTINGS_UPDATED,
         EVENT_TRANSACTION_RECORDED,
+        EVENT_TRANSACTION_REFLECTED,
         EVENT_JUDGMENT_REASON_REQUESTED,
         EVENT_TRANSACTION_REASON_ADDED,
         EVENT_JUDGMENT_COMPLETED,

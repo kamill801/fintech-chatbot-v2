@@ -30,6 +30,7 @@ import type {
   TransactionDetail,
   TransactionDraft,
   TransactionResult,
+  SpendingReflection,
 } from "./types";
 
 interface LedgerContextValue {
@@ -46,6 +47,7 @@ interface LedgerContextValue {
   saveSettings(patch: Partial<Settings>): Promise<void>;
   createTransaction(draft: TransactionDraft, operationId?: string): Promise<TransactionResult>;
   answerReason(id: string, reason: string): Promise<TransactionResult>;
+  reflectTransaction(id: string, reflection: SpendingReflection, note: string): Promise<Transaction>;
   getTransaction(id: string): Promise<TransactionDetail>;
   correctJudgment(
     id: string,
@@ -63,6 +65,7 @@ const initialSettings: Settings = {
   roast_enabled: false,
   locale: "ko-KR",
   timezone: "Asia/Seoul",
+  spending_rules: [],
 };
 
 function errorMessage(error: unknown): string {
@@ -180,6 +183,24 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         const result = await ledgerApi.answerReason(id, reason);
         setTransactions((items) => items.map((item) => (item.transaction_id === id ? result.transaction : item)));
         return result;
+      },
+      async reflectTransaction(id, reflection, note) {
+        if (demo) {
+          const reflected_at = new Date().toISOString();
+          const current = transactions.find((item) => item.transaction_id === id) ?? demoTransactions[0];
+          const updated = {
+            ...current,
+            reflection,
+            reflection_note: note.trim() || null,
+            reflected_at,
+          };
+          setTransactions((items) => items.map((item) => (item.transaction_id === id ? updated : item)));
+          return updated;
+        }
+        const updated = await ledgerApi.reflectTransaction(id, reflection, note);
+        setTransactions((items) => items.map((item) => (item.transaction_id === id ? updated : item)));
+        setSummary(await ledgerApi.summary());
+        return updated;
       },
       async getTransaction(id) {
         if (demo) {

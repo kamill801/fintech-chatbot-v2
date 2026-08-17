@@ -181,6 +181,23 @@ class FlaskLedgerE2ETests(unittest.TestCase):
         self.assertIn("headline", summary["weekly_briefing"])
         self.assertIn("improvement", summary["weekly_briefing"])
 
+    def test_reflection_endpoint_updates_transaction_and_summary(self) -> None:
+        transaction_id, _judgment_id = self.create_reason_judgment()
+        response = self.client.put(
+            f"/api/v1/me/transactions/{transaction_id}/reflection",
+            json={"reflection": "regretted", "reflection_note": "다시 생각하니 불필요했어요"},
+            headers=self.mutate_headers("reflection-e2e"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json()["data"]["transaction"]["reflection"],
+            "regretted",
+        )
+        summary = self.client.get("/api/v1/me/summary", headers=self.headers).get_json()[
+            "data"
+        ]["summary"]
+        self.assertEqual(summary["reflection_summary"]["regretted_count"], 1)
+
     def test_metrics_endpoint_reports_share_rate(self) -> None:
         _transaction_id, judgment_id = self.create_reason_judgment()
         self.client.put(

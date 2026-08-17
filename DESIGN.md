@@ -74,7 +74,8 @@ The home screen must answer four questions in this order:
   - make manual transaction capture take less than 15 seconds for common expenses;
   - make budget position and goal impact understandable without opening a report;
   - keep normal-mode capture uninterrupted and reserve one focused reason question per expense for the explicitly enabled 욕쟁이 할머니 모드;
-  - turn stored transaction judgments into a concise weekly briefing and one practical improvement;
+  - learn what the user considers worthwhile, uncertain, or regretted after the purchase;
+  - turn stored judgments and reflections into one measurable seven-day behavior change;
   - make every judgment inspectable, correctable, and actionable;
   - make 욕쟁이 할머니 모드 entertaining enough to share without weakening trust or accuracy.
 - Non-goals:
@@ -83,9 +84,10 @@ The home screen must answer four questions in this order:
   - a full financial-product marketplace;
   - automatic account connection in the first UI implementation.
 - Success signals:
-  - overspending agreement, four-week discretionary-spending reduction, and intentional 욕쟁이 할머니 모드-result shares as defined in `TECHSPEC.md`;
+  - overspending agreement, regretted-spend reduction, weekly-action completion, and intentional 욕쟁이 할머니 모드-result shares as defined in `TECHSPEC.md`;
   - manual-entry completion rate and time;
   - pending-question answer rate;
+  - post-purchase reflection rate and four-week regretted-spend trend;
   - judgment correction rate by confidence band;
   - seven-day and four-week return rate.
 
@@ -96,6 +98,7 @@ The home screen must answer four questions in this order:
 - User jobs:
   - record a purchase immediately with minimal typing;
   - understand whether the purchase threatens this month's plan or the active goal;
+  - tell the coach whether a completed purchase was worthwhile, uncertain, or regretted;
   - explain each purchase once only when 욕쟁이 할머니 모드 is enabled;
   - see a practical correction, not a moral verdict;
   - review the month by category and behavior pattern;
@@ -112,8 +115,8 @@ Use four bottom destinations and one global add action:
 | --- | --- | --- |
 | 홈 | Understand the current month and next action | Spendable amount, goal pace, agent brief, recent activity |
 | 장부 | Find, add, and correct money records | Monthly calendar, daily totals, selected-day records, transaction detail |
-| 에이전트 | Review AI guidance or resolve grandma-mode questions | Weekly AI briefing by default; pending reasons first only while grandma mode is on |
-| 리포트 | Understand patterns and plan a correction | Monthly trend, category bars, repeated discretionary spend, goal forecast |
+| 에이전트 | Review AI guidance or resolve grandma-mode questions | Learned regret pattern, goal impact, one weekly action; pending reasons first only while grandma mode is on |
+| 리포트 | Understand patterns and plan a correction | Monthly trend, category bars, reflection summary, goal forecast |
 | `+` | Record a transaction | Amount-first manual entry sheet |
 
 Settings, privacy, data source, profile, and mode controls open from the home header. Goals are not a fifth tab; the active goal is surfaced on Home and managed from its detail view.
@@ -131,10 +134,10 @@ Settings, privacy, data source, profile, and mode controls open from the home he
 | Reason question | Submit one grandma-mode reason | Transaction summary, one question, concise answer, skip consequence explained |
 | Judgment | Take corrective action | Label, confidence, evidence, rationale, one action, correction, optional share |
 | Ledger | Inspect records | Sunday-to-Saturday monthly calendar, daily totals, selected-day records, date-aware add |
-| Transaction detail | Correct record | Original record, reason, judgment history, append-only correction |
-| Agent | Review and improve | Judgment-backed weekly total/count, top category, caution/overspending callout, one next action; grandma-mode pending inbox when enabled |
-| Report | Adjust next month | Budget comparison, category bars, repeated spend, goal forecast, one recommendation |
-| Settings | Control trust | 욕쟁이 할머니 모드, profile, goal, data source, privacy, export/delete/revoke |
+| Transaction detail | Reflect and correct | Original record, reason, latest `잘 쓴 돈/애매함/후회함` reflection, judgment history, append-only correction |
+| Agent | Review and improve | Reflection evidence state, strongest regret pattern, goal impact, one bounded seven-day action; grandma-mode pending inbox when enabled |
+| Report | Adjust next month | Budget comparison, category bars, reflection count/rate/amount, goal forecast, one recommendation |
+| Settings | Control trust | 욕쟁이 할머니 모드, editable personal spending rules, profile, goal, data source, privacy, export/delete/revoke |
 
 ### Content hierarchy
 
@@ -179,6 +182,15 @@ Character never outranks the amount or evidence.
 
 Applying an adjustment edits a plan value only. It never moves money.
 
+### Post-purchase learning loop
+
+`transaction detail -> 잘 쓴 돈/애매함/후회함 -> optional note -> personal pattern -> one weekly action -> next briefing effect`
+
+- A reflection is optional and replaceable; it never rewrites the original transaction or judgment.
+- Two or more reflections may unlock a learned pattern, but the UI must distinguish sparse feedback from reliable personal evidence.
+- The weekly coach selects one bounded action instead of presenting a generic advice list.
+- Goal impact is deterministic arithmetic; AI explains the consequence but does not invent the number.
+
 ## Design principles
 
 ### Ledger before chat
@@ -188,6 +200,10 @@ Transactions live in a stable ledger. Agent conversations link back to a specifi
 ### Evidence before emotion
 
 Show `budget 72% used`, `same category 3 times`, or `goal date +8 days` before a label or 욕쟁이 할머니 모드 line. Confidence is visible as plain language plus an inspectable percentage in details.
+
+### User feedback before generic norms
+
+Treat `잘 쓴 돈`, `애매함`, and `후회함` as the user's own outcome feedback, not as a replacement AI verdict. Prefer repeated personal evidence such as `최근 배달 4건 중 3건을 후회함` over broad assumptions about what people should buy. Personal rules remain editable and their presence must be visible wherever they materially affect coaching.
 
 ### Questions only by consent, one action always
 
@@ -199,7 +215,7 @@ Paper color, editorial type, and hand-drawn marks create warmth. Amounts, dates,
 
 ### Familiar core, distinctive edge
 
-Keep the proven Korean ledger structure: monthly status, quick input, calendar-first ledger, selected-day records, and category report. Differentiate through the judgment-backed weekly briefing, evidence-backed transaction judgment, and opt-in voice.
+Keep the proven Korean ledger structure: monthly status, quick input, calendar-first ledger, selected-day records, and category report. Differentiate through the post-purchase learning loop, personal spending rules, one measurable weekly action, and an opt-in voice that makes the same evidence more memorable.
 
 ## Visual language
 
@@ -314,7 +330,9 @@ The viewport should not show every report or feature. Its single hero job is und
 | `BudgetRunway` | on-track, close, exceeded; labels always visible |
 | `GoalStrip` | on-track, delayed, achieved, no goal |
 | `AgentBrief` | quiet, pending reason, completed advice, fallback judgment |
+| `WeeklyCoach` | sparse feedback, learned pattern, one action, measured effect |
 | `TransactionRow` | income, expense, pending, judged, corrected, manual/imported |
+| `SpendingReflection` | unset, well spent, unsure, regretted, saving, saved |
 | `TransactionComposer` | default, validation error, saving, duplicate detected |
 | `ReasonSheet` | question, submitting, timeout/error, answered |
 | `JudgmentSheet` | justified, caution, overspending; 기본 말투/욕쟁이 할머니 모드 message parity |
@@ -351,6 +369,7 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 - Loading: preserve layout with neutral ruled placeholders; never display `0원` as a loading value.
 - Empty Home: explain that the first expense creates the month view and keep `지출 기록하기` primary.
 - Empty Agent: show the next scheduled check-in, not an open-ended `무엇이든 물어보세요` prompt.
+- Sparse reflection data: ask for a few post-purchase evaluations and do not label a category as a learned regret pattern yet.
 - Error: retain the user's input, identify whether save or judgment failed, and expose retry.
 - AI fallback: label the result `기본 규칙으로 판단` and keep evidence visible.
 - Success: use a concise inline confirmation; no confetti.
@@ -393,6 +412,8 @@ The exact user-facing name is `욕쟁이 할머니 모드`. `Roast` is retained 
 
 - Every transaction shows its source and editability.
 - Onboarding explains that merchant, memo, and reason are sensitive and what is sent for judgment.
+- Settings explains that personal rules and category-level reflection history can be sent as sanitized judgment context, while reflection notes stay out of telemetry and shares.
+- Transaction detail keeps the latest reflection editable and keeps the original transaction and judgment visibly separate.
 - Account connection is never shown as active until a production read-only provider is approved and implemented.
 - Share starts from a redacted preview. The user must explicitly include any amount or category.
 - Delete and revoke actions explain scope and irreversibility before confirmation.

@@ -30,6 +30,8 @@ OPENAI_PROMPT_ALLOWLIST = frozenset(
         "requires_reason",
         "factors",
         "user_reason",
+        "spending_rules",
+        "reflection_context",
         "policy_version",
     }
 )
@@ -222,6 +224,8 @@ def build_prompt_payload(
     category: str,
     signals: Mapping[str, Any],
     user_reason: str | None,
+    spending_rules: list[str] | None = None,
+    reflection_context: Mapping[str, int | float] | None = None,
     policy_version: str,
     include_exact_amount: bool = False,
 ) -> dict[str, Any]:
@@ -232,6 +236,23 @@ def build_prompt_payload(
     }
     if user_reason:
         payload["user_reason"] = sanitize_free_text(user_reason)
+    if spending_rules:
+        sanitized_rules = []
+        for rule in spending_rules[:8]:
+            sanitized_rule = sanitize_free_text(rule, max_length=120)
+            if sanitized_rule:
+                sanitized_rules.append(sanitized_rule)
+        payload["spending_rules"] = sanitized_rules
+    if reflection_context:
+        payload["reflection_context"] = {
+            key: reflection_context[key]
+            for key in (
+                "category_reflected_count",
+                "category_regretted_count",
+                "category_regret_rate",
+            )
+            if key in reflection_context
+        }
     if include_exact_amount and amount_krw is not None:
         payload["amount_krw"] = amount_krw
     for key in (

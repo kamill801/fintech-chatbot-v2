@@ -12,11 +12,12 @@ from ledger.domain.events import (
     EVENT_JUDGMENT_REASON_REQUESTED,
     EVENT_LEGACY_IMPORTED,
     EVENT_PROFILE_UPSERTED,
-    EVENT_SETTINGS_ROAST_CHANGED,
+    EVENT_SETTINGS_UPDATED,
     EVENT_SHARE_CLICKED,
     EVENT_SHARE_SUCCEEDED,
     EVENT_SHARE_VIEWED,
     EVENT_TRANSACTION_REASON_ADDED,
+    EVENT_TRANSACTION_REFLECTED,
     EVENT_TRANSACTION_RECORDED,
     EventEnvelope,
 )
@@ -186,6 +187,33 @@ class RedisLedgerRepository(LedgerRepository):
                 transaction_id,
                 reason,
                 answered_at,
+                idempotency_key,
+                correlation_id,
+                source,
+            ),
+        )
+
+    def reflect_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        reflection: str,
+        *,
+        reflection_note: str | None,
+        reflected_at: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            user_ref,
+            idempotency_key,
+            lambda: self._reflect_transaction(
+                user_ref,
+                transaction_id,
+                reflection,
+                reflection_note,
+                reflected_at,
                 idempotency_key,
                 correlation_id,
                 source,
@@ -387,6 +415,8 @@ class RedisLedgerRepository(LedgerRepository):
                 "share_successes": 0,
                 "accounts_revoked": 0,
                 "legacy_imports": 0,
+                "spend_reflections": 0,
+                "regretted_reflections": 0,
             }
         return self._privacy.decrypt_json(encrypted)
 
@@ -494,7 +524,7 @@ class RedisLedgerRepository(LedgerRepository):
             self._append_event(
                 pipe,
                 user_ref,
-                EVENT_SETTINGS_ROAST_CHANGED,
+                EVENT_SETTINGS_UPDATED,
                 payload,
                 idempotency_key=idempotency_key,
                 correlation_id=correlation_id,
@@ -631,6 +661,60 @@ class RedisLedgerRepository(LedgerRepository):
                     self._privacy.encrypt_json(answered.to_dict()),
                 )
                 self._track_keys(pipe, user_ref, pending_key)
+            pipe.execute()
+        return StoredResult(200, {"transaction": updated.to_dict()})
+
+    def _reflect_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        reflection: str,
+        reflection_note: str | None,
+        reflected_at: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+    ) -> StoredResult:
+        transaction = self.get_transaction(user_ref, transaction_id)
+        if transaction is None:
+            raise DomainValidationError("transaction not found")
+        updated = Transaction.from_dict(
+            {
+                **transaction.to_dict(),
+                "reflection": reflection,
+                "reflection_note": reflection_note,
+                "reflected_at": reflected_at,
+            }
+        )
+        payload = {
+            "transaction_id": transaction_id,
+            "reflection": reflection,
+            "reflection_note": reflection_note,
+            "reflected_at": reflected_at,
+        }
+        with self._redis.pipeline(transaction=True) as pipe:
+            self._append_event(
+                pipe,
+                user_ref,
+                EVENT_TRANSACTION_REFLECTED,
+                payload,
+                idempotency_key=idempotency_key,
+                correlation_id=correlation_id,
+                source=source,
+                redacted_metadata={"reflection": reflection},
+            )
+            transaction_key = self._transaction_key(user_ref, transaction_id)
+            pipe.set(transaction_key, self._privacy.encrypt_json(updated.to_dict()))
+            self._track_keys(pipe, user_ref, transaction_key)
+            metrics = self.get_metrics(user_ref)
+            metrics["spend_reflections"] = int(metrics.get("spend_reflections", 0)) + 1
+            if reflection == "regretted":
+                metrics["regretted_reflections"] = int(
+                    metrics.get("regretted_reflections", 0)
+                ) + 1
+            metrics_key = self._key(user_ref, "metrics")
+            pipe.set(metrics_key, self._privacy.encrypt_json(metrics))
+            self._track_keys(pipe, user_ref, metrics_key)
             pipe.execute()
         return StoredResult(200, {"transaction": updated.to_dict()})
 

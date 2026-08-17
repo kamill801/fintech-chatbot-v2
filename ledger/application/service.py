@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from math import ceil
 from typing import Any, Callable, Protocol
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -13,6 +14,7 @@ from ledger.adapters.synthetic import ProviderUnavailableError
 from ledger.application.signals import POLICY_VERSION, SignalInputs, clamp, compute_signal_set
 from ledger.domain.models import (
     ALLOWED_JUDGMENT_LABELS,
+    ALLOWED_SPENDING_REFLECTIONS,
     DomainValidationError,
     FinancialGoal,
     FinancialProfile,
@@ -35,6 +37,7 @@ logger = logging.getLogger(__name__)
 CATEGORY_NAMES_KO = {
     "cafe": "카페·간식",
     "food": "식비",
+    "food_delivery": "배달",
     "transport": "교통",
     "shopping": "쇼핑",
     "housing": "주거",
@@ -149,6 +152,9 @@ class LedgerService:
             roast_enabled=payload.get("roast_enabled", current.roast_enabled),
             locale=str(payload.get("locale", current.locale)),
             timezone=str(payload.get("timezone", current.timezone)),
+            spending_rules=_spending_rules(
+                payload.get("spending_rules", current.spending_rules)
+            ),
         )
         stored = self.repository.update_settings(
             user_ref,
@@ -394,6 +400,38 @@ class LedgerService:
         )
         return ServiceResult(stored.status, stored.body)
 
+    def reflect_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> ServiceResult:
+        self._require_transaction(user_ref, transaction_id)
+        reflection = str(payload.get("reflection") or "")
+        if reflection not in ALLOWED_SPENDING_REFLECTIONS:
+            raise ServiceError(
+                "invalid_reflection",
+                "reflection must be well_spent, unsure, or regretted",
+                400,
+            )
+        stored = self.repository.reflect_transaction(
+            user_ref,
+            transaction_id,
+            reflection,
+            reflection_note=_optional_text(
+                payload.get("reflection_note"), max_length=160
+            ),
+            reflected_at=utc_now_iso(),
+            idempotency_key=_key(f"reflection:{transaction_id}", idempotency_key),
+            correlation_id=correlation_id,
+            source=source,
+        )
+        return ServiceResult(stored.status, stored.body)
+
     def record_share_view(
         self,
         user_ref: str,
@@ -512,11 +550,17 @@ class LedgerService:
             "total_spent_krw": total,
             "by_category_krw": by_category,
             "transaction_count": len(current),
+            "reflection_summary": self._reflection_summary(
+                current,
+                profile,
+                as_of=now.date(),
+            ),
             "weekly_briefing": self._weekly_briefing(
                 user_ref,
                 transactions,
                 now=now,
                 timezone=timezone,
+                profile=profile,
             ),
         }
         if profile:
@@ -531,6 +575,49 @@ class LedgerService:
             )
         return ServiceResult(200, {"summary": summary})
 
+    def _reflection_summary(
+        self,
+        transactions: list[Transaction],
+        profile: FinancialProfile | None,
+        *,
+        as_of: date,
+    ) -> dict[str, Any]:
+        reflected = [item for item in transactions if item.reflection is not None]
+        regretted = [item for item in reflected if item.reflection == "regretted"]
+        regretted_by_category: dict[str, tuple[int, int]] = {}
+        for transaction in regretted:
+            count, amount = regretted_by_category.get(transaction.category, (0, 0))
+            regretted_by_category[transaction.category] = (
+                count + 1,
+                amount + transaction.amount_krw,
+            )
+        strongest_category = (
+            max(
+                regretted_by_category,
+                key=lambda category: (
+                    regretted_by_category[category][0],
+                    regretted_by_category[category][1],
+                ),
+            )
+            if regretted_by_category
+            else None
+        )
+        regretted_spent = sum(item.amount_krw for item in regretted)
+        return {
+            "reflected_count": len(reflected),
+            "well_spent_count": sum(
+                item.reflection == "well_spent" for item in reflected
+            ),
+            "unsure_count": sum(item.reflection == "unsure" for item in reflected),
+            "regretted_count": len(regretted),
+            "regretted_spent_krw": regretted_spent,
+            "regret_rate": round(len(regretted) / len(reflected), 4)
+            if reflected
+            else 0.0,
+            "strongest_regret_category": strongest_category,
+            "goal_delay_days": _goal_delay_days(regretted_spent, profile, as_of),
+        }
+
     def _weekly_briefing(
         self,
         user_ref: str,
@@ -538,6 +625,7 @@ class LedgerService:
         *,
         now: datetime,
         timezone: ZoneInfo,
+        profile: FinancialProfile | None,
     ) -> dict[str, Any]:
         week_start = now.date() - timedelta(days=now.weekday())
         week_end = week_start + timedelta(days=6)
@@ -595,7 +683,50 @@ class LedgerService:
             default=None,
         )
         total = sum(transaction.amount_krw for transaction in weekly)
-        if label_counts["overspending"]:
+        reflected = [item for item in weekly if item.reflection is not None]
+        regretted = [item for item in reflected if item.reflection == "regretted"]
+        regretted_by_category: dict[str, tuple[int, int]] = {}
+        for transaction in regretted:
+            count, amount = regretted_by_category.get(transaction.category, (0, 0))
+            regretted_by_category[transaction.category] = (
+                count + 1,
+                amount + transaction.amount_krw,
+            )
+        regret_category = (
+            max(
+                regretted_by_category,
+                key=lambda category: (
+                    regretted_by_category[category][0],
+                    regretted_by_category[category][1],
+                ),
+            )
+            if regretted_by_category
+            else None
+        )
+        regret_pattern = None
+        if regret_category:
+            regret_count, regret_amount = regretted_by_category[regret_category]
+            regret_pattern = {
+                "category": regret_category,
+                "category_name": _category_name(regret_category),
+                "count": regret_count,
+                "spent_krw": regret_amount,
+            }
+        if len(reflected) >= 2:
+            evidence_state = "learned"
+        elif reflected:
+            evidence_state = "feedback_sparse"
+        elif reviewed:
+            evidence_state = "judgment_only"
+        else:
+            evidence_state = "empty"
+
+        if regret_pattern:
+            headline = (
+                f"이번 주 {_category_name(regret_category)}에서 "
+                f"후회한 소비 {regret_pattern['count']}건이 보여요."
+            )
+        elif label_counts["overspending"]:
             headline = f"이번 주 과소비 {label_counts['overspending']}건을 먼저 점검해요."
         elif label_counts["caution"]:
             headline = f"주의가 필요한 지출 {label_counts['caution']}건이 보여요."
@@ -620,7 +751,13 @@ class LedgerService:
             summary_text = "거래를 기록하면 이번 주 흐름을 자동으로 묶어 드려요."
 
         concern_payload = None
-        if concern is not None and concern[2] != "justified":
+        if regret_pattern:
+            goal_name = profile.goal.name if profile else "목표"
+            improvement = (
+                f"이번 주 {_category_name(regret_category)} 지출을 1회 줄이고, "
+                f"절약한 금액을 {goal_name}에 남겨둬요."
+            )
+        elif concern is not None and concern[2] != "justified":
             transaction, judgment, effective_label = concern
             concern_payload = {
                 "transaction_id": transaction.transaction_id,
@@ -654,6 +791,11 @@ class LedgerService:
             "summary": summary_text,
             "improvement": improvement,
             "concern": concern_payload,
+            "evidence_state": evidence_state,
+            "regret_pattern": regret_pattern,
+            "goal_impact_days": _goal_delay_days(
+                sum(item.amount_krw for item in regretted), profile, now.date()
+            ),
         }
 
     def get_metrics(self, user_ref: str) -> ServiceResult:
@@ -762,6 +904,10 @@ class LedgerService:
                 category=transaction.category,
                 signals=signals,
                 user_reason=transaction.reason,
+                spending_rules=self.repository.get_settings(user_ref).spending_rules,
+                reflection_context=self._category_reflection_context(
+                    user_ref, transaction.category
+                ),
             )
         )
         stored = self.repository.save_judgment(
@@ -811,6 +957,23 @@ class LedgerService:
                 {"transaction": transaction.to_dict(), "pending_question": pending.to_dict()},
             )
         return None
+
+    def _category_reflection_context(
+        self, user_ref: str, category: str
+    ) -> dict[str, int | float]:
+        reflected = [
+            item
+            for item in self.repository.list_transactions(user_ref)
+            if item.category == category and item.reflection is not None
+        ]
+        if not reflected:
+            return {}
+        regretted_count = sum(item.reflection == "regretted" for item in reflected)
+        return {
+            "category_reflected_count": len(reflected),
+            "category_regretted_count": regretted_count,
+            "category_regret_rate": round(regretted_count / len(reflected), 4),
+        }
 
     def _compute_signals(
         self, profile: FinancialProfile, transaction: Transaction
@@ -981,6 +1144,25 @@ def _optional_text(value: Any, *, max_length: int) -> str | None:
     return sanitize_free_text(value, max_length=max_length)
 
 
+def _spending_rules(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        raise ServiceError("invalid_request", "spending_rules must be a list", 400)
+    if len(value) > 8:
+        raise ServiceError(
+            "invalid_request", "spending_rules can contain at most 8 items", 400
+        )
+    rules: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ServiceError(
+                "invalid_request", "spending_rules must contain strings", 400
+            )
+        rule = sanitize_free_text(item, max_length=120)
+        if rule and rule not in rules:
+            rules.append(rule)
+    return rules
+
+
 def _normalized_category(value: Any) -> str:
     if value is None:
         return "unknown"
@@ -1012,6 +1194,25 @@ def _goal_pressure(profile: FinancialProfile, as_of: date) -> float:
     required_monthly = savings_gap / months_remaining
     disposable = max(1, profile.monthly_income_krw - fixed_and_debt)
     return clamp(required_monthly / disposable)
+
+
+def _goal_delay_days(
+    regretted_spent_krw: int,
+    profile: FinancialProfile | None,
+    as_of: date,
+) -> int:
+    if profile is None or regretted_spent_krw <= 0:
+        return 0
+    savings_gap = max(
+        0, profile.goal.target_amount_krw - profile.goal.current_amount_krw
+    )
+    days_remaining = max(
+        1, (parse_date(profile.goal.target_date, "goal.target_date") - as_of).days
+    )
+    if savings_gap == 0:
+        return 0
+    required_daily_savings = savings_gap / days_remaining
+    return ceil(regretted_spent_krw / max(required_daily_savings, 1))
 
 
 def _key(scope: str, client_key: str) -> str:

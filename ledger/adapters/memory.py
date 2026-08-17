@@ -14,11 +14,12 @@ from ledger.domain.events import (
     EVENT_JUDGMENT_REASON_REQUESTED,
     EVENT_LEGACY_IMPORTED,
     EVENT_PROFILE_UPSERTED,
-    EVENT_SETTINGS_ROAST_CHANGED,
+    EVENT_SETTINGS_UPDATED,
     EVENT_SHARE_CLICKED,
     EVENT_SHARE_SUCCEEDED,
     EVENT_SHARE_VIEWED,
     EVENT_TRANSACTION_REASON_ADDED,
+    EVENT_TRANSACTION_REFLECTED,
     EVENT_TRANSACTION_RECORDED,
     EventEnvelope,
 )
@@ -60,6 +61,8 @@ class _UserStore:
             "share_successes": 0,
             "accounts_revoked": 0,
             "legacy_imports": 0,
+            "spend_reflections": 0,
+            "regretted_reflections": 0,
         }
     )
 
@@ -206,6 +209,34 @@ class InMemoryLedgerRepository(LedgerRepository):
                 transaction_id,
                 reason,
                 answered_at,
+                idempotency_key,
+                correlation_id,
+                source,
+            ),
+        )
+
+    def reflect_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        reflection: str,
+        *,
+        reflection_note: str | None,
+        reflected_at: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            user_ref,
+            idempotency_key,
+            lambda store: self._reflect_transaction(
+                store,
+                user_ref,
+                transaction_id,
+                reflection,
+                reflection_note,
+                reflected_at,
                 idempotency_key,
                 correlation_id,
                 source,
@@ -470,7 +501,7 @@ class InMemoryLedgerRepository(LedgerRepository):
         self._append_event(
             store,
             user_ref,
-            EVENT_SETTINGS_ROAST_CHANGED,
+            EVENT_SETTINGS_UPDATED,
             payload,
             idempotency_key=idempotency_key,
             correlation_id=correlation_id,
@@ -574,6 +605,51 @@ class InMemoryLedgerRepository(LedgerRepository):
             )
             store.pending_question = self._privacy.encrypt_json(answered.to_dict())
         store.transactions[transaction_id] = self._privacy.encrypt_json(updated.to_dict())
+        return StoredResult(200, {"transaction": updated.to_dict()})
+
+    def _reflect_transaction(
+        self,
+        store: _UserStore,
+        user_ref: str,
+        transaction_id: str,
+        reflection: str,
+        reflection_note: str | None,
+        reflected_at: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+    ) -> StoredResult:
+        transaction = self.get_transaction(user_ref, transaction_id)
+        if transaction is None:
+            raise DomainValidationError("transaction not found")
+        updated = Transaction.from_dict(
+            {
+                **transaction.to_dict(),
+                "reflection": reflection,
+                "reflection_note": reflection_note,
+                "reflected_at": reflected_at,
+            }
+        )
+        payload = {
+            "transaction_id": transaction_id,
+            "reflection": reflection,
+            "reflection_note": reflection_note,
+            "reflected_at": reflected_at,
+        }
+        self._append_event(
+            store,
+            user_ref,
+            EVENT_TRANSACTION_REFLECTED,
+            payload,
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+            source=source,
+            redacted_metadata={"reflection": reflection},
+        )
+        store.transactions[transaction_id] = self._privacy.encrypt_json(updated.to_dict())
+        store.metrics["spend_reflections"] += 1
+        if reflection == "regretted":
+            store.metrics["regretted_reflections"] += 1
         return StoredResult(200, {"transaction": updated.to_dict()})
 
     def _save_judgment(
