@@ -29,6 +29,19 @@ export interface Settings {
   locale: string;
   timezone: string;
   spending_rules?: string[];
+  accounts: LedgerAccount[];
+  category_budgets_krw: Record<string, number>;
+}
+
+export type TransactionType = "expense" | "income" | "transfer";
+export type AccountType = "cash" | "bank" | "card" | "savings" | "other";
+
+export interface LedgerAccount {
+  account_id: string;
+  name: string;
+  account_type: AccountType;
+  opening_balance_krw: number;
+  archived: boolean;
 }
 
 export type SpendingReflection = "well_spent" | "unsure" | "regretted";
@@ -48,6 +61,11 @@ export interface Transaction {
   reflection?: SpendingReflection | null;
   reflection_note?: string | null;
   reflected_at?: string | null;
+  transaction_type: TransactionType;
+  account_id: string;
+  destination_account_id: string | null;
+  exclude_from_budget: boolean;
+  updated_at?: string | null;
 }
 
 export interface Signals {
@@ -158,6 +176,27 @@ export interface Summary {
   total_spent_krw: number;
   by_category_krw: Record<string, number>;
   transaction_count: number;
+  budget_spent_krw?: number;
+  total_income_krw?: number;
+  net_cashflow_krw?: number;
+  transfer_total_krw?: number;
+  expense_count?: number;
+  income_count?: number;
+  transfer_count?: number;
+  previous_month?: {
+    month: string;
+    total_spent_krw: number;
+    change_krw: number;
+    change_rate: number | null;
+  };
+  category_budgets?: Record<string, {
+    budget_krw: number;
+    spent_krw: number;
+    remaining_krw: number;
+    usage: number;
+    daily_allowance_krw: number;
+  }>;
+  account_balances?: Array<LedgerAccount & { balance_krw: number }>;
   discretionary_budget_krw?: number;
   budget_usage?: number;
   goal?: Goal;
@@ -179,4 +218,8 @@ export interface TransactionDraft {
   description?: string;
   occurred_at?: string;
   reason?: string;
+  transaction_type?: TransactionType;
+  account_id?: string;
+  destination_account_id?: string | null;
+  exclude_from_budget?: boolean;
 }

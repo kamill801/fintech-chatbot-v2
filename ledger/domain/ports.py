@@ -102,6 +102,29 @@ class LedgerRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def update_transaction(
+        self,
+        transaction: Transaction,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
     def save_pending_question(
         self,
         user_ref: str,

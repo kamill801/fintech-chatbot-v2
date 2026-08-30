@@ -19,6 +19,10 @@ class ManualTransactionDraft:
     description: str | None = None
     reason: str | None = None
     idempotency_key: str | None = None
+    transaction_type: str = "expense"
+    account_id: str = "cash"
+    destination_account_id: str | None = None
+    exclude_from_budget: bool = False
 
 
 def _utc_now() -> str:
@@ -50,4 +54,8 @@ class ManualTransactionSource:
             reason=draft.reason,
             status="recorded",
             created_at=_utc_now(),
+            transaction_type=draft.transaction_type,
+            account_id=draft.account_id,
+            destination_account_id=draft.destination_account_id,
+            exclude_from_budget=draft.exclude_from_budget,
         )

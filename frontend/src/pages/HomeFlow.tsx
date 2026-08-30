@@ -24,10 +24,11 @@ import { ApiError } from "../api";
 import { useLedger } from "../ledger-context";
 import { manualDraftKey } from "../local-drafts";
 import { Link, useNavigate, useParams } from "../router";
-import type { Transaction, TransactionDraft } from "../types";
+import type { Transaction, TransactionDraft, TransactionType } from "../types";
 import { categoryNames, createClientId, formatCompactWon, formatDate, formatTodayLabel, formatWon, withDemo } from "../utils";
 
-const categories = ["cafe", "food", "transport", "shopping", "housing", "health", "other"];
+const expenseCategories = ["cafe", "food", "transport", "shopping", "housing", "health", "other"];
+const incomeCategories = ["salary", "other"];
 
 interface StoredManualDraft {
   draft: TransactionDraft;
@@ -127,8 +128,8 @@ function initialDateForInput(): string {
 
 function blankManualDraft(demo: boolean): TransactionDraft {
   return demo
-    ? { amount_krw: 12_000, category: "cafe", merchant: "카페 온도" }
-    : { amount_krw: 0, category: "other", merchant: "" };
+    ? { amount_krw: 12_000, category: "cafe", merchant: "카페 온도", transaction_type: "expense", account_id: "bank" }
+    : { amount_krw: 0, category: "other", merchant: "", transaction_type: "expense" };
 }
 
 function readManualDraft(key: string, demo: boolean): StoredManualDraft {
@@ -148,7 +149,7 @@ function readManualDraft(key: string, demo: boolean): StoredManualDraft {
 }
 
 export function ManualTransactionPage() {
-  const { createTransaction, demo, settings } = useLedger();
+  const { createTransaction, demo, settings, transactions } = useLedger();
   const { userKey } = useAuth();
   const navigate = useNavigate();
   const draftKey = manualDraftKey(userKey, demo);
@@ -157,6 +158,15 @@ export function ManualTransactionPage() {
   const [date, setDate] = useState(initialDateForInput);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const transactionType = draft.transaction_type ?? "expense";
+  const configuredAccounts = settings.accounts ?? [{ account_id: "cash", name: "현금", account_type: "cash" as const, opening_balance_krw: 0, archived: false }];
+  const activeAccounts = configuredAccounts.filter((account) => !account.archived);
+  const accountId = draft.account_id ?? activeAccounts[0]?.account_id ?? "cash";
+  const categories = transactionType === "income" ? incomeCategories : transactionType === "transfer" ? ["transfer"] : expenseCategories;
+  const recentSuggestions = (transactions ?? [])
+    .filter((item) => item.transaction_type === transactionType)
+    .filter((item, index, items) => items.findIndex((candidate) => `${candidate.category}:${candidate.merchant ?? ""}:${candidate.account_id}` === `${item.category}:${item.merchant ?? ""}:${item.account_id}`) === index)
+    .slice(0, 3);
 
   useEffect(() => {
     window.localStorage.setItem(draftKey, JSON.stringify(storedDraft));
@@ -166,17 +176,30 @@ export function ManualTransactionPage() {
     setStoredDraft((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
   }
 
+  function selectTransactionType(nextType: TransactionType) {
+    updateDraft({
+      transaction_type: nextType,
+      category: nextType === "income" ? "salary" : nextType === "transfer" ? "transfer" : "other",
+      destination_account_id: nextType === "transfer" ? activeAccounts.find((account) => account.account_id !== accountId)?.account_id ?? null : null,
+      exclude_from_budget: false,
+    });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.amount_krw || draft.amount_krw < 1) {
       setError("금액을 입력해 주세요.");
       return;
     }
+    if (transactionType === "transfer" && (!draft.destination_account_id || draft.destination_account_id === accountId)) {
+      setError("보낼 계좌와 받을 계좌를 다르게 선택해 주세요.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       const occurredAt = new Date(`${date}T12:00:00+09:00`).toISOString();
-      const result = await createTransaction({ ...draft, occurred_at: occurredAt }, operationId);
+      const result = await createTransaction({ ...draft, transaction_type: transactionType, account_id: accountId, occurred_at: occurredAt }, operationId);
       window.localStorage.removeItem(draftKey);
       if (result.pending_question) {
         navigate(withDemo(`/transactions/${result.transaction.transaction_id}/reason`, demo));
@@ -187,7 +210,7 @@ export function ManualTransactionPage() {
       if (nextError instanceof ApiError && nextError.code === "pending_reason_required") {
         setError("먼저 이전 지출의 이유를 답해 주세요.");
       } else {
-        setError(navigator.onLine ? "지출을 저장하지 못했어요. 다시 시도해 주세요." : "오프라인이에요. 입력 내용은 이 기기에 보관했어요.");
+        setError(navigator.onLine ? "거래를 저장하지 못했어요. 다시 시도해 주세요." : "오프라인이에요. 입력 내용은 이 기기에 보관했어요.");
       }
     } finally {
       setSaving(false);
@@ -196,16 +219,20 @@ export function ManualTransactionPage() {
 
   return (
     <main className="standalone-screen composer-screen">
-      <PageHeader title="지출 기록" right={<span className="source-pill"><i /> 수기 입력</span>} />
+      <PageHeader title="거래 기록" right={<span className="source-pill"><i /> 수기 입력</span>} />
       <form onSubmit={submit} noValidate>
         <section className="amount-entry">
-          <h1>얼마 썼어?</h1>
+          <h1>{transactionType === "expense" ? "얼마 썼어?" : transactionType === "income" ? "얼마 들어왔어?" : "얼마 옮겼어?"}</h1>
           <CurrencyInput className="composer-money-input" ariaLabel="금액" value={draft.amount_krw} onChange={(amount_krw) => updateDraft({ amount_krw })} />
         </section>
-        <div className="transaction-kind" aria-label="거래 유형: 지출">
-          <span>거래 유형</span>
-          <strong>지출</strong>
+        <div className="segmented-control transaction-type-control" role="group" aria-label="거래 유형">
+          {(["expense", "income", "transfer"] as const).map((type) => (
+            <button type="button" key={type} className={transactionType === type ? "selected" : ""} aria-pressed={transactionType === type} onClick={() => selectTransactionType(type)}>
+              {{ expense: "지출", income: "수입", transfer: "이체" }[type]}
+            </button>
+          ))}
         </div>
+        {recentSuggestions.length > 0 && <section className="quick-entry"><span>최근 거래 빠른 입력</span><div>{recentSuggestions.map((item) => <button type="button" key={item.transaction_id} onClick={() => updateDraft({ amount_krw: item.amount_krw, category: item.category, merchant: item.merchant ?? "", description: item.description ?? "", account_id: item.account_id })}><strong>{item.merchant || categoryNames[item.category]}</strong><small>{formatWon(item.amount_krw)}</small></button>)}</div></section>}
         <Surface className="composer-fields">
           <label className="field-row">
             <span className="warm-icon"><CategoryIcon category={draft.category} /></span><strong>분류</strong>
@@ -214,9 +241,14 @@ export function ManualTransactionPage() {
             </select><CaretRight size={19} />
           </label>
           <label className="field-row">
-            <span className="warm-icon"><MapPin size={23} /></span><strong>사용처</strong>
-            <input value={draft.merchant ?? ""} placeholder="사용처 입력" onChange={(event) => updateDraft({ merchant: event.target.value })} /><CaretRight size={19} />
+            <span className="warm-icon"><MapPin size={23} /></span><strong>{transactionType === "expense" ? "사용처" : transactionType === "income" ? "입금처" : "이체 메모"}</strong>
+            <input value={draft.merchant ?? ""} placeholder={transactionType === "expense" ? "사용처 입력" : "선택 입력"} onChange={(event) => updateDraft({ merchant: event.target.value })} /><CaretRight size={19} />
           </label>
+          <label className="field-row">
+            <span className="warm-icon"><Wallet size={23} /></span><strong>{transactionType === "transfer" ? "보낼 계좌" : "계좌"}</strong>
+            <select value={accountId} onChange={(event) => updateDraft({ account_id: event.target.value })}>{activeAccounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}</select><CaretRight size={19} />
+          </label>
+          {transactionType === "transfer" && <label className="field-row"><span className="warm-icon"><Wallet size={23} /></span><strong>받을 계좌</strong><select value={draft.destination_account_id ?? ""} onChange={(event) => updateDraft({ destination_account_id: event.target.value || null })}><option value="">계좌 선택</option>{activeAccounts.filter((account) => account.account_id !== accountId).map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}</select><CaretRight size={19} /></label>}
           <label className="field-row date-field-row">
             <span className="warm-icon"><CalendarBlank size={23} /></span><strong>날짜</strong>
             <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
@@ -226,9 +258,10 @@ export function ManualTransactionPage() {
             <input value={draft.description ?? ""} placeholder="선택 입력" onChange={(event) => updateDraft({ description: event.target.value })} /><CaretRight size={19} />
           </label>
         </Surface>
-        <InfoCallout>{settings.roast_enabled ? "욕쟁이 할머니가 지출 이유를 한 번 확인해요" : "기록하면 AI가 이번 주 흐름과 개선점을 정리해요"}</InfoCallout>
+        {transactionType === "expense" && <label className="budget-exclusion"><input type="checkbox" checked={draft.exclude_from_budget ?? false} onChange={(event) => updateDraft({ exclude_from_budget: event.target.checked })} /><span><strong>이번 달 예산에서 제외</strong><small>환급·대납처럼 실제 생활비가 아닌 지출에 사용해요.</small></span></label>}
+        <InfoCallout>{transactionType !== "expense" ? "수입과 이체는 소비 판단 없이 장부에 바로 기록해요" : settings.roast_enabled ? "욕쟁이 할머니가 지출 이유를 한 번 확인해요" : "기록하면 AI가 이번 주 흐름과 개선점을 정리해요"}</InfoCallout>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <PrimaryButton disabled={saving}>{saving ? "기록하는 중" : settings.roast_enabled ? "기록하고 이유 답하기" : "지출 기록하기"}</PrimaryButton>
+        <PrimaryButton disabled={saving}>{saving ? "기록하는 중" : transactionType === "expense" && settings.roast_enabled ? "기록하고 이유 답하기" : "거래 기록하기"}</PrimaryButton>
       </form>
     </main>
   );

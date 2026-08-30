@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { confidenceText, createClientId, currentMonthKey, formatCompactWon, formatMonthLabel, formatTodayLabel, formatWon, labelText, withDemo } from "./utils";
+import { confidenceText, createClientId, currentMonthKey, formatCalendarWon, formatCompactWon, formatMonthLabel, formatTodayLabel, formatWon, labelText, withDemo } from "./utils";
 
 describe("Korean ledger formatting", () => {
   it("formats won without decimals", () => {
     expect(formatWon(623000)).toBe("623,000원");
     expect(formatCompactWon(10000000)).toBe("1,000만원");
+    expect(formatCalendarWon(78500)).toBe("7.9만");
+    expect(formatCalendarWon(9000)).toBe("9천");
   });
 
   it("uses plain-language judgment labels", () => {

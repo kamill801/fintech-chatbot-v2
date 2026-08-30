@@ -182,15 +182,23 @@ export function CategoryIcon({ category, size = 22 }: { category: string; size?:
 }
 
 export function TransactionRow({ transaction, onClick }: { transaction: Transaction; onClick?(): void }) {
+  const transactionType = transaction.transaction_type ?? "expense";
+  const typeLabel = {
+    expense: categoryNames[transaction.category] || transaction.category,
+    income: "수입",
+    transfer: "이체",
+  }[transactionType];
+  const fallbackName = transactionType === "expense" ? "지출" : typeLabel;
+  const amountPrefix = transactionType === "income" ? "+" : "";
   return (
-    <button className="transaction-row" onClick={onClick} type="button">
+    <button className={`transaction-row transaction-${transactionType}`} onClick={onClick} type="button">
       <CategoryIcon category={transaction.category} />
       <span className="transaction-copy">
-        <strong>{transaction.merchant || categoryNames[transaction.category] || "지출"}</strong>
-        <small>{categoryNames[transaction.category] || transaction.category}</small>
+        <strong>{transaction.merchant || fallbackName}</strong>
+        <small>{typeLabel}</small>
       </span>
       <time>{formatTime(transaction.occurred_at)}</time>
-      <strong className="transaction-amount">{formatWon(transaction.amount_krw)}</strong>
+      <strong className="transaction-amount">{amountPrefix}{formatWon(transaction.amount_krw)}</strong>
       {onClick && <CaretRight size={18} />}
     </button>
   );
@@ -259,7 +267,7 @@ export function AppShell({
           })}
           <NavLink to={withDemo("/settings", demo)}><Gear size={23} /> 설정</NavLink>
         </nav>
-        <NavLink className="rail-add" to={withDemo(addTo, demo)}><Plus size={22} /> 지출 기록</NavLink>
+        <NavLink className="rail-add" to={withDemo(addTo, demo)}><Plus size={22} /> 거래 기록</NavLink>
       </aside>
       <main className="app-content">{children}</main>
       {showAdd && <NavLink className="floating-add" to={withDemo(addTo, demo)} aria-label={addLabel}><Plus size={32} /></NavLink>}

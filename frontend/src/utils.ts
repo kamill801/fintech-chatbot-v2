@@ -24,6 +24,8 @@ export const categoryNames: Record<string, string> = {
   education: "교육",
   leisure: "여가",
   other: "기타",
+  salary: "급여",
+  transfer: "이체",
 };
 
 export function formatWon(value: number): string {
@@ -33,6 +35,22 @@ export function formatWon(value: number): string {
 export function formatCompactWon(value: number): string {
   if (value >= 10_000) return `${Math.round(value / 10_000).toLocaleString("ko-KR")}만원`;
   return formatWon(value);
+}
+
+export function formatCalendarWon(value: number): string {
+  if (value >= 100_000_000) {
+    const billions = Math.round((value / 100_000_000) * 10) / 10;
+    return `${billions.toLocaleString("ko-KR")}억`;
+  }
+  if (value >= 10_000) {
+    const tenThousands = Math.round((value / 10_000) * 10) / 10;
+    return `${tenThousands.toLocaleString("ko-KR")}만`;
+  }
+  if (value >= 1_000) {
+    const thousands = Math.round((value / 1_000) * 10) / 10;
+    return `${thousands.toLocaleString("ko-KR")}천`;
+  }
+  return Math.round(value).toLocaleString("ko-KR");
 }
 
 export function formatDate(value: string): string {

@@ -10,6 +10,7 @@ import {
   PencilSimple,
   ShareNetwork,
   Sparkle,
+  Trash,
   Wallet,
 } from "@phosphor-icons/react";
 import {
@@ -26,7 +27,7 @@ import {
 } from "../components";
 import { useLedger } from "../ledger-context";
 import { Link, useNavigate, useParams } from "../router";
-import type { Judgment, JudgmentLabel, SharePayload, SpendingReflection, TransactionDetail } from "../types";
+import type { Judgment, JudgmentLabel, SharePayload, SpendingReflection, TransactionDetail, TransactionDraft, TransactionType } from "../types";
 import { categoryNames, confidenceText, formatDate, formatTime, formatWon, labelText, withDemo } from "../utils";
 
 function useTransactionDetail(transactionId: string) {
@@ -38,7 +39,7 @@ function useTransactionDetail(transactionId: string) {
       setDetail(await getTransaction(transactionId));
       setError(null);
     } catch {
-      setError("거래 판단을 불러오지 못했어요.");
+      setError("거래를 불러오지 못했어요.");
     }
   }, [getTransaction, transactionId]);
   useEffect(() => { void reload(); }, [reload, settings.roast_enabled]);
@@ -109,7 +110,8 @@ export function JudgmentPage() {
 
 export function TransactionDetailPage() {
   const { transactionId = "" } = useParams();
-  const { correctJudgment, demo, reflectTransaction } = useLedger();
+  const { correctJudgment, deleteTransaction, demo, reflectTransaction, settings, updateTransaction } = useLedger();
+  const navigate = useNavigate();
   const { detail, error, reload } = useTransactionDetail(transactionId);
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState<JudgmentLabel>("justified");
@@ -120,6 +122,11 @@ export function TransactionDetailPage() {
   const [reflectionNote, setReflectionNote] = useState("");
   const [reflectionSaving, setReflectionSaving] = useState(false);
   const [reflectionStatus, setReflectionStatus] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState(false);
+  const [transactionDraft, setTransactionDraft] = useState<Partial<TransactionDraft>>({});
+  const [transactionSaving, setTransactionSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!detail) return;
@@ -157,20 +164,81 @@ export function TransactionDetailPage() {
     }
   }
 
+  function openTransactionEditor() {
+    if (!detail) return;
+    const { transaction } = detail;
+    setTransactionDraft({
+      amount_krw: transaction.amount_krw,
+      transaction_type: transaction.transaction_type,
+      category: transaction.category,
+      merchant: transaction.merchant ?? "",
+      description: transaction.description ?? "",
+      occurred_at: transaction.occurred_at.slice(0, 10),
+      account_id: transaction.account_id,
+      destination_account_id: transaction.destination_account_id,
+      exclude_from_budget: transaction.exclude_from_budget,
+    });
+    setEditingTransaction(true);
+  }
+
+  async function saveTransaction() {
+    if (!transactionDraft.amount_krw || transactionDraft.amount_krw < 1) {
+      setSaveError("금액을 입력해 주세요.");
+      return;
+    }
+    if (transactionDraft.transaction_type === "transfer" && (!transactionDraft.destination_account_id || transactionDraft.destination_account_id === transactionDraft.account_id)) {
+      setSaveError("보낼 계좌와 받을 계좌를 다르게 선택해 주세요.");
+      return;
+    }
+    setTransactionSaving(true);
+    setSaveError(null);
+    try {
+      const payload = { ...transactionDraft };
+      if (payload.occurred_at && /^\d{4}-\d{2}-\d{2}$/.test(payload.occurred_at)) payload.occurred_at = new Date(`${payload.occurred_at}T12:00:00+09:00`).toISOString();
+      const result = await updateTransaction(transactionId, payload);
+      setEditingTransaction(false);
+      if (result.pending_question) navigate(withDemo(`/transactions/${transactionId}/reason`, demo));
+      else await reload();
+    } catch {
+      setSaveError("거래를 수정하지 못했어요.");
+    } finally {
+      setTransactionSaving(false);
+    }
+  }
+
+  async function removeTransaction() {
+    setDeleting(true);
+    setSaveError(null);
+    try {
+      await deleteTransaction(transactionId);
+      navigate(withDemo("/ledger", demo));
+    } catch {
+      setSaveError("거래를 삭제하지 못했어요.");
+      setDeleting(false);
+    }
+  }
+
   if (error) return <main className="standalone-screen"><PageHeader title="거래 상세" /><p className="form-error">{error}</p></main>;
   if (!detail) return <div className="loading-screen">거래를 불러오는 중</div>;
   const { transaction, judgment } = detail;
+  const transactionType = transaction.transaction_type ?? "expense";
+  const transactionTypeLabel = { expense: "지출", income: "수입", transfer: "이체" }[transactionType];
+  const accountNames = Object.fromEntries((settings.accounts ?? []).map((account) => [account.account_id, account.name]));
+  const editType = transactionDraft.transaction_type ?? transaction.transaction_type;
   return (
     <main className="standalone-screen transaction-detail-screen">
-      <PageHeader title="거래 상세" right={<span>•••</span>} />
+      <PageHeader title="거래 상세" right={<button className="detail-edit-button" onClick={openTransactionEditor}>수정</button>} />
       <section className="detail-hero">
-        <h1>{formatWon(transaction.amount_krw)}</h1>
+        <h1 className={transactionType === "income" ? "income-text" : ""}>{transactionType === "income" ? "+" : transactionType === "expense" ? "-" : ""}{formatWon(transaction.amount_krw)}</h1>
         <div><span className="detail-icon">☕</span><p><strong>{transaction.merchant || categoryNames[transaction.category]}</strong><small>{categoryNames[transaction.category]}</small></p></div>
-        <span className="source-pill">수기 입력</span>
+        <span className="source-pill">{transactionTypeLabel} · 수기 입력</span>
       </section>
       <Surface className="detail-fields">
         <div><strong>날짜</strong><span>{formatDate(transaction.occurred_at)} · {formatTime(transaction.occurred_at)}</span></div>
+        <div><strong>{transactionType === "transfer" ? "보낸 계좌" : "계좌"}</strong><span>{accountNames[transaction.account_id] ?? transaction.account_id ?? "현금"}</span></div>
+        {transaction.destination_account_id && <div><strong>받은 계좌</strong><span>{accountNames[transaction.destination_account_id] ?? transaction.destination_account_id}</span></div>}
         <div><strong>메모</strong><span className="muted">{transaction.description || "선택 입력 없음"}</span></div>
+        {transaction.exclude_from_budget && <div><strong>예산</strong><span>이번 달 예산에서 제외</span></div>}
       </Surface>
       {judgment && (
         <Surface className="detail-judgment">
@@ -181,7 +249,7 @@ export function TransactionDetailPage() {
         </Surface>
       )}
       {transaction.reason && <div className="my-reason"><strong>내가 답한 이유</strong><p>{transaction.reason}</p></div>}
-      <Surface className="spend-reflection">
+      {transactionType === "expense" && <Surface className="spend-reflection">
         <div className="reflection-heading">
           <div><span>소비 돌아보기</span><h2>지금 생각하면 이 소비 어땠나요?</h2></div>
           {transaction.reflection && <small>저장됨</small>}
@@ -219,16 +287,18 @@ export function TransactionDetailPage() {
         <button className="reflection-save" disabled={!reflection || reflectionSaving} onClick={() => void saveReflection()}>
           {reflectionSaving ? "저장 중" : transaction.reflection ? "평가 수정" : "내 소비 기준에 반영"}
         </button>
-      </Surface>
+      </Surface>}
       <Surface className="history-card">
         <h2>기록</h2>
-        <div><PencilSimple /> <time>{formatTime(transaction.created_at)}</time> 지출 기록</div>
+        <div><PencilSimple /> <time>{formatTime(transaction.created_at)}</time> {transactionTypeLabel} 기록</div>
         {transaction.reason && <div><NotePencil /> <time>{formatTime(transaction.occurred_at)}</time> 이유 답변</div>}
         {judgment && <div><Sparkle /> <time>{formatTime(transaction.occurred_at)}</time> 판단 완료</div>}
         {transaction.reflected_at && <div><Lightbulb /> <time>{formatTime(transaction.reflected_at)}</time> 소비 평가</div>}
       </Surface>
       {judgment && <button className="outline-button" onClick={() => setEditing(true)}><PencilSimple size={21} /> 판단 수정</button>}
-      <p className="muted detail-footnote">수정해도 원래 판단과 기록은 남아요</p>
+      <button className="outline-button transaction-edit-action" onClick={openTransactionEditor}><PencilSimple size={21} /> 거래 내용 수정</button>
+      <button className="delete-transaction-button" onClick={() => setConfirmDelete(true)}><Trash size={20} /> 거래 삭제</button>
+      {judgment && <p className="muted detail-footnote">판단을 수정해도 원래 판단 기록은 남아요</p>}
 
       {editing && (
         <div className="dialog-backdrop" role="presentation" onMouseDown={() => setEditing(false)}>
@@ -243,6 +313,8 @@ export function TransactionDetailPage() {
           </section>
         </div>
       )}
+      {editingTransaction && <div className="dialog-backdrop" role="presentation" onMouseDown={() => !transactionSaving && setEditingTransaction(false)}><section className="correction-dialog transaction-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="transaction-edit-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="transaction-edit-title">거래 내용 수정</h2><div className="edit-form-grid"><label>유형<select value={editType} onChange={(event) => setTransactionDraft((current) => ({ ...current, transaction_type: event.target.value as TransactionType, category: event.target.value === "income" ? "salary" : event.target.value === "transfer" ? "transfer" : "other", destination_account_id: null }))}><option value="expense">지출</option><option value="income">수입</option><option value="transfer">이체</option></select></label><label>금액<input type="number" min="1" inputMode="numeric" value={transactionDraft.amount_krw ?? 0} onChange={(event) => setTransactionDraft((current) => ({ ...current, amount_krw: Number(event.target.value) || 0 }))} /></label><label>분류<select value={transactionDraft.category ?? "other"} onChange={(event) => setTransactionDraft((current) => ({ ...current, category: event.target.value }))}>{(editType === "income" ? ["salary", "other"] : editType === "transfer" ? ["transfer"] : ["cafe", "food", "transport", "shopping", "housing", "health", "other"]).map((category) => <option key={category} value={category}>{categoryNames[category]}</option>)}</select></label><label>사용처<input value={transactionDraft.merchant ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, merchant: event.target.value }))} /></label><label>계좌<select value={transactionDraft.account_id ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, account_id: event.target.value }))}>{(settings.accounts ?? []).filter((account) => !account.archived).map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}</select></label>{editType === "transfer" && <label>받을 계좌<select value={transactionDraft.destination_account_id ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, destination_account_id: event.target.value || null }))}><option value="">선택</option>{(settings.accounts ?? []).filter((account) => !account.archived && account.account_id !== transactionDraft.account_id).map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}</select></label>}<label>날짜<input type="date" value={transactionDraft.occurred_at?.slice(0, 10) ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, occurred_at: event.target.value }))} /></label><label>메모<input value={transactionDraft.description ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, description: event.target.value }))} /></label>{editType === "expense" && <label className="edit-checkbox"><input type="checkbox" checked={transactionDraft.exclude_from_budget ?? false} onChange={(event) => setTransactionDraft((current) => ({ ...current, exclude_from_budget: event.target.checked }))} />예산에서 제외</label>}</div>{saveError && <p className="form-error" role="alert">{saveError}</p>}<PrimaryButton disabled={transactionSaving} onClick={() => void saveTransaction()}>{transactionSaving ? "저장 중" : "거래 저장"}</PrimaryButton><TextButton disabled={transactionSaving} onClick={() => setEditingTransaction(false)}>취소</TextButton></section></div>}
+      {confirmDelete && <div className="dialog-backdrop" role="presentation" onMouseDown={() => !deleting && setConfirmDelete(false)}><section className="correction-dialog delete-dialog" role="alertdialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><Trash size={32} /><h2>이 거래를 삭제할까요?</h2><p>월 합계와 예산, 계좌 잔액에서 즉시 제외돼요.</p>{saveError && <p className="form-error" role="alert">{saveError}</p>}<PrimaryButton disabled={deleting} onClick={() => void removeTransaction()}>{deleting ? "삭제 중" : "삭제하기"}</PrimaryButton><TextButton disabled={deleting} onClick={() => setConfirmDelete(false)}>취소</TextButton></section></div>}
       <Link className="sr-only" to={withDemo("/ledger", demo)}>장부로</Link>
     </main>
   );

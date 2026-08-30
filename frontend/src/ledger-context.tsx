@@ -46,6 +46,8 @@ interface LedgerContextValue {
   saveProfile(profile: Profile): Promise<void>;
   saveSettings(patch: Partial<Settings>): Promise<void>;
   createTransaction(draft: TransactionDraft, operationId?: string): Promise<TransactionResult>;
+  updateTransaction(id: string, draft: Partial<TransactionDraft>): Promise<TransactionResult>;
+  deleteTransaction(id: string): Promise<void>;
   answerReason(id: string, reason: string): Promise<TransactionResult>;
   reflectTransaction(id: string, reflection: SpendingReflection, note: string): Promise<Transaction>;
   getTransaction(id: string): Promise<TransactionDetail>;
@@ -66,6 +68,8 @@ const initialSettings: Settings = {
   locale: "ko-KR",
   timezone: "Asia/Seoul",
   spending_rules: [],
+  accounts: [{ account_id: "cash", name: "현금", account_type: "cash", opening_balance_krw: 0, archived: false }],
+  category_budgets_krw: {},
 };
 
 function errorMessage(error: unknown): string {
@@ -149,7 +153,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       },
       async createTransaction(draft, operationId) {
         if (demo) {
-          const needsReason = settings.roast_enabled && !draft.reason;
+          const transactionType = draft.transaction_type ?? "expense";
+          const needsReason = transactionType === "expense" && settings.roast_enabled && !draft.reason;
           const transaction: Transaction = {
             transaction_id: `tx-${createClientId()}`,
             amount_krw: draft.amount_krw,
@@ -160,10 +165,15 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
             source: "manual",
             source_reference: null,
             reason: draft.reason ?? null,
-            status: needsReason ? "awaiting_reason" : "judged",
+            status: needsReason ? "awaiting_reason" : transactionType === "expense" ? "judged" : "recorded",
             created_at: new Date().toISOString(),
+            transaction_type: transactionType,
+            account_id: draft.account_id ?? settings.accounts[0]?.account_id ?? "cash",
+            destination_account_id: draft.destination_account_id ?? null,
+            exclude_from_budget: draft.exclude_from_budget ?? false,
           };
           setTransactions((items) => [transaction, ...items]);
+          if (transactionType !== "expense") return { transaction };
           return needsReason
             ? { transaction, signals: demoSignals, pending_question: { ...demoPending, transaction_id: transaction.transaction_id } }
             : { transaction, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled) };
@@ -172,6 +182,33 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         setTransactions((items) => [result.transaction, ...items]);
         setSummary(await ledgerApi.summary());
         return result;
+      },
+      async updateTransaction(id, draft) {
+        if (demo) {
+          const current = transactions.find((item) => item.transaction_id === id) ?? demoTransactions[0];
+          const updated: Transaction = {
+            ...current,
+            ...draft,
+            merchant: draft.merchant ?? current.merchant,
+            description: draft.description ?? current.description,
+            destination_account_id:
+              draft.destination_account_id === undefined
+                ? current.destination_account_id
+                : draft.destination_account_id,
+            updated_at: new Date().toISOString(),
+          };
+          setTransactions((items) => items.map((item) => (item.transaction_id === id ? updated : item)));
+          return { transaction: updated, judgment: updated.transaction_type === "expense" ? demoJudgment(settings.roast_enabled) : undefined };
+        }
+        const result = await ledgerApi.updateTransaction(id, draft);
+        setTransactions((items) => items.map((item) => (item.transaction_id === id ? result.transaction : item)));
+        setSummary(await ledgerApi.summary());
+        return result;
+      },
+      async deleteTransaction(id) {
+        if (!demo) await ledgerApi.deleteTransaction(id);
+        setTransactions((items) => items.filter((item) => item.transaction_id !== id));
+        if (!demo) setSummary(await ledgerApi.summary());
       },
       async answerReason(id, reason) {
         if (demo) {

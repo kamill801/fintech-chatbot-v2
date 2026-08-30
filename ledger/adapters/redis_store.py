@@ -17,8 +17,10 @@ from ledger.domain.events import (
     EVENT_SHARE_SUCCEEDED,
     EVENT_SHARE_VIEWED,
     EVENT_TRANSACTION_REASON_ADDED,
+    EVENT_TRANSACTION_DELETED,
     EVENT_TRANSACTION_REFLECTED,
     EVENT_TRANSACTION_RECORDED,
+    EVENT_TRANSACTION_UPDATED,
     EventEnvelope,
 )
 from ledger.domain.models import (
@@ -144,6 +146,43 @@ class RedisLedgerRepository(LedgerRepository):
             if transaction is not None:
                 transactions.append(transaction)
         return transactions
+
+    def update_transaction(
+        self,
+        transaction: Transaction,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            transaction.user_ref,
+            idempotency_key,
+            lambda: self._update_transaction(
+                transaction, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def delete_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            user_ref,
+            idempotency_key,
+            lambda: self._delete_transaction(
+                user_ref,
+                transaction_id,
+                idempotency_key,
+                correlation_id,
+                source,
+            ),
+        )
 
     def save_pending_question(
         self,
@@ -572,6 +611,97 @@ class RedisLedgerRepository(LedgerRepository):
             self._incr_metric(pipe, transaction.user_ref, "transactions_recorded")
             pipe.execute()
         return StoredResult(201, {"transaction": payload})
+
+    def _update_transaction(
+        self,
+        transaction: Transaction,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+    ) -> StoredResult:
+        if self.get_transaction(transaction.user_ref, transaction.transaction_id) is None:
+            raise DomainValidationError("transaction not found")
+        payload = transaction.to_dict()
+        judgment_id = self._redis.get(
+            self._judgment_for_transaction_key(
+                transaction.user_ref, transaction.transaction_id
+            )
+        )
+        pending = self.get_pending_question(transaction.user_ref)
+        with self._redis.pipeline(transaction=True) as pipe:
+            self._append_event(
+                pipe,
+                transaction.user_ref,
+                EVENT_TRANSACTION_UPDATED,
+                payload,
+                idempotency_key=idempotency_key,
+                correlation_id=correlation_id,
+                source=source,
+                redacted_metadata={"transaction_type": transaction.transaction_type},
+            )
+            transaction_key = self._transaction_key(
+                transaction.user_ref, transaction.transaction_id
+            )
+            transactions_key = self._key(transaction.user_ref, "transactions")
+            pipe.set(transaction_key, self._privacy.encrypt_json(payload))
+            pipe.zadd(
+                transactions_key,
+                {transaction.transaction_id: self._score(transaction.occurred_at)},
+            )
+            judgment_index_key = self._judgment_for_transaction_key(
+                transaction.user_ref, transaction.transaction_id
+            )
+            pipe.delete(judgment_index_key)
+            if judgment_id:
+                pipe.delete(
+                    self._judgment_key(transaction.user_ref, judgment_id),
+                    self._correction_key(transaction.user_ref, judgment_id),
+                )
+            if pending and pending.transaction_id == transaction.transaction_id:
+                pipe.delete(self._key(transaction.user_ref, "pending_question"))
+            self._track_keys(pipe, transaction.user_ref, transaction_key, transactions_key)
+            pipe.execute()
+        return StoredResult(200, {"transaction": payload})
+
+    def _delete_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+    ) -> StoredResult:
+        if self.get_transaction(user_ref, transaction_id) is None:
+            raise DomainValidationError("transaction not found")
+        judgment_id = self._redis.get(
+            self._judgment_for_transaction_key(user_ref, transaction_id)
+        )
+        pending = self.get_pending_question(user_ref)
+        payload = {"transaction_id": transaction_id, "deleted_at": utc_now_iso()}
+        with self._redis.pipeline(transaction=True) as pipe:
+            self._append_event(
+                pipe,
+                user_ref,
+                EVENT_TRANSACTION_DELETED,
+                payload,
+                idempotency_key=idempotency_key,
+                correlation_id=correlation_id,
+                source=source,
+            )
+            pipe.delete(
+                self._transaction_key(user_ref, transaction_id),
+                self._judgment_for_transaction_key(user_ref, transaction_id),
+            )
+            pipe.zrem(self._key(user_ref, "transactions"), transaction_id)
+            if judgment_id:
+                pipe.delete(
+                    self._judgment_key(user_ref, judgment_id),
+                    self._correction_key(user_ref, judgment_id),
+                )
+            if pending and pending.transaction_id == transaction_id:
+                pipe.delete(self._key(user_ref, "pending_question"))
+            pipe.execute()
+        return StoredResult(200, {"transaction_id": transaction_id, "deleted": True})
 
     def _save_pending_question(
         self,

@@ -28,6 +28,11 @@ export const demoSettings: Settings = {
   locale: "ko-KR",
   timezone: "Asia/Seoul",
   spending_rules: ["배달은 주 2회까지", "친구와의 만남 비용은 월 4회까지 괜찮음"],
+  accounts: [
+    { account_id: "cash", name: "현금", account_type: "cash", opening_balance_krw: 300_000, archived: false },
+    { account_id: "bank", name: "생활비 통장", account_type: "bank", opening_balance_krw: 2_000_000, archived: false },
+  ],
+  category_budgets_krw: { food: 300_000, cafe: 100_000, shopping: 150_000 },
 };
 
 const demoTotalSpentKrw = 377_500;
@@ -36,6 +41,10 @@ export const demoBudgetUsage = demoTotalSpentKrw / demoProfile.discretionary_bud
 export const demoTransactions: Transaction[] = [
   {
     transaction_id: "tx-cafe",
+    transaction_type: "expense",
+    account_id: "bank",
+    destination_account_id: null,
+    exclude_from_budget: false,
     amount_krw: 12_000,
     merchant: "카페 온도",
     category: "cafe",
@@ -52,6 +61,10 @@ export const demoTransactions: Transaction[] = [
   },
   {
     transaction_id: "tx-lunch",
+    transaction_type: "expense",
+    account_id: "bank",
+    destination_account_id: null,
+    exclude_from_budget: false,
     amount_krw: 9_000,
     merchant: "점심",
     category: "food",
@@ -68,6 +81,10 @@ export const demoTransactions: Transaction[] = [
   },
   {
     transaction_id: "tx-transit",
+    transaction_type: "expense",
+    account_id: "bank",
+    destination_account_id: null,
+    exclude_from_budget: false,
     amount_krw: 1_500,
     merchant: "교통카드",
     category: "transport",
@@ -81,6 +98,10 @@ export const demoTransactions: Transaction[] = [
   },
   {
     transaction_id: "tx-grocery",
+    transaction_type: "expense",
+    account_id: "bank",
+    destination_account_id: null,
+    exclude_from_budget: false,
     amount_krw: 64_000,
     merchant: "마켓컬리",
     category: "food",
@@ -94,6 +115,10 @@ export const demoTransactions: Transaction[] = [
   },
   {
     transaction_id: "tx-store",
+    transaction_type: "expense",
+    account_id: "bank",
+    destination_account_id: null,
+    exclude_from_budget: false,
     amount_krw: 18_500,
     merchant: "편의점",
     category: "shopping",
@@ -110,6 +135,10 @@ export const demoTransactions: Transaction[] = [
   },
   {
     transaction_id: "tx-cafe-previous-1",
+    transaction_type: "expense",
+    account_id: "cash",
+    destination_account_id: null,
+    exclude_from_budget: false,
     amount_krw: 28_000,
     merchant: "브루클린 커피",
     category: "cafe",
@@ -123,6 +152,10 @@ export const demoTransactions: Transaction[] = [
   },
   {
     transaction_id: "tx-cafe-previous-2",
+    transaction_type: "expense",
+    account_id: "cash",
+    destination_account_id: null,
+    exclude_from_budget: false,
     amount_krw: 32_000,
     merchant: "카페 정원",
     category: "cafe",
@@ -139,6 +172,9 @@ export const demoTransactions: Transaction[] = [
 export const demoSummary: Summary = {
   month: "2026-08",
   total_spent_krw: demoTotalSpentKrw,
+  total_income_krw: 3_500_000,
+  net_cashflow_krw: 3_122_500,
+  transfer_total_krw: 0,
   by_category_krw: {
     food: 160_000,
     shopping: 95_000,
@@ -148,6 +184,22 @@ export const demoSummary: Summary = {
   transaction_count: 14,
   discretionary_budget_krw: demoProfile.discretionary_budget_krw,
   budget_usage: demoBudgetUsage,
+  budget_spent_krw: demoTotalSpentKrw,
+  previous_month: {
+    month: "2026-07",
+    total_spent_krw: 412_000,
+    change_krw: -34_500,
+    change_rate: -0.0837,
+  },
+  category_budgets: {
+    food: { budget_krw: 300_000, spent_krw: 160_000, remaining_krw: 140_000, usage: 0.5333, daily_allowance_krw: 5_385 },
+    cafe: { budget_krw: 100_000, spent_krw: 72_000, remaining_krw: 28_000, usage: 0.72, daily_allowance_krw: 1_077 },
+    shopping: { budget_krw: 150_000, spent_krw: 95_000, remaining_krw: 55_000, usage: 0.6333, daily_allowance_krw: 2_115 },
+  },
+  account_balances: [
+    { ...demoSettings.accounts[0], balance_krw: 240_000 },
+    { ...demoSettings.accounts[1], balance_krw: 4_682_500 },
+  ],
   goal: demoProfile.goal,
   reflection_summary: {
     reflected_count: 3,

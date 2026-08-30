@@ -5,7 +5,14 @@ import unittest
 import warnings
 
 from ledger.application.signals import SignalInputs, compute_signal_set
-from ledger.domain.models import DomainValidationError, FinancialGoal, FinancialProfile
+from ledger.domain.models import (
+    DomainValidationError,
+    FinancialGoal,
+    FinancialProfile,
+    LedgerAccount,
+    Transaction,
+    UserSettings,
+)
 from ledger.privacy import (
     OPENAI_PROMPT_ALLOWLIST,
     PrivacyConfig,
@@ -20,6 +27,41 @@ from tests.helpers import FERNET_KEY, USER_REF_SECRET, fixed_privacy, profile_pa
 
 
 class DomainValidationTests(unittest.TestCase):
+    def test_old_settings_without_accounts_receive_cash_default(self) -> None:
+        settings = UserSettings.from_dict(
+            {"roast_enabled": False, "locale": "ko-KR", "timezone": "Asia/Seoul"}
+        )
+        self.assertEqual(settings.accounts, [LedgerAccount("cash", "현금", "cash")])
+
+    def test_boolean_fields_reject_string_values(self) -> None:
+        with self.assertRaises(DomainValidationError):
+            LedgerAccount.from_dict(
+                {
+                    "account_id": "cash",
+                    "name": "현금",
+                    "account_type": "cash",
+                    "archived": "false",
+                }
+            )
+        with self.assertRaises(DomainValidationError):
+            Transaction.from_dict(
+                {
+                    "transaction_id": "tx-invalid-bool",
+                    "user_ref": "usr_test",
+                    "amount_krw": 1000,
+                    "merchant": None,
+                    "category": "food",
+                    "description": None,
+                    "occurred_at": utc(),
+                    "source": "manual",
+                    "source_reference": None,
+                    "reason": None,
+                    "status": "recorded",
+                    "created_at": utc(),
+                    "exclude_from_budget": "false",
+                }
+            )
+
     def test_rejects_negative_money_fields(self) -> None:
         payload = profile_payload()
         payload["monthly_income_krw"] = -1

@@ -150,6 +150,31 @@ def create_api_blueprint(
     def get_transaction(transaction_id: str) -> Response:
         return _success(service.get_transaction(g.user_ref, transaction_id))
 
+    @api.put("/api/v1/me/transactions/<transaction_id>")
+    @authenticated
+    def update_transaction(transaction_id: str) -> Response:
+        return _mutating(
+            lambda key: service.update_transaction(
+                g.user_ref,
+                transaction_id,
+                _json_body(),
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
+    @api.delete("/api/v1/me/transactions/<transaction_id>")
+    @authenticated
+    def delete_transaction(transaction_id: str) -> Response:
+        return _mutating(
+            lambda key: service.delete_transaction(
+                g.user_ref,
+                transaction_id,
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
     @api.post("/api/v1/me/transactions/<transaction_id>/reason")
     @authenticated
     def add_reason(transaction_id: str) -> Response:

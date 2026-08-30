@@ -2,8 +2,8 @@
 
 ## Current State
 
-- Phase: 6 - production hardening
-- Active task: none - Task 6.8 completed and approved for production release
+- Phase: 7 - household-ledger parity
+- Active task: none - Task 7.0 completed locally; next parity task requires product approval
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -506,6 +506,53 @@ Differentiate the product from a generic AI ledger by learning each user's own d
 - With enough reflections, the coach prioritizes the category with the most regretted transactions and proposes one bounded action for the next seven days.
 - With sparse or no reflections, the UI explicitly asks for feedback or uses existing judgment evidence without presenting it as learned regret behavior.
 - Normal recording remains uninterrupted and 욕쟁이 할머니 모드 remains optional and immediately reversible.
+- Backend tests, Redis integration, frontend tests, lint, TypeScript/build, compile, and responsive browser checks pass.
+
+## Task 7.0 - Core Ledger Parity Foundation (Completed locally)
+
+### Goal
+
+Make the product credible as a standalone Korean household ledger before expanding the AI layer. Match the web-compatible convenience baseline visible in Money Manager, Weple Money Pro, Wallet, Monefy, Toss, and Banksalad while keeping bank sync, SMS parsing, receipt OCR, widgets, and money movement outside this web MVP.
+
+### Scope
+
+- This task is the dedicated authorization to revise `TECHSPEC.md` for transaction kinds, manual accounts, category budgets, transaction maintenance, and deterministic cash-flow summaries.
+- Support expense, income, and transfer entries while applying overspending judgment and regret coaching only to expenses.
+- Add encrypted user-managed accounts/payment sources and require valid source/destination semantics for transfers.
+- Add quick-entry suggestions derived from the user's recent records without sending extra data to AI.
+- Add calendar/list views, transaction search, type/category/account filters, monthly income/expense/net totals, and previous-month comparison.
+- Add deterministic category-budget status and remaining daily allowance.
+- Add transaction editing and deletion with idempotent mutation routes and append-only audit evidence.
+- Add privacy-safe CSV export in the authenticated browser.
+- Preserve existing Redis records by defaulting missing transaction kinds to expense and missing settings collections to empty/default values.
+
+### Explicit Deferrals
+
+- Production bank/MyData sync, SMS notification parsing, receipt OCR, native widgets, family sharing, recurring background jobs, and automated money movement remain separate provider/platform tasks.
+- AI must not calculate balances, totals, budget usage, or cash flow. It may only explain deterministic values and coach expense behavior.
+
+### Ordered Checkpoints
+
+- [x] Benchmark leading domestic and global ledger apps using official store/product evidence and record evidence limits.
+- [x] Map the current product against the benchmark and rank the gaps.
+- [x] Revise `PLAN.md` and `TECHSPEC.md` with the approved ledger-parity contract.
+- [x] Add failing domain, service, repository, API, and frontend regression tests.
+- [x] Implement backward-compatible ledger domain and encrypted persistence changes.
+- [x] Implement faster entry, account/budget controls, maintenance actions, search/filter, and report improvements.
+- [x] Run full backend/frontend verification, browser flow capture, and secret/diff review.
+- [x] Append `progress.txt`, mark this task complete, and create one scoped local commit without pushing or deploying unless explicitly requested.
+
+### Acceptance Criteria
+
+- Users can record expense, income, and transfer entries without a bank connection.
+- Transfers require two different accounts and never inflate income, expense, budget usage, category reports, or AI coaching.
+- Only expenses invoke the judgment pipeline, reason workflow, reflection, and regret metrics.
+- Existing transactions/settings load without migration downtime and behave as expense/default settings records.
+- Users can find a transaction by merchant, memo, or category and narrow by type, category, and account.
+- Calendar and list views show the same filtered source data and monthly totals.
+- Category budgets expose spent, remaining, usage, and a remaining-days daily allowance using deterministic arithmetic.
+- Users can edit or remove their own transaction and the monthly summary refreshes immediately.
+- CSV export contains only the authenticated user's currently visible ledger fields and is generated locally without a third-party sink.
 - Backend tests, Redis integration, frontend tests, lint, TypeScript/build, compile, and responsive browser checks pass.
 
 ## Archived Work

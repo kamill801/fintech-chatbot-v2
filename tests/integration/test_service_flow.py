@@ -528,6 +528,185 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
         transactions = self.service.list_transactions(self.user_ref).data["transactions"]
         self.assertEqual([item["amount_krw"] for item in transactions[:2]], [2000, 1000])
 
+    def test_income_transfer_accounts_and_category_budget_are_ledger_safe(self) -> None:
+        self.upsert_profile()
+        self.service.update_settings(
+            self.user_ref,
+            {
+                "accounts": [
+                    {
+                        "account_id": "cash",
+                        "name": "현금",
+                        "account_type": "cash",
+                        "opening_balance_krw": 0,
+                    },
+                    {
+                        "account_id": "bank",
+                        "name": "생활비 통장",
+                        "account_type": "bank",
+                        "opening_balance_krw": 1000000,
+                    },
+                ],
+                "category_budgets_krw": {"food": 100000},
+            },
+            idempotency_key="settings-ledger",
+            correlation_id=correlation_id(),
+        )
+        judge_calls = len(self.judge.requests)
+        income = self.service.create_transaction(
+            self.user_ref,
+            {
+                "transaction_type": "income",
+                "amount_krw": 3500000,
+                "category": "salary",
+                "account_id": "bank",
+            },
+            idempotency_key="income-1",
+            correlation_id=correlation_id(),
+        )
+        transfer = self.service.create_transaction(
+            self.user_ref,
+            {
+                "transaction_type": "transfer",
+                "amount_krw": 100000,
+                "category": "transfer",
+                "account_id": "bank",
+                "destination_account_id": "cash",
+            },
+            idempotency_key="transfer-1",
+            correlation_id=correlation_id(),
+        )
+        expense = self.service.create_transaction(
+            self.user_ref,
+            {
+                "transaction_type": "expense",
+                "amount_krw": 20000,
+                "category": "food",
+                "account_id": "bank",
+            },
+            idempotency_key="expense-1",
+            correlation_id=correlation_id(),
+        )
+
+        self.assertEqual(income.status, 201)
+        self.assertNotIn("judgment", income.data)
+        self.assertNotIn("judgment", transfer.data)
+        self.assertEqual(len(self.judge.requests), judge_calls + 1)
+        summary = self.service.get_summary(self.user_ref).data["summary"]
+        self.assertEqual(summary["total_income_krw"], 3500000)
+        self.assertEqual(summary["total_spent_krw"], 20000)
+        self.assertEqual(summary["transfer_total_krw"], 100000)
+        self.assertEqual(summary["net_cashflow_krw"], 3480000)
+        self.assertEqual(summary["category_budgets"]["food"]["remaining_krw"], 80000)
+        balances = {
+            item["account_id"]: item["balance_krw"]
+            for item in summary["account_balances"]
+        }
+        self.assertEqual(balances, {"cash": 100000, "bank": 4380000})
+        self.assertEqual(expense.data["transaction"]["transaction_type"], "expense")
+
+    def test_transaction_update_rejudges_and_delete_removes_projection(self) -> None:
+        self.upsert_profile()
+        created = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 12000, "category": "cafe", "merchant": "카페 온도"},
+            idempotency_key="tx-edit-source",
+            correlation_id=correlation_id(),
+        )
+        transaction_id = created.data["transaction"]["transaction_id"]
+        original_judgment_id = created.data["judgment"]["judgment_id"]
+        updated = self.service.update_transaction(
+            self.user_ref,
+            transaction_id,
+            {"amount_krw": 18000, "merchant": "카페 수정"},
+            idempotency_key="tx-edit",
+            correlation_id=correlation_id(),
+        )
+        self.assertEqual(updated.status, 200)
+        self.assertEqual(updated.data["transaction"]["amount_krw"], 18000)
+        self.assertNotEqual(updated.data["judgment"]["judgment_id"], original_judgment_id)
+
+        deleted = self.service.delete_transaction(
+            self.user_ref,
+            transaction_id,
+            idempotency_key="tx-delete",
+            correlation_id=correlation_id(),
+        )
+        self.assertTrue(deleted.data["deleted"])
+        repeated = self.service.delete_transaction(
+            self.user_ref,
+            transaction_id,
+            idempotency_key="tx-delete",
+            correlation_id=correlation_id(),
+        )
+        self.assertEqual(repeated.data, deleted.data)
+        self.assertIsNone(self.repository.get_transaction(self.user_ref, transaction_id))
+        self.assertIsNone(
+            self.repository.get_judgment_for_transaction(self.user_ref, transaction_id)
+        )
+
+    def test_update_quota_failure_does_not_modify_transaction(self) -> None:
+        self.upsert_profile()
+        created = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 12000, "category": "cafe", "merchant": "카페 온도"},
+            idempotency_key="tx-before-limited-edit",
+            correlation_id=correlation_id(),
+        )
+        transaction_id = created.data["transaction"]["transaction_id"]
+        self.service.judgment_quota = FakeQuota([QuotaExceededError("raw quota key")])
+
+        with self.assertRaises(ServiceError) as caught:
+            self.service.update_transaction(
+                self.user_ref,
+                transaction_id,
+                {"amount_krw": 99000},
+                idempotency_key="tx-limited-edit",
+                correlation_id=correlation_id(),
+            )
+
+        self.assertEqual(caught.exception.code, "ai_judgment_quota_exceeded")
+        stored = self.repository.get_transaction(self.user_ref, transaction_id)
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.amount_krw, 12000)
+
+    def test_transaction_boolean_fields_are_strict(self) -> None:
+        self.upsert_profile()
+        with self.assertRaises(ServiceError) as caught:
+            self.service.create_transaction(
+                self.user_ref,
+                {
+                    "amount_krw": 12000,
+                    "category": "cafe",
+                    "exclude_from_budget": "false",
+                },
+                idempotency_key="tx-invalid-boolean",
+                correlation_id=correlation_id(),
+            )
+        self.assertEqual(caught.exception.code, "invalid_request")
+
+    def test_income_cannot_receive_spending_reflection(self) -> None:
+        self.upsert_profile()
+        income = self.service.create_transaction(
+            self.user_ref,
+            {
+                "transaction_type": "income",
+                "amount_krw": 500000,
+                "category": "salary",
+            },
+            idempotency_key="income-reflection",
+            correlation_id=correlation_id(),
+        )
+        with self.assertRaises(ServiceError) as caught:
+            self.service.reflect_transaction(
+                self.user_ref,
+                income.data["transaction"]["transaction_id"],
+                {"reflection": "well_spent"},
+                idempotency_key="income-reflection-invalid",
+                correlation_id=correlation_id(),
+            )
+        self.assertEqual(caught.exception.code, "reflection_not_allowed")
+
     def test_share_requires_roast_enabled(self) -> None:
         self.upsert_profile()
         judged = self.service.create_transaction(

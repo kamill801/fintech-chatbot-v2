@@ -13,6 +13,8 @@ ALLOWED_TRANSACTION_SOURCES = frozenset(
 ALLOWED_TRANSACTION_STATUSES = frozenset(
     {"recorded", "awaiting_reason", "judged", "corrected"}
 )
+ALLOWED_TRANSACTION_TYPES = frozenset({"expense", "income", "transfer"})
+ALLOWED_ACCOUNT_TYPES = frozenset({"cash", "bank", "card", "savings", "other"})
 ALLOWED_JUDGMENT_LABELS = frozenset(
     {"justified", "caution", "overspending", "insufficient_context"}
 )
@@ -151,11 +153,50 @@ class FinancialProfile:
 
 
 @dataclass(frozen=True)
+class LedgerAccount:
+    account_id: str
+    name: str
+    account_type: str
+    opening_balance_krw: int = 0
+    archived: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.account_id or len(self.account_id) > 64:
+            raise DomainValidationError("account_id must be 1 to 64 characters")
+        if not self.name or len(self.name) > 40:
+            raise DomainValidationError("account name must be 1 to 40 characters")
+        if self.account_type not in ALLOWED_ACCOUNT_TYPES:
+            raise DomainValidationError("unsupported account_type")
+        require_non_negative_int(self.opening_balance_krw, "opening_balance_krw")
+        if not isinstance(self.archived, bool):
+            raise DomainValidationError("archived must be boolean")
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> LedgerAccount:
+        return cls(
+            account_id=str(payload["account_id"]),
+            name=str(payload["name"]),
+            account_type=str(payload.get("account_type", "other")),
+            opening_balance_krw=int(payload.get("opening_balance_krw", 0)),
+            archived=payload.get("archived", False),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def default_ledger_accounts() -> list[LedgerAccount]:
+    return [LedgerAccount(account_id="cash", name="현금", account_type="cash")]
+
+
+@dataclass(frozen=True)
 class UserSettings:
     roast_enabled: bool = False
     locale: str = "ko-KR"
     timezone: str = "Asia/Seoul"
     spending_rules: list[str] = field(default_factory=list)
+    accounts: list[LedgerAccount] = field(default_factory=default_ledger_accounts)
+    category_budgets_krw: dict[str, int] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -169,16 +210,38 @@ class UserSettings:
             raise DomainValidationError("spending_rules must contain at most 8 items")
         if any(not rule or len(rule) > 120 for rule in self.spending_rules):
             raise DomainValidationError("each spending rule must be 1 to 120 characters")
+        if not isinstance(self.accounts, list) or not 1 <= len(self.accounts) <= 20:
+            raise DomainValidationError("accounts must contain 1 to 20 items")
+        account_ids = [account.account_id for account in self.accounts]
+        if len(account_ids) != len(set(account_ids)):
+            raise DomainValidationError("account_id values must be unique")
+        if not isinstance(self.category_budgets_krw, dict):
+            raise DomainValidationError("category_budgets_krw must be an object")
+        for category, budget in self.category_budgets_krw.items():
+            if not category or len(category) > 40:
+                raise DomainValidationError("budget category must be 1 to 40 characters")
+            require_positive_int(budget, f"category_budgets_krw.{category}")
         if self.schema_version != SCHEMA_VERSION:
             raise DomainValidationError("unsupported settings schema_version")
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> UserSettings:
+        raw_accounts = payload.get("accounts")
+        accounts = (
+            default_ledger_accounts()
+            if raw_accounts is None
+            else [LedgerAccount.from_dict(item) for item in raw_accounts]
+        )
         return cls(
-            roast_enabled=bool(payload.get("roast_enabled", False)),
+            roast_enabled=payload.get("roast_enabled", False),
             locale=str(payload.get("locale", "ko-KR")),
             timezone=str(payload.get("timezone", "Asia/Seoul")),
             spending_rules=[str(rule) for rule in payload.get("spending_rules", [])],
+            accounts=accounts,
+            category_budgets_krw={
+                str(category): int(budget)
+                for category, budget in dict(payload.get("category_budgets_krw", {})).items()
+            },
             schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
         )
 
@@ -203,6 +266,11 @@ class Transaction:
     reflection: str | None = None
     reflection_note: str | None = None
     reflected_at: str | None = None
+    transaction_type: str = "expense"
+    account_id: str = "cash"
+    destination_account_id: str | None = None
+    exclude_from_budget: bool = False
+    updated_at: str | None = None
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -219,10 +287,29 @@ class Transaction:
             raise DomainValidationError("unsupported transaction source")
         if self.status not in ALLOWED_TRANSACTION_STATUSES:
             raise DomainValidationError("unsupported transaction status")
+        if self.transaction_type not in ALLOWED_TRANSACTION_TYPES:
+            raise DomainValidationError("unsupported transaction_type")
+        if not self.account_id:
+            raise DomainValidationError("account_id is required")
+        if self.transaction_type == "transfer":
+            if not self.destination_account_id:
+                raise DomainValidationError("destination_account_id is required for transfer")
+            if self.destination_account_id == self.account_id:
+                raise DomainValidationError("transfer accounts must be different")
+        elif self.destination_account_id is not None:
+            raise DomainValidationError("destination_account_id is only valid for transfer")
+        if not isinstance(self.exclude_from_budget, bool):
+            raise DomainValidationError("exclude_from_budget must be boolean")
+        if self.transaction_type != "expense" and self.exclude_from_budget:
+            raise DomainValidationError("only expenses can be excluded from budget")
+        if self.transaction_type != "expense" and self.reflection is not None:
+            raise DomainValidationError("only expenses can have a spending reflection")
         if self.reflection is not None and self.reflection not in ALLOWED_SPENDING_REFLECTIONS:
             raise DomainValidationError("unsupported spending reflection")
         if self.reflected_at is not None:
             parse_utc_datetime(self.reflected_at, "reflected_at")
+        if self.updated_at is not None:
+            parse_utc_datetime(self.updated_at, "updated_at")
         if self.schema_version != SCHEMA_VERSION:
             raise DomainValidationError("unsupported transaction schema_version")
 
@@ -244,6 +331,11 @@ class Transaction:
             reflection=payload.get("reflection"),
             reflection_note=payload.get("reflection_note"),
             reflected_at=payload.get("reflected_at"),
+            transaction_type=str(payload.get("transaction_type", "expense")),
+            account_id=str(payload.get("account_id", "cash")),
+            destination_account_id=payload.get("destination_account_id"),
+            exclude_from_budget=payload.get("exclude_from_budget", False),
+            updated_at=payload.get("updated_at"),
             schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
         )
 

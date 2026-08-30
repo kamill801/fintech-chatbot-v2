@@ -181,6 +181,39 @@ class FlaskLedgerE2ETests(unittest.TestCase):
         self.assertIn("headline", summary["weekly_briefing"])
         self.assertIn("improvement", summary["weekly_briefing"])
 
+    def test_income_update_and_delete_routes(self) -> None:
+        self.put_profile()
+        created = self.client.post(
+            "/api/v1/me/transactions",
+            json={
+                "transaction_type": "income",
+                "amount_krw": 100000,
+                "category": "salary",
+            },
+            headers=self.mutate_headers("income-route"),
+        )
+        self.assertEqual(created.status_code, 201)
+        transaction_id = created.get_json()["data"]["transaction"]["transaction_id"]
+        updated = self.client.put(
+            f"/api/v1/me/transactions/{transaction_id}",
+            json={"amount_krw": 120000},
+            headers=self.mutate_headers("income-update-route"),
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(
+            updated.get_json()["data"]["transaction"]["amount_krw"], 120000
+        )
+        deleted = self.client.delete(
+            f"/api/v1/me/transactions/{transaction_id}",
+            headers=self.mutate_headers("income-delete-route"),
+        )
+        self.assertEqual(deleted.status_code, 200)
+        self.assertTrue(deleted.get_json()["data"]["deleted"])
+        missing = self.client.get(
+            f"/api/v1/me/transactions/{transaction_id}", headers=self.headers
+        )
+        self.assertEqual(missing.status_code, 404)
+
     def test_reflection_endpoint_updates_transaction_and_summary(self) -> None:
         transaction_id, _judgment_id = self.create_reason_judgment()
         response = self.client.put(

@@ -123,6 +123,15 @@ export const ledgerApi = {
       idempotencyKey,
     });
   },
+  async updateTransaction(id: string, draft: Partial<TransactionDraft>): Promise<TransactionResult> {
+    return request<TransactionResult>(`/api/v1/me/transactions/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(draft),
+    });
+  },
+  async deleteTransaction(id: string): Promise<void> {
+    await request(`/api/v1/me/transactions/${id}`, { method: "DELETE" });
+  },
   async answerReason(id: string, reason: string): Promise<TransactionResult> {
     return request<TransactionResult>(`/api/v1/me/transactions/${id}/reason`, {
       method: "POST",

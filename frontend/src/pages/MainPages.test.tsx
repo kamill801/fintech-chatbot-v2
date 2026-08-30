@@ -79,10 +79,10 @@ describe("live ledger summaries", () => {
 
     expect(screen.getAllByText("0원").length).toBeGreaterThan(0);
     expect(screen.queryByText("377,500원")).not.toBeInTheDocument();
-    expect(screen.getByText("아직 기록한 지출이 없어요.")).toBeInTheDocument();
+    expect(screen.getByText("이 날짜에 기록한 거래가 없어요.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "검색" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "필터" })).not.toBeInTheDocument();
-    expect(screen.getByRole("grid", { name: "2026년 8월 지출 달력" })).toBeInTheDocument();
+    expect(screen.getByRole("grid", { name: "2026년 8월 거래 달력" })).toBeInTheDocument();
     expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["일", "월", "화", "수", "목", "금", "토"]);
   });
 
@@ -119,8 +119,53 @@ describe("live ledger summaries", () => {
 
     expect(screen.getByRole("heading", { name: "8월 16일 내역" })).toBeInTheDocument();
     expect(screen.getByText("문구점")).toBeInTheDocument();
-    const addLink = screen.getByRole("link", { name: "8월 16일에 지출 추가" });
+    const addLink = screen.getByRole("link", { name: "8월 16일에 거래 추가" });
     expect(addLink).toHaveAttribute("href", "/add?date=2026-08-16");
+  });
+
+  it("searches the list and narrows records by type, category, and account", async () => {
+    const user = userEvent.setup();
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      settings: {
+        roast_enabled: false,
+        locale: "ko-KR",
+        timezone: "Asia/Seoul",
+        accounts: [
+          { account_id: "cash", name: "현금", account_type: "cash", opening_balance_krw: 0, archived: false },
+          { account_id: "salary", name: "급여 통장", account_type: "bank", opening_balance_krw: 0, archived: false },
+        ],
+      },
+      summary: { month: "2026-08", total_spent_krw: 12000, total_income_krw: 3500000, by_category_krw: { cafe: 12000 }, transaction_count: 2 },
+      transactions: [
+        { transaction_id: "tx-cafe", amount_krw: 12000, merchant: "카페 온도", category: "cafe", description: "친구 약속", occurred_at: "2026-08-16T03:00:00Z", source: "manual", source_reference: null, reason: null, status: "judged", created_at: "2026-08-16T03:00:00Z", transaction_type: "expense", account_id: "cash", destination_account_id: null, exclude_from_budget: false },
+        { transaction_id: "tx-salary", amount_krw: 3500000, merchant: "회사", category: "salary", description: "8월 급여", occurred_at: "2026-08-15T03:00:00Z", source: "manual", source_reference: null, reason: null, status: "recorded", created_at: "2026-08-15T03:00:00Z", transaction_type: "income", account_id: "salary", destination_account_id: null, exclude_from_budget: false },
+      ],
+    });
+
+    render(<BrowserRouter><LedgerPage /></BrowserRouter>);
+    await user.click(screen.getByRole("button", { name: "목록" }));
+    expect(screen.getByText("카페 온도")).toBeInTheDocument();
+    expect(screen.getByText("회사")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "거래 유형 필터" }), "income");
+    expect(screen.queryByText("카페 온도")).not.toBeInTheDocument();
+    expect(screen.getByText("회사")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "거래 유형 필터" }), "all");
+    await user.selectOptions(screen.getByRole("combobox", { name: "분류 필터" }), "cafe");
+    expect(screen.getByText("카페 온도")).toBeInTheDocument();
+    expect(screen.queryByText("회사")).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "분류 필터" }), "all");
+    await user.selectOptions(screen.getByRole("combobox", { name: "계좌 필터" }), "salary");
+    expect(screen.queryByText("카페 온도")).not.toBeInTheDocument();
+    expect(screen.getByText("회사")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "계좌 필터" }), "all");
+    await user.type(screen.getByRole("textbox", { name: "거래 검색" }), "친구");
+    expect(screen.getByText("카페 온도")).toBeInTheDocument();
+    expect(screen.queryByText("회사")).not.toBeInTheDocument();
   });
 
   it("shows a judgment-backed weekly AI briefing in normal mode", () => {

@@ -5,7 +5,7 @@
 
 ## 1. Product Goal
 
-Build a Korean AI household-ledger agent that understands a user's financial position, goal, and own definition of a worthwhile purchase; tracks manually entered or read-only imported transactions; judges likely overspending; learns from later spend reflections; and recommends one concrete corrective action. Normal mode keeps recording uninterrupted; the opt-in grandma mode asks for purchase context before judging each expense.
+Build a Korean household ledger that is complete and trustworthy before its AI layer: it records income, expenses, and transfers across user-managed accounts; computes balances, budgets, and reports deterministically; then uses AI to understand a user's financial position, goal, and own definition of a worthwhile expense. AI judges likely overspending, learns from later expense reflections, and recommends one concrete corrective action. Normal mode keeps expense recording uninterrupted; the opt-in grandma mode asks for purchase context before judging each expense.
 
 The primary outcome is fewer regretted purchases and measurable behavior change, not transaction storage alone.
 
@@ -29,7 +29,8 @@ The MVP is successful only when all three product metrics can be measured:
 Backend completion before design requires:
 
 - Financial profile and one goal can be stored and retrieved.
-- Manual transactions work without any account provider.
+- Manual expense, income, and transfer transactions work without any account provider.
+- User-managed accounts, category budgets, transaction maintenance, search, and export work without AI or a financial-data provider.
 - Deterministic signals are computed before every final judgment.
 - Normal mode completes a best-available judgment without a reason question.
 - Roast mode causes exactly one transaction-bound reason question for every expense without a supplied reason.
@@ -48,6 +49,10 @@ Backend completion before design requires:
 - Financial profile: liquid assets, income, fixed expenses, debt payments, discretionary budget.
 - One active financial goal: name, target amount, current amount, target date.
 - Manual transaction entry as a first-class source.
+- Expense, income, and transfer transaction kinds with deterministic cash-flow semantics.
+- Encrypted user-managed cash, bank, card, savings, and other accounts.
+- Per-category monthly budgets, remaining amounts, and remaining-days daily allowance.
+- Transaction search, filtering, update, deletion, and local CSV export.
 - Provider-neutral read-only account adapter port.
 - Synthetic provider adapter for contract tests.
 - Deterministic financial signals.
@@ -98,6 +103,10 @@ Stop and report after the backend and its tests are complete. Do not begin UI/UX
 10. Raw sensitive financial data never enters Sheets, structured logs, metrics, or share payloads.
 11. A reflection updates a current projection but never erases the original transaction, AI judgment, or correction history.
 12. Regret patterns and goal impact are computed only from stored user evidence and deterministic arithmetic; the model cannot invent them.
+13. Ledger arithmetic never depends on a language model. Income, expense, transfer, account balance, budget, and period comparison values are deterministic.
+14. Transfers move value between two different accounts and never count as income, expense, budget usage, category spending, or AI coaching evidence.
+15. Overspending judgment, reason questions, reflections, and regret metrics apply only to expense transactions.
+16. Existing transactions without a `transaction_type` load as `expense`; existing settings without account or category-budget collections load with safe defaults.
 
 ## 5. Architecture
 
@@ -216,13 +225,17 @@ Validation:
 {
   "roast_enabled": false,
   "spending_rules": ["배달은 주 2회까지", "친구와의 만남은 우선순위가 높음"],
+  "accounts": [
+    {"account_id": "cash", "name": "현금", "account_type": "cash", "opening_balance_krw": 0, "archived": false}
+  ],
+  "category_budgets_krw": {"food": 300000, "cafe": 80000},
   "locale": "ko-KR",
   "timezone": "Asia/Seoul",
   "schema_version": 1
 }
 ```
 
-`spending_rules` contains at most eight sanitized strings of at most 120 characters each. Existing settings without this field load as an empty list.
+`spending_rules` contains at most eight sanitized strings of at most 120 characters each. `accounts` contains at most twenty encrypted user-managed accounts with a unique identifier, name, supported account type, non-negative opening balance, and archive flag. `category_budgets_krw` contains supported expense categories with positive integer monthly KRW limits. Existing settings without these fields load with an empty rule list, one zero-balance cash account, and no category budgets.
 
 ### 6.3 Transaction
 
@@ -231,6 +244,10 @@ Validation:
   "transaction_id": "uuid",
   "user_ref": "pseudonymous-id",
   "amount_krw": 120000,
+  "transaction_type": "expense",
+  "account_id": "cash",
+  "destination_account_id": null,
+  "exclude_from_budget": false,
   "merchant": "encrypted raw merchant or null",
   "category": "shopping",
   "description": "encrypted optional text",
@@ -248,6 +265,8 @@ Validation:
 ```
 
 Allowed source values: manual, synthetic, provider_readonly, legacy.
+
+Allowed transaction types: expense, income, transfer. Expense and income require one source `account_id`. Transfer additionally requires a different `destination_account_id`. `exclude_from_budget` may exclude an expense from budget usage while preserving it in total expense and cash-flow reports.
 
 Allowed status values: recorded, awaiting_reason, judged, corrected.
 
@@ -557,6 +576,8 @@ Routes:
 - GET /api/v1/me/transactions
 - POST /api/v1/me/transactions
 - GET /api/v1/me/transactions/{transaction_id}
+- PUT /api/v1/me/transactions/{transaction_id}
+- DELETE /api/v1/me/transactions/{transaction_id}
 - PUT /api/v1/me/transactions/{transaction_id}/reflection
 - POST /api/v1/me/transactions/{transaction_id}/reason
 - POST /api/v1/me/judgments/{judgment_id}/corrections
@@ -567,11 +588,13 @@ Routes:
 - POST /api/v1/me/accounts/{connection_id}/revoke
 - DELETE /api/v1/me/data
 
-Transaction creation returns:
+Expense transaction creation returns:
 
 - 201 with judgment when no reason is needed.
 - 202 with pending_question when a reason is required.
 - 409 profile_required when onboarding is incomplete.
+
+Income and transfer creation return 201 with the stored transaction and no judgment, pending question, quota consumption, or AI call. Transaction update and deletion are idempotent and owner-scoped. Editing an expense amount, category, merchant, date, or budget inclusion invalidates the current judgment for display and recomputes it through the same bounded pipeline; income and transfers never enter that pipeline.
 
 ### 11.1 Regret-aware summary contract
 
@@ -793,3 +816,5 @@ References:
 | 2026-08-04 | Web auth | Supabase Auth JWT with asymmetric JWKS verification; verified `sub` only |
 | 2026-08-04 | Deployment | Vercel frontend, Render Flask web service, Upstash TLS Redis |
 | 2026-08-04 | Free-tier worker | RQ remains Kakao-only and is not deployed on the free web MVP |
+| 2026-08-30 | Ledger-first parity | Complete deterministic manual-ledger fundamentals before expanding AI features |
+| 2026-08-30 | Transaction semantics | Expense, income, and transfer are explicit; AI and regret coaching remain expense-only |

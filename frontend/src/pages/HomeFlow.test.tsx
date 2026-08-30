@@ -50,9 +50,9 @@ describe("manual transaction drafts", () => {
       });
 
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
-    await user.click(screen.getByRole("button", { name: "지출 기록하기" }));
+    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
     await screen.findByRole("alert");
-    await user.click(screen.getByRole("button", { name: "지출 기록하기" }));
+    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
 
     await waitFor(() => expect(mocks.createTransaction).toHaveBeenCalledTimes(2));
     expect(mocks.createTransaction.mock.calls[0][1]).toBe("manual-op-1");
@@ -60,14 +60,17 @@ describe("manual transaction drafts", () => {
     expect(window.localStorage.getItem(manualDraftKey("user-a"))).toBeNull();
   });
 
-  it("shows a fixed expense type and an accessible native date field", () => {
+  it("supports each ledger transaction type and an accessible native date field", async () => {
+    const user = userEvent.setup();
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
 
-    const typeSummary = screen.getAllByLabelText("거래 유형: 지출").at(-1);
-    expect(typeSummary).toBeInTheDocument();
-    expect(within(typeSummary!).getByText("거래 유형")).toBeInTheDocument();
-    expect(within(typeSummary!).getByText("지출")).toBeInTheDocument();
-    expect(within(typeSummary!).queryByRole("button")).not.toBeInTheDocument();
+    const typeControl = screen.getByRole("group", { name: "거래 유형" });
+    expect(within(typeControl).getByRole("button", { name: "지출" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(typeControl).getByRole("button", { name: "수입" })).toBeInTheDocument();
+    expect(within(typeControl).getByRole("button", { name: "이체" })).toBeInTheDocument();
+    await user.click(within(typeControl).getByRole("button", { name: "수입" }));
+    expect(screen.getByRole("heading", { name: "얼마 들어왔어?" })).toBeInTheDocument();
+    expect(screen.queryByText("이번 달 예산에서 제외")).not.toBeInTheDocument();
 
     const dateInput = screen.getAllByLabelText("날짜").at(-1)!;
     expect(dateInput).toHaveAttribute("type", "date");
@@ -89,7 +92,7 @@ describe("manual transaction drafts", () => {
     });
 
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
-    await user.click(screen.getByRole("button", { name: "지출 기록하기" }));
+    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/ledger"));
     expect(screen.queryByText("정보가 부족하면 이유를 한 번 물어봐요")).not.toBeInTheDocument();
@@ -119,6 +122,38 @@ describe("manual transaction drafts", () => {
 
     await waitFor(() => expect(window.location.pathname).toBe("/transactions/tx-roast/reason"));
     expect(screen.getByText("욕쟁이 할머니가 지출 이유를 한 번 확인해요")).toBeInTheDocument();
+  });
+
+  it("records income without opening the expense reason flow", async () => {
+    const user = userEvent.setup();
+    mocks.useLedger.mockReturnValue({
+      createTransaction: mocks.createTransaction,
+      demo: false,
+      settings: { roast_enabled: true, locale: "ko-KR", timezone: "Asia/Seoul" },
+      transactions: [],
+    });
+    window.localStorage.setItem(
+      manualDraftKey("user-a"),
+      JSON.stringify({
+        draft: { amount_krw: 3500000, category: "other", merchant: "회사" },
+        operationId: "income-op",
+      }),
+    );
+    mocks.createTransaction.mockResolvedValue({
+      transaction: { transaction_id: "tx-income", transaction_type: "income" },
+    });
+
+    render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
+    await user.click(screen.getByRole("button", { name: "수입" }));
+    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/ledger"));
+    expect(mocks.createTransaction).toHaveBeenCalledWith(expect.objectContaining({
+      amount_krw: 3500000,
+      transaction_type: "income",
+      category: "salary",
+      account_id: "cash",
+    }), "income-op");
   });
 
   it("prefills the date selected from the ledger calendar", () => {

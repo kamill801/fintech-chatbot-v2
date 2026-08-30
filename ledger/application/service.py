@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from calendar import monthrange
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from math import ceil
@@ -19,6 +20,7 @@ from ledger.domain.models import (
     FinancialGoal,
     FinancialProfile,
     JudgmentResult,
+    LedgerAccount,
     PendingQuestion,
     Transaction,
     UserSettings,
@@ -155,6 +157,10 @@ class LedgerService:
             spending_rules=_spending_rules(
                 payload.get("spending_rules", current.spending_rules)
             ),
+            accounts=_ledger_accounts(payload.get("accounts", current.accounts)),
+            category_budgets_krw=_category_budgets(
+                payload.get("category_budgets_krw", current.category_budgets_krw)
+            ),
         )
         stored = self.repository.update_settings(
             user_ref,
@@ -217,9 +223,11 @@ class LedgerService:
                 409,
             )
         settings = self.repository.get_settings(user_ref)
+        transaction_type = _transaction_type(payload.get("transaction_type"))
         active_pending = self.repository.get_pending_question(user_ref)
         if (
-            settings.roast_enabled
+            transaction_type == "expense"
+            and settings.roast_enabled
             and active_pending is not None
             and active_pending.answered_at is None
         ):
@@ -238,15 +246,27 @@ class LedgerService:
             description=_optional_text(payload.get("description"), max_length=500),
             reason=_optional_text(payload.get("reason"), max_length=500),
             idempotency_key=idempotency_key,
+            transaction_type=transaction_type,
+            account_id=_account_id(payload.get("account_id"), default="cash"),
+            destination_account_id=_account_id(
+                payload.get("destination_account_id"), default=None
+            ),
+            exclude_from_budget=_boolean(
+                payload.get("exclude_from_budget", False), "exclude_from_budget"
+            ),
         )
         transaction = self.manual_source.create_record(draft)
+        _validate_transaction_accounts(settings, transaction)
         transaction_record_key = _key("transaction-record", idempotency_key)
         recorded = self.repository.get_cached_result(user_ref, transaction_record_key)
         quota_prechecked = False
-        requires_interactive_reason = settings.roast_enabled and not transaction.reason
+        requires_interactive_reason = (
+            transaction.transaction_type == "expense"
+            and settings.roast_enabled
+            and not transaction.reason
+        )
         if recorded is None:
-            signals = self._compute_signals(profile, transaction)
-            if not requires_interactive_reason:
+            if transaction.transaction_type == "expense" and not requires_interactive_reason:
                 self._consume_judgment_quota(user_ref)
                 quota_prechecked = True
             recorded = self.repository.record_transaction(
@@ -256,6 +276,9 @@ class LedgerService:
                 source=source,
             )
         transaction = Transaction.from_dict(recorded.body["transaction"])
+        if transaction.transaction_type != "expense":
+            result = ServiceResult(201, {"transaction": transaction.to_dict()})
+            return self._cache_service_result(user_ref, response_key, result)
         existing = self._existing_transaction_result(user_ref, transaction)
         if existing:
             return self._cache_service_result(user_ref, response_key, existing)
@@ -304,6 +327,171 @@ class LedgerService:
             quota_prechecked=quota_prechecked,
         )
         return self._cache_service_result(user_ref, response_key, result)
+
+    def update_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> ServiceResult:
+        response_key = _key(f"transaction-update-response:{transaction_id}", idempotency_key)
+        cached = self.repository.get_cached_result(user_ref, response_key)
+        if cached:
+            return ServiceResult(cached.status, cached.body)
+        existing = self._require_transaction(user_ref, transaction_id)
+        settings = self.repository.get_settings(user_ref)
+        profile = self.repository.get_profile(user_ref)
+        transaction_type = _transaction_type(
+            payload.get("transaction_type", existing.transaction_type)
+        )
+        updated = Transaction(
+            transaction_id=existing.transaction_id,
+            user_ref=user_ref,
+            amount_krw=_integer(payload, "amount_krw")
+            if "amount_krw" in payload
+            else existing.amount_krw,
+            category=_normalized_category(payload.get("category", existing.category)),
+            occurred_at=str(payload.get("occurred_at", existing.occurred_at)),
+            source=existing.source,
+            source_reference=existing.source_reference,
+            merchant=_optional_text(
+                payload.get("merchant", existing.merchant), max_length=120
+            ),
+            description=_optional_text(
+                payload.get("description", existing.description), max_length=500
+            ),
+            reason=(
+                _optional_text(payload.get("reason", existing.reason), max_length=500)
+                if transaction_type == "expense"
+                else None
+            ),
+            status="recorded",
+            created_at=existing.created_at,
+            reflection=existing.reflection if transaction_type == "expense" else None,
+            reflection_note=(
+                existing.reflection_note if transaction_type == "expense" else None
+            ),
+            reflected_at=existing.reflected_at if transaction_type == "expense" else None,
+            transaction_type=transaction_type,
+            account_id=_account_id(
+                payload.get("account_id", existing.account_id), default="cash"
+            ),
+            destination_account_id=(
+                _account_id(
+                    payload.get(
+                        "destination_account_id", existing.destination_account_id
+                    ),
+                    default=None,
+                )
+                if transaction_type == "transfer"
+                else None
+            ),
+            exclude_from_budget=(
+                _boolean(
+                    payload.get("exclude_from_budget", existing.exclude_from_budget),
+                    "exclude_from_budget",
+                )
+                if transaction_type == "expense"
+                else False
+            ),
+            updated_at=utc_now_iso(),
+        )
+        _validate_transaction_accounts(settings, updated)
+        requires_interactive_reason = (
+            transaction_type == "expense"
+            and settings.roast_enabled
+            and not updated.reason
+        )
+        quota_prechecked = False
+        if transaction_type == "expense":
+            if profile is None:
+                raise ServiceError("profile_required", "financial profile is missing", 409)
+            if not requires_interactive_reason:
+                self._consume_judgment_quota(user_ref)
+                quota_prechecked = True
+        stored = self.repository.update_transaction(
+            updated,
+            idempotency_key=_key(f"transaction-update:{transaction_id}", idempotency_key),
+            correlation_id=correlation_id,
+            source=source,
+        )
+        updated = Transaction.from_dict(stored.body["transaction"])
+        if transaction_type != "expense":
+            return self._cache_service_result(
+                user_ref,
+                response_key,
+                ServiceResult(200, {"transaction": updated.to_dict()}),
+            )
+        signals = self._compute_signals(profile, updated)
+        if requires_interactive_reason:
+            question = PendingQuestion(
+                question_id=str(uuid4()),
+                transaction_id=updated.transaction_id,
+                question="고친 지출도 이유는 남겨야지. 왜 썼는지 말해봐.",
+                asked_at=utc_now_iso(),
+            )
+            pending = self.repository.save_pending_question(
+                user_ref,
+                question,
+                idempotency_key=_key(f"transaction-update-question:{transaction_id}", idempotency_key),
+                correlation_id=correlation_id,
+                source=source,
+            )
+            return self._cache_service_result(
+                user_ref,
+                response_key,
+                ServiceResult(
+                    202,
+                    {
+                        "transaction": self.repository.get_transaction(
+                            user_ref, transaction_id
+                        ).to_dict(),
+                        "signals": signals.to_dict(),
+                        **pending.body,
+                    },
+                ),
+            )
+        judged = self._complete_judgment(
+            user_ref,
+            updated,
+            signals,
+            idempotency_key=_key(f"transaction-update-judgment:{transaction_id}", idempotency_key),
+            correlation_id=correlation_id,
+            source=source,
+            quota_prechecked=quota_prechecked,
+        )
+        return self._cache_service_result(
+            user_ref, response_key, ServiceResult(200, judged.data)
+        )
+
+    def delete_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> ServiceResult:
+        operation_key = _key(
+            f"transaction-delete:{transaction_id}", idempotency_key
+        )
+        cached = self.repository.get_cached_result(user_ref, operation_key)
+        if cached:
+            return ServiceResult(cached.status, cached.body)
+        self._require_transaction(user_ref, transaction_id)
+        stored = self.repository.delete_transaction(
+            user_ref,
+            transaction_id,
+            idempotency_key=operation_key,
+            correlation_id=correlation_id,
+            source=source,
+        )
+        return ServiceResult(stored.status, stored.body)
 
     def add_reason(
         self,
@@ -410,7 +598,13 @@ class LedgerService:
         correlation_id: str,
         source: str = "api",
     ) -> ServiceResult:
-        self._require_transaction(user_ref, transaction_id)
+        transaction = self._require_transaction(user_ref, transaction_id)
+        if transaction.transaction_type != "expense":
+            raise ServiceError(
+                "reflection_not_allowed",
+                "only expense transactions can have a spending reflection",
+                409,
+            )
         reflection = str(payload.get("reflection") or "")
         if reflection not in ALLOWED_SPENDING_REFLECTIONS:
             raise ServiceError(
@@ -539,25 +733,84 @@ class LedgerService:
                 now,
             )
         ]
+        previous_month_anchor = (now.replace(day=1) - timedelta(days=1))
+        previous = [
+            transaction
+            for transaction in transactions
+            if _same_month(
+                parse_utc_datetime(transaction.occurred_at, "occurred_at").astimezone(timezone),
+                previous_month_anchor,
+            )
+        ]
+        current_expenses = [
+            item for item in current if item.transaction_type == "expense"
+        ]
+        current_income = [item for item in current if item.transaction_type == "income"]
+        current_transfers = [
+            item for item in current if item.transaction_type == "transfer"
+        ]
+        budget_expenses = [
+            item for item in current_expenses if not item.exclude_from_budget
+        ]
+        previous_expenses = [
+            item for item in previous if item.transaction_type == "expense"
+        ]
         by_category: dict[str, int] = {}
-        for transaction in current:
+        for transaction in current_expenses:
             by_category[transaction.category] = (
                 by_category.get(transaction.category, 0) + transaction.amount_krw
             )
-        total = sum(transaction.amount_krw for transaction in current)
+        total = sum(transaction.amount_krw for transaction in current_expenses)
+        budget_spent = sum(transaction.amount_krw for transaction in budget_expenses)
+        income_total = sum(transaction.amount_krw for transaction in current_income)
+        transfer_total = sum(transaction.amount_krw for transaction in current_transfers)
+        previous_total = sum(transaction.amount_krw for transaction in previous_expenses)
+        days_remaining = monthrange(now.year, now.month)[1] - now.day + 1
+        category_budgets = {
+            category: {
+                "budget_krw": budget,
+                "spent_krw": sum(
+                    item.amount_krw
+                    for item in budget_expenses
+                    if item.category == category
+                ),
+            }
+            for category, budget in settings.category_budgets_krw.items()
+        }
+        for values in category_budgets.values():
+            values["remaining_krw"] = max(0, values["budget_krw"] - values["spent_krw"])
+            values["usage"] = round(values["spent_krw"] / values["budget_krw"], 4)
+            values["daily_allowance_krw"] = values["remaining_krw"] // max(1, days_remaining)
         summary: dict[str, Any] = {
             "month": now.strftime("%Y-%m"),
             "total_spent_krw": total,
+            "budget_spent_krw": budget_spent,
+            "total_income_krw": income_total,
+            "net_cashflow_krw": income_total - total,
+            "transfer_total_krw": transfer_total,
             "by_category_krw": by_category,
             "transaction_count": len(current),
+            "expense_count": len(current_expenses),
+            "income_count": len(current_income),
+            "transfer_count": len(current_transfers),
+            "previous_month": {
+                "month": previous_month_anchor.strftime("%Y-%m"),
+                "total_spent_krw": previous_total,
+                "change_krw": total - previous_total,
+                "change_rate": round((total - previous_total) / previous_total, 4)
+                if previous_total
+                else None,
+            },
+            "category_budgets": category_budgets,
+            "account_balances": _account_balances(settings.accounts, transactions),
             "reflection_summary": self._reflection_summary(
-                current,
+                current_expenses,
                 profile,
                 as_of=now.date(),
             ),
             "weekly_briefing": self._weekly_briefing(
                 user_ref,
-                transactions,
+                [item for item in transactions if item.transaction_type == "expense"],
                 now=now,
                 timezone=timezone,
                 profile=profile,
@@ -568,7 +821,7 @@ class LedgerService:
                 {
                     "discretionary_budget_krw": profile.discretionary_budget_krw,
                     "budget_usage": round(
-                        total / profile.discretionary_budget_krw, 4
+                        budget_spent / profile.discretionary_budget_krw, 4
                     ),
                     "goal": profile.goal.to_dict(),
                 }
@@ -964,7 +1217,9 @@ class LedgerService:
         reflected = [
             item
             for item in self.repository.list_transactions(user_ref)
-            if item.category == category and item.reflection is not None
+            if item.transaction_type == "expense"
+            and item.category == category
+            and item.reflection is not None
         ]
         if not reflected:
             return {}
@@ -981,7 +1236,8 @@ class LedgerService:
         prior = [
             item
             for item in self.repository.list_transactions(profile.user_ref)
-            if item.transaction_id != transaction.transaction_id
+            if item.transaction_type == "expense"
+            and item.transaction_id != transaction.transaction_id
         ]
         occurred = parse_utc_datetime(transaction.occurred_at, "occurred_at")
         monthly_spend = sum(
@@ -1136,6 +1392,12 @@ def _integer(payload: dict[str, Any], field_name: str) -> int:
     return value
 
 
+def _boolean(value: Any, field_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ServiceError("invalid_request", f"{field_name} must be a boolean", 400)
+    return value
+
+
 def _optional_text(value: Any, *, max_length: int) -> str | None:
     if value is None:
         return None
@@ -1161,6 +1423,97 @@ def _spending_rules(value: Any) -> list[str]:
         if rule and rule not in rules:
             rules.append(rule)
     return rules
+
+
+def _ledger_accounts(value: Any) -> list[LedgerAccount]:
+    if not isinstance(value, list):
+        raise ServiceError("invalid_request", "accounts must be a list", 400)
+    accounts: list[LedgerAccount] = []
+    for item in value:
+        if isinstance(item, LedgerAccount):
+            accounts.append(item)
+        elif isinstance(item, dict):
+            accounts.append(LedgerAccount.from_dict(item))
+        else:
+            raise ServiceError(
+                "invalid_request", "accounts must contain objects", 400
+            )
+    return accounts
+
+
+def _category_budgets(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict):
+        raise ServiceError(
+            "invalid_request", "category_budgets_krw must be an object", 400
+        )
+    budgets: dict[str, int] = {}
+    for raw_category, raw_budget in value.items():
+        category = _normalized_category(raw_category)
+        if not isinstance(raw_budget, int) or isinstance(raw_budget, bool):
+            raise ServiceError(
+                "invalid_request", "category budget must be an integer", 400
+            )
+        budgets[category] = raw_budget
+    return budgets
+
+
+def _transaction_type(value: Any) -> str:
+    transaction_type = str(value or "expense").strip().lower()
+    if transaction_type not in {"expense", "income", "transfer"}:
+        raise ServiceError("invalid_request", "unsupported transaction_type", 400)
+    return transaction_type
+
+
+def _account_id(value: Any, *, default: str | None) -> str | None:
+    if value is None or value == "":
+        return default
+    if not isinstance(value, str):
+        raise ServiceError("invalid_request", "account_id must be a string", 400)
+    account_id = value.strip()
+    if not account_id or len(account_id) > 64:
+        raise ServiceError(
+            "invalid_request", "account_id must be 1 to 64 characters", 400
+        )
+    return account_id
+
+
+def _validate_transaction_accounts(
+    settings: UserSettings, transaction: Transaction
+) -> None:
+    known_ids = {account.account_id for account in settings.accounts if not account.archived}
+    if transaction.account_id not in known_ids:
+        raise ServiceError("invalid_account", "source account was not found", 400)
+    if (
+        transaction.destination_account_id is not None
+        and transaction.destination_account_id not in known_ids
+    ):
+        raise ServiceError("invalid_account", "destination account was not found", 400)
+
+
+def _account_balances(
+    accounts: list[LedgerAccount], transactions: list[Transaction]
+) -> list[dict[str, Any]]:
+    balances = {
+        account.account_id: account.opening_balance_krw for account in accounts
+    }
+    for transaction in transactions:
+        if transaction.account_id not in balances:
+            continue
+        if transaction.transaction_type == "income":
+            balances[transaction.account_id] += transaction.amount_krw
+        elif transaction.transaction_type == "expense":
+            balances[transaction.account_id] -= transaction.amount_krw
+        elif transaction.transaction_type == "transfer":
+            balances[transaction.account_id] -= transaction.amount_krw
+            if transaction.destination_account_id in balances:
+                balances[transaction.destination_account_id] += transaction.amount_krw
+    return [
+        {
+            **account.to_dict(),
+            "balance_krw": balances[account.account_id],
+        }
+        for account in accounts
+    ]
 
 
 def _normalized_category(value: Any) -> str:

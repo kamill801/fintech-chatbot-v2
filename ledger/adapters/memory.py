@@ -19,8 +19,10 @@ from ledger.domain.events import (
     EVENT_SHARE_SUCCEEDED,
     EVENT_SHARE_VIEWED,
     EVENT_TRANSACTION_REASON_ADDED,
+    EVENT_TRANSACTION_DELETED,
     EVENT_TRANSACTION_REFLECTED,
     EVENT_TRANSACTION_RECORDED,
+    EVENT_TRANSACTION_UPDATED,
     EventEnvelope,
 )
 from ledger.domain.models import (
@@ -160,6 +162,44 @@ class InMemoryLedgerRepository(LedgerRepository):
             key=lambda item: (store.transaction_order[item], item),
         )
         return [Transaction.from_dict(self._privacy.decrypt_json(store.transactions[i])) for i in ids]
+
+    def update_transaction(
+        self,
+        transaction: Transaction,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            transaction.user_ref,
+            idempotency_key,
+            lambda store: self._update_transaction(
+                store, transaction, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def delete_transaction(
+        self,
+        user_ref: str,
+        transaction_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            user_ref,
+            idempotency_key,
+            lambda store: self._delete_transaction(
+                store,
+                user_ref,
+                transaction_id,
+                idempotency_key,
+                correlation_id,
+                source,
+            ),
+        )
 
     def save_pending_question(
         self,
@@ -534,6 +574,79 @@ class InMemoryLedgerRepository(LedgerRepository):
         store.transaction_order[transaction.transaction_id] = transaction.occurred_at
         store.metrics["transactions_recorded"] += 1
         return StoredResult(201, {"transaction": payload})
+
+    def _update_transaction(
+        self,
+        store: _UserStore,
+        transaction: Transaction,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+    ) -> StoredResult:
+        if transaction.transaction_id not in store.transactions:
+            raise DomainValidationError("transaction not found")
+        payload = transaction.to_dict()
+        self._append_event(
+            store,
+            transaction.user_ref,
+            EVENT_TRANSACTION_UPDATED,
+            payload,
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+            source=source,
+            redacted_metadata={"transaction_type": transaction.transaction_type},
+        )
+        self._remove_transaction_judgments(store, transaction.transaction_id)
+        pending = self.get_pending_question(transaction.user_ref)
+        if pending and pending.transaction_id == transaction.transaction_id:
+            store.pending_question = None
+        store.transactions[transaction.transaction_id] = self._privacy.encrypt_json(payload)
+        store.transaction_order[transaction.transaction_id] = transaction.occurred_at
+        return StoredResult(200, {"transaction": payload})
+
+    def _delete_transaction(
+        self,
+        store: _UserStore,
+        user_ref: str,
+        transaction_id: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+    ) -> StoredResult:
+        if transaction_id not in store.transactions:
+            raise DomainValidationError("transaction not found")
+        payload = {"transaction_id": transaction_id, "deleted_at": utc_now_iso()}
+        self._append_event(
+            store,
+            user_ref,
+            EVENT_TRANSACTION_DELETED,
+            payload,
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+            source=source,
+        )
+        self._remove_transaction_judgments(store, transaction_id)
+        pending = self.get_pending_question(user_ref)
+        if pending and pending.transaction_id == transaction_id:
+            store.pending_question = None
+        store.transactions.pop(transaction_id, None)
+        store.transaction_order.pop(transaction_id, None)
+        return StoredResult(200, {"transaction_id": transaction_id, "deleted": True})
+
+    def _remove_transaction_judgments(
+        self, store: _UserStore, transaction_id: str
+    ) -> None:
+        judgment_ids = [
+            judgment_id
+            for judgment_id, encrypted in store.judgments.items()
+            if JudgmentResult.from_dict(
+                self._privacy.decrypt_json(encrypted)
+            ).transaction_id
+            == transaction_id
+        ]
+        for judgment_id in judgment_ids:
+            store.judgments.pop(judgment_id, None)
+            store.corrections.pop(judgment_id, None)
 
     def _save_pending_question(
         self,
