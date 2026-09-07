@@ -1,4 +1,4 @@
-import { LockKey } from "@phosphor-icons/react";
+import { ChatCircleDots, LockKey } from "@phosphor-icons/react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../auth-context";
 import { BookkeeperMark, Highlight, PrimaryButton, Surface } from "../components";
@@ -6,12 +6,13 @@ import { BookkeeperMark, Highlight, PrimaryButton, Surface } from "../components
 type AuthMode = "login" | "signup";
 
 export function LoginPage() {
-  const { configured, error, signIn, signUp } = useAuth();
+  const { configured, error, signIn, signInWithKakao, signUp } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [kakaoSubmitting, setKakaoSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmationRequired, setConfirmationRequired] = useState(false);
 
@@ -47,13 +48,27 @@ export function LoginPage() {
     }
   }
 
+  async function startKakaoLogin() {
+    if (!configured || kakaoSubmitting) return;
+    setFormError(null);
+    setConfirmationRequired(false);
+    setKakaoSubmitting(true);
+    try {
+      await signInWithKakao();
+    } catch {
+      // The shared auth error remains visible and email login stays available.
+    } finally {
+      setKakaoSubmitting(false);
+    }
+  }
+
   return (
     <main className="auth-page">
       <section className="auth-hero">
         <div>
           <span className="auth-kicker">AI 가계부 에이전트</span>
-          <h1>쓴 돈은 기록하고,<br /><Highlight>다음 소비</Highlight>는 더 나아지게.</h1>
-          <p>지출을 남기면 예산과 목표를 함께 보고, 과소비라고 단정하기 전에 이유부터 확인해요.</p>
+          <h1>쓴 돈은 기록하고,<br /><Highlight>후회할 소비</Highlight>는 줄이게.</h1>
+          <p>예산과 목표, 내가 남긴 소비 평가를 함께 보고 다음 주에 바꿀 행동 하나를 알려드려요.</p>
         </div>
         <BookkeeperMark />
       </section>
@@ -61,9 +76,19 @@ export function LoginPage() {
       <Surface className="auth-card">
         <span className="auth-icon"><LockKey size={28} /></span>
         <div>
-          <h2>{mode === "login" ? "로그인" : "회원가입"}</h2>
-          <p>{mode === "login" ? "이메일과 비밀번호로 바로 시작해요." : "내 장부를 안전하게 보관할 계정을 만들어요."}</p>
+          <h2>내 장부 시작하기</h2>
+          <p>카카오로 빠르게 시작하거나 이메일 계정을 사용할 수 있어요.</p>
         </div>
+        <button
+          className="kakao-login-button"
+          type="button"
+          disabled={!configured || kakaoSubmitting || submitting}
+          onClick={() => void startKakaoLogin()}
+        >
+          <ChatCircleDots aria-hidden="true" size={23} weight="fill" />
+          <span>{kakaoSubmitting ? "카카오 연결 중" : "카카오로 시작하기"}</span>
+        </button>
+        <div className="auth-divider"><span>또는 이메일로 계속</span></div>
         <div className="auth-mode-switch" role="tablist" aria-label="인증 방식">
           <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => changeMode("login")}>로그인</button>
           <button type="button" role="tab" aria-selected={mode === "signup"} onClick={() => changeMode("signup")}>회원가입</button>
@@ -118,7 +143,7 @@ export function LoginPage() {
         )}
       </Surface>
 
-      <p className="auth-privacy"><LockKey size={17} /> 로그인 토큰은 장부 서버에서 검증하며 이메일은 금융 기록에 저장하지 않아요.</p>
+      <p className="auth-privacy"><LockKey size={17} /> 로그인 정보와 금융 기록은 분리하고, 장부 소유권은 인증된 사용자 ID로만 확인해요.</p>
       <a className="auth-demo-link" href="/?demo=1">계정 없이 데모 보기</a>
     </main>
   );

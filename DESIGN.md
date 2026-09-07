@@ -6,6 +6,7 @@
 - Last refreshed: 2026-08-05
 - Product name: undecided; screen copy uses `내 장부` as a neutral working label
 - Primary product surfaces: mobile app first, responsive web second, Kakao transport retained as a thin secondary surface
+- Primary authentication: Kakao Login first, email/password fallback retained
 - Product contract: `TECHSPEC.md`
 - Execution queue: `PLAN.md`
 - Evidence reviewed:
@@ -55,6 +56,8 @@ The home screen must answer four questions in this order:
 - Replaceable money: KRW inputs must allow a temporarily empty field and whole-value replacement; state validation happens on commit, not on every deleted digit.
 - Live-data integrity: zero is valid financial data. Demo amounts and dates can appear only in explicit demo mode.
 - One mark, one symbol: the bookkeeper avatar uses one icon with a separately laid-out label; layered icons and stamps are not an implementation target.
+- Korea-first sign-in: use one prominent `카카오로 시작하기` action, then a visually secondary email login/signup fallback. Do not force Kakao email consent.
+- Identity separation: nickname and profile image personalize the shell only. Missing or changed Kakao metadata must never change ledger ownership, which remains bound to the verified Supabase user ID.
 
 ## Brand
 

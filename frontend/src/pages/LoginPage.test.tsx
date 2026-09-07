@@ -5,6 +5,7 @@ import { LoginPage } from "./LoginPage";
 
 const auth = vi.hoisted(() => ({
   signIn: vi.fn(),
+  signInWithKakao: vi.fn(),
   signUp: vi.fn(),
 }));
 
@@ -13,6 +14,7 @@ vi.mock("../auth-context", () => ({
     configured: true,
     error: null,
     signIn: auth.signIn,
+    signInWithKakao: auth.signInWithKakao,
     signUp: auth.signUp,
   }),
 }));
@@ -22,8 +24,20 @@ describe("LoginPage", () => {
 
   beforeEach(() => {
     auth.signIn.mockReset();
+    auth.signInWithKakao.mockReset().mockResolvedValue(undefined);
     auth.signUp.mockReset();
     auth.signUp.mockResolvedValue(true);
+  });
+
+  it("starts Kakao login from the primary action", async () => {
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await user.click(screen.getByRole("button", { name: "카카오로 시작하기" }));
+
+    expect(auth.signInWithKakao).toHaveBeenCalledTimes(1);
+    expect(auth.signIn).not.toHaveBeenCalled();
+    expect(auth.signUp).not.toHaveBeenCalled();
   });
 
   it("logs in with an email and password instead of sending a magic link", async () => {
@@ -42,8 +56,8 @@ describe("LoginPage", () => {
   it("leads with the next-spend benefit instead of an abstract judgment slogan", () => {
     render(<LoginPage />);
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("쓴 돈은 기록하고,다음 소비는 더 나아지게.");
-    expect(screen.getByText(/과소비라고 단정하기 전에 이유부터 확인해요/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("쓴 돈은 기록하고,후회할 소비는 줄이게.");
+    expect(screen.getByText(/다음 주에 바꿀 행동 하나/)).toBeInTheDocument();
     expect(screen.queryByText(/판단을 같이/)).not.toBeInTheDocument();
   });
 

@@ -16,13 +16,25 @@ interface AuthContextValue {
   loading: boolean;
   session: Session | null;
   userKey: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  provider: string | null;
   error: string | null;
   signIn(email: string, password: string): Promise<void>;
+  signInWithKakao(): Promise<void>;
   signUp(email: string, password: string): Promise<boolean>;
   signOut(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function metadataValue(metadata: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -65,6 +77,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signInWithKakao = useCallback(async () => {
+    if (!supabase) throw new Error("auth_not_configured");
+    setError(null);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "kakao",
+      options: { redirectTo: window.location.origin },
+    });
+    if (oauthError) {
+      setError("카카오 로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      throw oauthError;
+    }
+  }, []);
+
   const signUp = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error("auth_not_configured");
     setError(null);
@@ -96,19 +121,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [session]);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
+  const value = useMemo<AuthContextValue>(() => {
+    const metadata = (session?.user?.user_metadata ?? {}) as Record<string, unknown>;
+    const provider = session?.user?.app_metadata?.provider;
+    return {
+      avatarUrl: metadataValue(metadata, "avatar_url", "picture", "profile_image_url"),
       configured: authConfigured,
+      displayName: metadataValue(metadata, "name", "full_name", "preferred_username")
+        ?? session?.user?.email?.split("@")[0]
+        ?? null,
       error,
       loading,
+      provider: typeof provider === "string" ? provider : null,
       session,
       signIn,
+      signInWithKakao,
       signOut,
       signUp,
-      userKey: session?.user?.id ?? session?.user?.email ?? null,
-    }),
-    [error, loading, session, signIn, signOut, signUp],
-  );
+      userKey: session?.user?.id ?? null,
+    };
+  }, [error, loading, session, signIn, signInWithKakao, signOut, signUp]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

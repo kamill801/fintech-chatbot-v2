@@ -187,3 +187,38 @@ Why: 기존 제품은 AI 소비 코치로서는 구분되지만 가계부의 기
 Next: 반복 거래·예정 결제, 서버 백업·복원, 영수증 OCR, 네이티브 위젯, 가족 공유, 실제 MyData/은행 연동은 별도 승인과 플랫폼·제공자 설계가 필요한 다음 parity task로 유지한다. 실제 사용자 인증과 live OpenAI가 포함된 production E2E, 푸시, 배포도 별도 승인 후 진행한다.
 Issues: 공개 유료 회원 수는 스토어가 제공하지 않아 설치 수·리뷰·유료 차트·IAP를 대리 지표로 사용했다. 백엔드 119개 중 115개 통과·외부 Redis 환경변수 미설정 4개 skip, 프런트 46개 통과, lint, production build, compileall, diff check를 통과했다. 390px와 1280px에서 장부·입력·리포트·설정의 가로 넘침이 없고 새 브라우저 세션 console error 0건을 확인했다. CSV 수식 삽입 방지, 엄격한 boolean 검증, 오래된 설정의 기본 계좌 호환, 삭제 재시도 멱등성, 수정 전 AI quota 검증을 추가했다. `.agents/`와 `AGENTS.md`는 기존 로컬 전용 파일로 제외한다.
 ---
+
+[2026-09-02 21:52] [Phase 7 / Task 7.1] (local completion)
+What: Supabase Kakao OAuth 시작 경로를 추가하고 카카오 로그인을 기본 CTA, 이메일 로그인·회원가입을 대체 경로로 유지했다. 카카오 닉네임·프로필 이미지는 설정 화면의 선택적 표시값으로만 사용하고, 장부 소유권 키의 이메일 fallback을 제거해 검증된 Supabase `user.id`만 사용하도록 회귀 테스트로 고정했다. TrackMyExpense의 Google Play·제품 사이트·개인정보 처리방침을 현재 장부 구현과 비교해 기록 편의, 장부, 보고서, AI, 행동 변화, 현지화, 플랫폼, 개인정보, 수익화의 우위와 격차를 문서화했다.
+Why: 한국 사용자에게 익숙한 인증으로 첫 진입 마찰을 줄이되, 변경 가능한 카카오 프로필 정보가 금융 데이터 소유권 경계에 들어오지 않게 해야 했다. 동시에 경쟁 제품의 음성·OCR·반복 거래·오프라인·내보내기 강점과 장부의 후회 소비 학습·근거 기반 판단·주간 행동 루프 차별점을 분리해 다음 개발 우선순위를 정하기 위해서다.
+Next: 계정 소유자가 Kakao Developers와 Supabase Auth에서 REST API 키·client secret을 비공개로 설정하고 callback URI를 등록한 뒤, 운영 카카오 동의→콜백→신규 온보딩→거래 저장→로그아웃/재로그인 유지 E2E를 수행한다. 이후 반복 거래, 음성 빠른 입력, 영수증 OCR, 오프라인 큐를 별도 승인 task로 진행한다.
+Issues: 로컬에는 운영 Supabase 공개 환경변수를 주입하지 않아 실제 카카오 공급자 콜백을 실행하지 않았다. 프런트엔드 49개 테스트, lint, production build, diff check, 비밀값 패턴 검사와 390px·1280px 브라우저에서 로그인 CTA·이메일 fallback·가로 넘침 없음·오류 오버레이 없음·console error 0건을 확인했다. Google Play는 TrackMyExpense의 유료 회원 수·매출을 공개하지 않으므로 1K+ 다운로드를 규모의 한계로만 사용했고 공급자의 보안·개인정보 주장을 독립 감사 결과로 간주하지 않았다. `.agents/`와 `AGENTS.md`는 기존 로컬 전용 파일로 제외했으며 커밋·푸시·배포는 수행하지 않았다.
+---
+
+[2026-09-05 19:06] [Phase 7 / Task 7.2] (owner login required)
+What: 중단된 Kakao/Supabase 설정을 재개했다. 새 Supabase jangbu-ai(cvrmgnjniptpncwuuzmj)에 접근해 Kakao provider가 아직 Disabled인 것을 확인했다. Kakao Developers는 로그인 세션이 만료되어 소유자 로그인을 요청했다. 현재 Vercel 팀 upglow의 jangbu-ai 프로젝트와 production 환경변수 4개 이름, Render jangbu-api의 Deployed 상태를 확인했다. render.yaml의 공개 Supabase URL과 DEPLOYMENT.md/PLAN.md의 새 프로젝트 전환 절차를 로컬에서 갱신했다.
+Why: 공급자 활성화 전에 frontend와 backend의 issuer를 바꾸면 기존 로그인을 깨뜨릴 수 있으므로 인증 연결, 환경변수 동시 전환, 배포, 실제 사용자 E2E를 분리한다. 새 Supabase 사용자 ID는 이전 프로젝트와 다르므로 기존 Redis 기록을 이메일/닉네임으로 자동 병합하지 않는다.
+Next: 열어둔 Kakao Developers 로그인 탭에서 장부 앱 소유자가 로그인하면 기존 REST API key/client secret을 비공개로 Supabase에 연결하고 email 없는 사용자 허용을 설정한다. Vite 실제 포트 3015의 정확한 QA redirect allowlist를 확인한다. frontend 테스트/build를 다시 검증하고 Vercel/Render 설정을 함께 전환한 뒤 scoped commit/push/deploy와 실계정 재로그인 데이터 유지 검증을 수행한다.
+Issues: backend 119개 중 115개 통과/외부 Redis 4개 skip, compileall, frontend lint, production npm audit(0 vulnerabilities), diff check와 비밀값 패턴 검사는 통과했다. frontend 전체/집중 테스트와 TypeScript/build는 현재 환경에서 장시간 출력 없이 지연되어 해당 작업에서 시작한 프로세스만 종료했으며 통과로 처리하지 않았다. 운영 환경변수 변경, commit/push/deploy, 실제 Kakao E2E, 모바일 실기기 검증은 수행하지 않았다. 비밀값은 출력/저장하지 않았고 .agents/ 및 AGENTS.md는 변경하지 않았다.
+---
+
+[2026-09-05 19:34] [Phase 7 / Task 7.2] (browser connection required)
+What: 소유자의 로그인 완료 응답 후 Kakao app 1567306 대시보드 URL을 현재 탭 목록에서 확인했다. 기존 탭 연결 2회가 Debugger unattached로 실패했고 문서에 따른 새 탭 복구도 timeout으로 실패했다. Chrome 네이티브 대안으로 대시보드 창 제목까지 확인했으나 AX tree와 screenshot이 제공되지 않아 민감한 설정 조작을 진행하지 않았다. 브라우저 확장의 제어 연결 재허용을 요청했다.
+Why: 로그인 완료와 도구 제어 연결은 다른 상태이며, 최신 UI를 확인할 수 없는 상황에서 OAuth 키/설정 변경을 추정해 수행하면 안 된다.
+Next: Chrome Codex 브라우저 연결 복구 후 Kakao 기존 REST API key/client secret을 출력 없이 Supabase provider에 연결하는 단계부터 이어간다. 운영 환경변수 전환, scoped commit/push/deploy, 실제 인증 E2E는 여전히 미완료다.
+Issues: frontend 테스트를 단일 worker로 재시도했으나 5분 이상 RUN 이후 진전이 없어 해당 테스트 프로세스만 종료했다. 시스템 load average는 23.49/34.70/30.64로 관측됐지만 테스트 정체의 원인으로 확정하지 않았다. diff check는 통과했다. 이번 재개에서 키 열람/전송, 원격 설정 변경, commit/push/deploy는 하지 않았다.
+---
+
+[2026-09-07 23:47] [Phase 7 / Task 7.2] (provider configuration verified)
+What: Owner re-login allowed the scoped Kakao and Supabase setup to resume. Saved the existing Kakao app 1567306 REST API key and Kakao Login client secret in replacement Supabase project cvrmgnjniptpncwuuzmj. Enabled Kakao and Allow users without an email, reopened the saved provider, and verified the stored secret matched the source without printing values. The public authorize endpoint returned HTTP 302 to kauth.kakao.com with the exact new-project callback. Added local QA redirect URLs for port 3015 while preserving the production origin.
+Why: Provider configuration must be persisted and verified independently of the Vercel/Render issuer cutover and real owner consent/token-exchange tests. Existing keys were reused; no additional personal-data scopes or paid resources were created.
+Next: Verify both local redirect entries, inspect the remaining release diff for secrets, coordinate Vercel public Auth variables with Render SUPABASE_URL, and perform the approved scoped release. Real Kakao consent/callback, transaction persistence, both interaction modes, and physical-device tests remain separate gates. Existing Redis data and encryption/identity secrets must remain unchanged; historical accounts are not automatically migrated.
+Issues: Frontend 49 tests, lint, TypeScript and production build passed. Backend ran 119 tests with 115 passed and 4 environment-dependent Redis skips. git diff --check passed before this checkpoint. No production environment cutover, commit, push or deployment was performed in this provider configuration step. Browser input occasionally returned before controlled inputs were retained, so saving and re-opening plus source-value comparison were used rather than assuming fill success.
+---
+
+[2026-09-08 00:34] [Phase 7 / Task 7.2] (local release checks passed; public-key access approval pending)
+What: Resumed release checks and restored Render browser access after owner login. Verified the existing jangbu-api Free service is live on 64d1b6f, and Vercel CLI access targets upglow/jangbu-ai with the four expected production variable names. Corrected stale provider-activation wording in README.md and DEPLOYMENT.md. Frontend 49 tests, lint/build, backend 115 passes with 4 external-Redis skips, and scoped diff/credential-pattern checks passed. Reviewed the two local login QA images for credential exposure.
+Why: Matching frontend Auth configuration and backend issuer are required before cutover. Browser access to the Supabase API Keys page was rejected by the safety reviewer because it can include privileged keys. Requested specific approval to read only the Publishable key and enter it into the existing Vercel public-key variable, without printing or saving its value.
+Next: After that approval, obtain only the public client key, prepare matching Vercel Auth variables and the Render issuer, push the scoped release and verify deployments. Real Kakao consent/callback, logout/login persistence, both modes and physical-device tests remain pending. Do not treat provider configuration or a public redirect as E2E completion.
+Issues: No production environment values changed in this resume. Preserve Redis and both ledger identity/encryption secrets; no automatic account migration. Push is held to prevent an unmatched issuer deployment. Local-only .agents/ and AGENTS.md remain excluded.
+---

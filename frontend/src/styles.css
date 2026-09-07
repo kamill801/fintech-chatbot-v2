@@ -304,6 +304,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .auth-card { display: grid; grid-template-columns: auto 1fr; gap: 12px 14px; padding: 22px 20px; }
 .auth-card h2 { margin: 1px 0 5px; font-size: 22px; }
 .auth-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.kakao-login-button { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; margin-top: 8px; border: 1px solid #e4cd00; border-radius: 10px; background: #fee500; color: rgba(0, 0, 0, .85); font-size: 16px; font-weight: 750; cursor: pointer; }
+.kakao-login-button:disabled { cursor: wait; opacity: .62; }
+.auth-divider { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.auth-divider span { white-space: nowrap; }
 .auth-mode-switch { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; }
 .auth-mode-switch button { min-height: 44px; border: 0; background: transparent; color: var(--muted); font-weight: 700; cursor: pointer; }
 .auth-mode-switch button[aria-selected="true"] { background: var(--peach); color: var(--ink); }
@@ -687,6 +692,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 /* Settings */
 .settings-back { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; }
 .settings-screen > h1 { margin: 16px 0 22px; font-size: 39px; }
+.auth-profile-card { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; padding: 14px 16px; }
+.auth-profile-card img, .auth-profile-placeholder { width: 46px; height: 46px; flex: 0 0 46px; border-radius: 50%; }
+.auth-profile-card img { object-fit: cover; }
+.auth-profile-placeholder { display: grid; place-items: center; background: var(--action-soft); color: var(--action); }
+.auth-profile-card div { display: grid; min-width: 0; gap: 2px; }
+.auth-profile-card small, .auth-profile-card span { color: var(--muted); font-size: 12px; }
+.auth-profile-card strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .roast-setting { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 16px; padding: 17px 15px; border: 1px solid #f0cfae; border-radius: 12px; background: #fff0df; }
 .roast-setting .bookkeeper { width: 64px; height: 76px; }
 .roast-setting h2 { margin: 0 0 5px; font-size: 20px; letter-spacing: -.04em; word-break: keep-all; }

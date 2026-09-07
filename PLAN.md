@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 7 - household-ledger parity
-- Active task: none - Task 7.0 completed locally; next parity task requires product approval
+- Active task: Task 7.2 - new Supabase project activation and Kakao production release
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -554,6 +554,66 @@ Make the product credible as a standalone Korean household ledger before expandi
 - Users can edit or remove their own transaction and the monthly summary refreshes immediately.
 - CSV export contains only the authenticated user's currently visible ledger fields and is generated locally without a third-party sink.
 - Backend tests, Redis integration, frontend tests, lint, TypeScript/build, compile, and responsive browser checks pass.
+
+## Task 7.1 - Kakao OAuth and TrackMyExpense Comparison (Completed Locally)
+
+### Goal
+
+Reduce Korea-first onboarding friction with Kakao Login while preserving the existing email/password fallback and Supabase user-ID ownership boundary. Compare the current product against TrackMyExpense using current official store and product evidence, then separate proven product advantages from ledger-parity gaps.
+
+### Scope
+
+- Add Kakao as the primary Supabase OAuth entry point without removing existing email/password authentication.
+- Keep all backend authorization and financial-record ownership keyed by the verified Supabase `user.id`; never use Kakao nickname, email, or profile image as an identity key.
+- Read optional Kakao nickname and profile-image metadata only for display and provide safe fallbacks for email users or missing consent.
+- Document provider-console setup without placing Kakao credentials in Vercel, source files, tests, commands, or logs.
+- Compare capture, core ledger, reports, AI, behavior change, localization, platform, privacy, and monetization using Google Play and the competitor's current product site.
+
+### Explicit Deferrals
+
+- Kakao Developers and Supabase dashboard activation require account-owner credentials and remain an external activation gate.
+- Automatic account merging, legal-name collection, phone-number collection, Kakao friends, and KakaoTalk message permissions are excluded.
+- Receipt OCR, voice capture, recurring transactions, offline sync, PDF/Excel export, and native app work remain separately approved ledger-parity tasks.
+
+### Ordered Checkpoints
+
+- [x] Add failing Kakao OAuth and login-page interaction tests.
+- [x] Implement Kakao-first login with email/password fallback and optional display metadata.
+- [x] Document the secret-safe Kakao Developers and Supabase activation path.
+- [x] Record the TrackMyExpense comparison, evidence limits, current winner, and prioritized gaps.
+- [x] Run frontend tests, lint, production build, and responsive browser verification.
+- [x] Append `progress.txt`, mark this task complete locally, and report the provider activation gate without pushing or deploying unless explicitly requested.
+
+### Acceptance Criteria
+
+- The login screen exposes one clear primary Kakao action and retains usable email login and signup.
+- The OAuth call uses the Supabase Kakao provider and a same-origin callback destination that can be allowlisted explicitly.
+- Kakao OAuth failures are visible and do not remove the email fallback.
+- A Kakao user's nickname/profile image may be displayed, but missing or mutable metadata never changes record ownership.
+- No Kakao secret or provider token is bundled into frontend code or committed documentation.
+- The comparison distinguishes official claims from code-verified current capabilities and does not claim review, revenue, or subscriber figures that the stores do not publish.
+- Frontend tests, lint, TypeScript/build, and 390px/desktop browser checks pass.
+
+## Task 7.2 - New Supabase Project and Kakao Release (Active)
+
+### Scope
+
+- Resume the owner-approved provider setup on Supabase project `cvrmgnjniptpncwuuzmj` (`jangbu-ai`, Short Travel, Seoul, Free).
+- Connect Kakao app `1567306` (`장부`) using its existing REST API key and client secret only in Supabase Auth.
+- Use optional nickname/profile-image consent and allow Kakao users without email.
+- Update the Vercel public Auth configuration and Render JWT issuer together after provider setup is verified.
+- Preserve Redis data and encryption keys. A new Supabase project issues new user IDs; historical accounts/data are not automatically migrated or merged.
+- Commit and push the reviewed Task 7.1/7.2 paths, deploy, and verify public routing separately from authenticated E2E.
+
+### Checkpoints
+
+- [x] Create the dedicated free Supabase project and register the production origin.
+- [x] Create Kakao app and configure Login, callback, and optional profile consent.
+- [x] Connect and verify the Supabase Kakao provider (2026-09-07: persisted credentials matched, enabled and email-less options retained, authorize endpoint returned the correct Kakao redirect; real consent/callback remains below).
+- [x] Run local frontend/backend checks and inspect the release diff for secrets (2026-09-08: 49 frontend tests, lint/build, 115 backend passes and 4 environment-dependent skips; no matches in the scoped credential-pattern scan).
+- [ ] Apply matching Vercel/Render settings, commit, push, deploy, and verify service health.
+- [ ] Verify real Kakao login, transaction persistence across logout/login, and both modes.
+- [ ] Report physical-device verification separately; browser resizing is not a real-device test.
 
 ## Archived Work
 

@@ -319,7 +319,7 @@ export function ReportPage() {
 
 export function SettingsPage() {
   const { deleteData, demo, profile, saveSettings, settings, transactions } = useLedger();
-  const { signOut } = useAuth();
+  const { avatarUrl, displayName, provider, signOut } = useAuth();
   const navigate = useNavigate();
   const [preview, setPreview] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -454,6 +454,12 @@ export function SettingsPage() {
     <main className="standalone-screen settings-screen">
       <button className="settings-back" onClick={() => navigate(-1)} aria-label="뒤로"><ArrowLeft size={31} /></button>
       <h1>설정</h1>
+      {!demo && <Surface className="auth-profile-card">
+        {avatarUrl
+          ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" />
+          : <span className="auth-profile-placeholder"><UserCircle size={34} /></span>}
+        <div><small>로그인 계정</small><strong>{displayName ?? "장부 사용자"}</strong><span>{provider === "kakao" ? "카카오 계정" : "이메일 계정"}</span></div>
+      </Surface>}
       <section className="roast-setting">
         <BookkeeperMark />
         <div><h2>욕쟁이 할머니 모드</h2><p>켜면 모든 지출의 이유를 묻고, 할머니 말투로 판단해요</p><button onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
