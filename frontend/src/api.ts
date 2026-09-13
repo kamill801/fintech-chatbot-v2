@@ -9,6 +9,9 @@ import type {
   TransactionDraft,
   TransactionResult,
   SpendingReflection,
+  PlanDraft,
+  PlanRevisionPreview,
+  SpendingPlanState,
 } from "./types";
 import { getAccessToken } from "./auth-client";
 import { createClientId } from "./utils";
@@ -112,6 +115,54 @@ export const ledgerApi = {
   async transactions(): Promise<Transaction[]> {
     return (await request<{ transactions: Transaction[] }>("/api/v1/me/transactions"))
       .transactions;
+  },
+  async plan(): Promise<SpendingPlanState | null> {
+    const data = await request<{ plan: null } | SpendingPlanState>("/api/v1/me/plan");
+    return data.plan ? (data as SpendingPlanState) : null;
+  },
+  async previewPlan(draft: PlanDraft): Promise<SpendingPlanState> {
+    return request<SpendingPlanState>("/api/v1/me/plan/preview", {
+      method: "POST",
+      body: JSON.stringify(draft),
+    });
+  },
+  async activatePlan(draft: PlanDraft): Promise<SpendingPlanState> {
+    return request<SpendingPlanState>("/api/v1/me/plan", {
+      method: "PUT",
+      body: JSON.stringify({ ...draft, confirmed: true }),
+    });
+  },
+  async previewPlanRevision(
+    draft: PlanDraft,
+    baseVersion: number,
+    reason: string,
+  ): Promise<{ revision_preview: PlanRevisionPreview; plan: SpendingPlanState["plan"]; progress: SpendingPlanState["progress"] }> {
+    return request("/api/v1/me/plan/revision-preview", {
+      method: "POST",
+      body: JSON.stringify({ ...draft, base_version: baseVersion, reason }),
+    });
+  },
+  async applyPlanRevision(
+    draft: PlanDraft,
+    baseVersion: number,
+    reason: string,
+  ): Promise<SpendingPlanState> {
+    return request<SpendingPlanState>("/api/v1/me/plan/revisions", {
+      method: "POST",
+      body: JSON.stringify({ ...draft, base_version: baseVersion, reason, apply: true }),
+    });
+  },
+  async checkInPlan(decision: "maintain" | "adjust", note: string): Promise<SpendingPlanState> {
+    return request<SpendingPlanState>("/api/v1/me/plan/check-ins", {
+      method: "POST",
+      body: JSON.stringify({ decision, note }),
+    });
+  },
+  async matchPlannedExpense(plannedExpenseId: string, transactionId: string): Promise<SpendingPlanState> {
+    return request<SpendingPlanState>(`/api/v1/me/plan/planned-expenses/${plannedExpenseId}/match`, {
+      method: "POST",
+      body: JSON.stringify({ transaction_id: transactionId }),
+    });
   },
   async transaction(id: string): Promise<TransactionDetail> {
     return request<TransactionDetail>(`/api/v1/me/transactions/${id}`);

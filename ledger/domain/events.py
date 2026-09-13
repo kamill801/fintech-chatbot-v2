@@ -24,6 +24,10 @@ EVENT_SHARE_SUCCEEDED = "share.succeeded"
 EVENT_ACCOUNT_REVOKED = "account.revoked"
 EVENT_LEGACY_IMPORTED = "legacy.imported"
 EVENT_DATA_DELETION_REQUESTED = "data.deletion_requested"
+EVENT_PLAN_ACTIVATED = "plan.activated"
+EVENT_PLAN_REVISED = "plan.revised"
+EVENT_PLAN_CHECKED_IN = "plan.checked_in"
+EVENT_PLANNED_EXPENSE_MATCHED = "plan.planned_expense_matched"
 
 ALLOWED_EVENT_TYPES = frozenset(
     {
@@ -44,6 +48,10 @@ ALLOWED_EVENT_TYPES = frozenset(
         EVENT_ACCOUNT_REVOKED,
         EVENT_LEGACY_IMPORTED,
         EVENT_DATA_DELETION_REQUESTED,
+        EVENT_PLAN_ACTIVATED,
+        EVENT_PLAN_REVISED,
+        EVENT_PLAN_CHECKED_IN,
+        EVENT_PLANNED_EXPENSE_MATCHED,
     }
 )
 

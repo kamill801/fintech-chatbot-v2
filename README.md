@@ -13,6 +13,8 @@ Responsive web/PWA and Flask backend for a Korean AI household-ledger agent that
 - Let users mark each purchase as `잘 쓴 돈`, `애매함`, or `후회함` and optionally explain why.
 - Store up to eight editable personal spending rules as encrypted user data.
 - Use a monthly calendar as the default ledger and combine stored judgments with post-purchase feedback in a weekly AI briefing.
+- Create one confirmed spending plan for an explicit period, reserve known expenses inside that budget, revise it through preview/apply, and check in weekly.
+- Compare original plan, current plan, actual spend, reservations, and flexible remaining without hiding negative shortfalls.
 - Prioritize one seven-day behavior change, show its estimated goal-date impact, and measure the result in the next briefing.
 - Record corrections, privacy-safe shares, metrics, and audit events.
 - Keep authenticated browser drafts user-scoped, clear them on sign-out/deletion, and reuse one operation ID across ambiguous retries.
@@ -36,7 +38,7 @@ Vercel web/PWA or KakaoTalk
               |
     +---------+----------+
     |                    |
-deterministic signals  structured AI judge
+deterministic signals/plan math  structured AI judge/advisor
     |                    |
     +---------+----------+
               |
@@ -64,7 +66,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-For a dependency-free local data path, keep `LEDGER_STORE=memory`. Kakao messages run inline in that mode. Set `OPENAI_API_KEY` only when testing the live structured judge; otherwise the auditable deterministic fallback is used.
+For a dependency-free local data path, keep `LEDGER_STORE=memory`. Kakao messages run inline in that mode. Set `OPENAI_API_KEY` only when testing the live structured judge and qualitative plan advisor; otherwise auditable deterministic fallbacks are used. `OPENAI_LEDGER_PLAN_MODEL` may override the plan-narrative model independently.
 
 Install the frontend dependencies:
 
@@ -131,6 +133,7 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 - Direct user identifiers are converted to HMAC pseudonyms.
 - Financial projections and event payloads are encrypted at rest.
 - OpenAI receives only the explicit derived-data allowlist.
+- Plan advice receives only period, deterministic progress/allocation/reservation facts, normalized planned-expense facts, priorities, rules, and aggregate patterns; code owns every displayed number.
 - Personal spending rules and category-level reflection history are sanitized before they enter that allowlist.
 - Logs, Sheets, metrics, and shares reject raw financial or chat fields.
 - Post-purchase reflections are encrypted at rest, excluded from telemetry and shares, and never rewrite the original transaction or AI judgment.
@@ -151,6 +154,6 @@ A local passing suite does not prove production OpenAI behavior, a production fi
 
 ## Project Status
 
-The approved web/PWA is implemented as a regret-aware spending coach: mode-aware manual entry, a monthly calendar ledger, backend-owned judgment, editable personal spending rules, post-purchase reflection, regret-aware weekly coaching with one action and goal impact, default/`욕쟁이 할머니 모드` rendering, correction, reports, settings, user-scoped draft retention, and redacted image sharing.
+The approved web/PWA is implemented as a plan-led spending coach: three-step plan confirmation, deterministic active-plan progress and reservations, previewed revisions, weekly check-ins, planned-expense matching, plan-led Home and Report, mode-aware manual entry, a monthly calendar ledger, backend-owned judgment, post-purchase reflection, and bounded qualitative AI guidance. Validated plan guidance is encrypted with its plan version, so passive plan reads stay stable and do not trigger repeated model calls.
 
-The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. The frontend Kakao OAuth path is implemented locally. The replacement Supabase project `cvrmgnjniptpncwuuzmj` has its Kakao provider configured and routing verified as of 2026-09-07; coordinated Vercel/Render Auth cutover and real consent/callback tests remain pending. Task 6.8 local verification on 2026-08-17 passed 107 backend tests with four environment-gated skips, all four Redis integration tests against an isolated local Redis, 44 frontend tests, lint, production build, compileall, diff/secret checks, and mobile plus desktop browser QA. A real authenticated Kakao sign-in, reflection-to-next-judgment E2E, and live OpenAI quality evaluation still require an owner-controlled test account; financial-provider linkage and money movement remain outside the verified MVP.
+The trusted production path is provisioned: Supabase project `ijdodqldneduqeblkivo` provides email/password authentication with immediate signup, Upstash provides the TLS Redis store, Render serves `https://jangbu-api.onrender.com`, and Vercel has the four public live-mode variables. The frontend Kakao OAuth path is implemented locally. The replacement Supabase project `cvrmgnjniptpncwuuzmj` has its Kakao provider configured and routing verified as of 2026-09-07; coordinated Vercel/Render Auth cutover and real consent/callback tests remain pending. Task 8.0 local verification on 2026-09-13 passed 134 backend tests with four Redis-gated skips, all four Redis integration tests against an isolated local Redis, 55 frontend tests, lint, production build, compileall, diff/secret checks, and mobile plus desktop browser QA. A real authenticated Kakao sign-in, live OpenAI plan-advisor quality evaluation, and physical-device E2E still require owner-controlled production access; financial-provider linkage and money movement remain outside the verified MVP.

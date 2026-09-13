@@ -128,6 +128,72 @@ def create_api_blueprint(
             )
         )
 
+    @api.get("/api/v1/me/plan")
+    @authenticated
+    def get_spending_plan() -> Response:
+        return _success(service.get_spending_plan(g.user_ref))
+
+    @api.post("/api/v1/me/plan/preview")
+    @authenticated
+    def preview_spending_plan() -> Response:
+        return _success(service.preview_spending_plan(g.user_ref, _json_body()))
+
+    @api.put("/api/v1/me/plan")
+    @authenticated
+    def activate_spending_plan() -> Response:
+        return _mutating(
+            lambda key: service.activate_spending_plan(
+                g.user_ref,
+                _json_body(),
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
+    @api.post("/api/v1/me/plan/revision-preview")
+    @authenticated
+    def preview_spending_plan_revision() -> Response:
+        return _success(
+            service.preview_spending_plan_revision(g.user_ref, _json_body())
+        )
+
+    @api.post("/api/v1/me/plan/revisions")
+    @authenticated
+    def apply_spending_plan_revision() -> Response:
+        return _mutating(
+            lambda key: service.apply_spending_plan_revision(
+                g.user_ref,
+                _json_body(),
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
+    @api.post("/api/v1/me/plan/check-ins")
+    @authenticated
+    def check_in_spending_plan() -> Response:
+        return _mutating(
+            lambda key: service.check_in_spending_plan(
+                g.user_ref,
+                _json_body(),
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
+    @api.post("/api/v1/me/plan/planned-expenses/<planned_expense_id>/match")
+    @authenticated
+    def match_planned_expense(planned_expense_id: str) -> Response:
+        return _mutating(
+            lambda key: service.match_planned_expense(
+                g.user_ref,
+                planned_expense_id,
+                _json_body(),
+                idempotency_key=key,
+                correlation_id=g.correlation_id,
+            )
+        )
+
     @api.get("/api/v1/me/transactions")
     @authenticated
     def list_transactions() -> Response:

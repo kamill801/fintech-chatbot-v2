@@ -801,7 +801,61 @@ References:
 - https://developers.kftc.or.kr/dev/starter/starter
 - https://www.fsc.go.kr/no010101/84780
 
-## 18. Decisions Log
+## 18. Spending-Plan Coach Contract
+
+### 18.1 Domain and Arithmetic
+
+Each user may have one active `SpendingPlan`. It contains an explicit inclusive start/end date, a user-confirmed discretionary `confirmed_budget_krw`, up to three ranked priorities, non-overlapping weekly or date-segment allocations whose amounts sum to the confirmed budget, planned expenses, status, version, confirmation time, creation/update times, revision history, and check-in history. KRW values are integers; dates and timestamps use ISO formats.
+
+For a plan period, code computes:
+
+- `actual_spent_krw`: expense transactions whose configured-timezone local date is inside the inclusive plan period and whose `exclude_from_budget` flag is false;
+- `total_remaining_krw = confirmed_budget_krw - actual_spent_krw`;
+- `reserved_remaining_krw`: the sum of unresolved planned expenses inside the same total budget;
+- `flexible_remaining_krw = total_remaining_krw - reserved_remaining_krw`;
+- `shortfall_krw = abs(min(0, flexible_remaining_krw))`.
+
+Negative totals are preserved and shown as shortfalls. Income, transfers, excluded expenses, and out-of-period expenses never affect plan actuals. Existing monthly `total_spent_krw` continues to report every expense; current-budget UI and signals use `budget_spent_krw` and exclude flagged expenses.
+
+A planned expense may be matched manually to one expense transaction owned by the same authenticated user. The transaction must be budget-included and inside the plan period. A transaction can match at most one planned expense. Matching removes the reservation while the actual transaction remains counted exactly once.
+
+### 18.2 Persistence and Events
+
+The current plan projection is encrypted with the existing application encryption service. Memory and Redis repositories expose the same behavior and append these immutable event types: `plan.activated`, `plan.revised`, `plan.checked_in`, and `plan.planned_expense_matched`. Redis applies the existing retention/registry rules. Old records with no plan projection remain readable as `plan=null`; full user deletion removes plan projection, plan events, and plan idempotency results.
+
+Plan activation, revision apply, check-in, and matching are idempotent. Revisions require the current `base_version`, store before/after snapshots, increment the version, and apply only after explicit confirmation. Preview operations do not persist.
+
+### 18.3 REST API
+
+Authenticated synchronous routes follow the existing response/error envelope:
+
+- `GET /api/v1/me/plan`
+- `POST /api/v1/me/plan/preview`
+- `PUT /api/v1/me/plan`
+- `POST /api/v1/me/plan/revision-preview`
+- `POST /api/v1/me/plan/revisions`
+- `POST /api/v1/me/plan/check-ins`
+- `POST /api/v1/me/plan/planned-expenses/{planned_expense_id}/match`
+
+Every mutating request requires `Idempotency-Key`. Setup activation requires `confirmed=true`; revision apply requires `apply=true`. Preview responses include deterministic progress and qualitative narrative but never alter the projection.
+
+### 18.4 Qualitative AI Advisor and Privacy
+
+Code owns every financial number, allocation, reservation, comparison, and before/after difference. The optional plan advisor receives only period boundaries, confirmed budget, deterministic progress/segment facts, normalized planned-expense category/date/amount/matched state, priority text, sanitized spending rules, and aggregate category/reflection/judgment patterns. It never receives merchant, memo, raw purchase reason, reflection note, account name, direct identity, or a raw transaction list.
+
+The OpenAI Responses adapter uses strict JSON Schema, `store=false`, an explicit timeout, a 500-token output cap, and at most two attempts. Its schema contains only `headline`, `explanation`, segment qualitative focuses, one `next_action`, assumptions, and confidence. Model text that calculates or restates numeric values is rejected. Missing credentials, timeout, schema failure, or safety validation failure returns a marked deterministic narrative based on the code-owned progress. A validated narrative is stored with the corresponding encrypted plan version so ordinary `GET /plan` refreshes remain stable and do not create repeated model cost; a new model call occurs only for an explicit setup or revision operation.
+
+### 18.5 Product Surface
+
+The primary tabs are 홈, 장부, 계획, and 리포트. Plan setup has three steps: period plus user-confirmed spendable budget; priorities plus planned expenses; review plus explicit confirmation. The active screen shows period, flexible/total/reserved progress, current segment, narrative, check-in, revision preview/apply, and manual planned-expense matching.
+
+Home leads with plan-period flexible remaining, input freshness, current segment allowance/remaining, one action/check-in, and recent transactions. With no plan it shows an honest setup action. Report compares original plan, current plan, and actual spend. An in-period budget-included expense response includes a brief deterministic plan impact. Should-I-buy simulation, automatic bank linking, notifications, products, and money movement remain deferred.
+
+### 18.6 Verification
+
+Tests cover domain validation and formulas including negative shortfall, period edges, timezone behavior, and excluded expenses; memory/Redis round trips, idempotency, legacy empty state, events, and deletion; service/API setup, preview, activation, revision, check-in, match, and ownership; AI allowlist/schema/fallback; and frontend plan/Home/Report/nav/impact flows.
+
+## 19. Decisions Log
 
 | Date | Decision | Result |
 | --- | --- | --- |
@@ -818,3 +872,5 @@ References:
 | 2026-08-04 | Free-tier worker | RQ remains Kakao-only and is not deployed on the free web MVP |
 | 2026-08-30 | Ledger-first parity | Complete deterministic manual-ledger fundamentals before expanding AI features |
 | 2026-08-30 | Transaction semantics | Expense, income, and transfer are explicit; AI and regret coaching remain expense-only |
+| 2026-09-13 | Spending plan authority | User confirms one discretionary period budget; code owns every number and AI provides bounded qualitative coaching only |
+| 2026-09-13 | Planned expenses | Unmatched planned expenses reserve part of the same budget; matching an owned actual expense releases the reservation |

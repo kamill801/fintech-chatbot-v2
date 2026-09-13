@@ -3,10 +3,11 @@ import { useLedger } from "./ledger-context";
 import { OnboardingBaseline, OnboardingGoal, OnboardingSource, OnboardingTrust } from "./pages/Onboarding";
 import { HomePage, ManualTransactionPage, ReasonPage } from "./pages/HomeFlow";
 import { JudgmentPage, SharePage, TransactionDetailPage } from "./pages/JudgmentFlow";
-import { AgentPage, LedgerPage, ReportPage, SettingsPage } from "./pages/MainPages";
+import { LedgerPage, ReportPage, SettingsPage } from "./pages/MainPages";
 import { AuthProvider, useAuth } from "./auth-context";
 import { LedgerProvider } from "./ledger-context";
 import { LoginPage } from "./pages/LoginPage";
+import { PlanPage } from "./pages/PlanPage";
 
 function LoadingScreen() {
   return (
@@ -54,7 +55,8 @@ function AppRoutes() {
       <Route path="/judgments/:transactionId" element={<JudgmentPage />} />
       <Route path="/ledger" element={<LedgerPage />} />
       <Route path="/transactions/:transactionId" element={<TransactionDetailPage />} />
-      <Route path="/agent" element={<AgentPage />} />
+      <Route path="/agent" element={<Navigate replace to={demo ? "/plan?demo=1" : "/plan"} />} />
+      <Route path="/plan" element={<PlanPage />} />
       <Route path="/report" element={<ReportPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/share/:transactionId" element={<SharePage />} />

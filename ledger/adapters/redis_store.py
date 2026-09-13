@@ -12,6 +12,10 @@ from ledger.domain.events import (
     EVENT_JUDGMENT_REASON_REQUESTED,
     EVENT_LEGACY_IMPORTED,
     EVENT_PROFILE_UPSERTED,
+    EVENT_PLAN_ACTIVATED,
+    EVENT_PLAN_CHECKED_IN,
+    EVENT_PLANNED_EXPENSE_MATCHED,
+    EVENT_PLAN_REVISED,
     EVENT_SETTINGS_UPDATED,
     EVENT_SHARE_CLICKED,
     EVENT_SHARE_SUCCEEDED,
@@ -36,6 +40,7 @@ from ledger.domain.models import (
     utc_now_iso,
 )
 from ledger.domain.ports import LedgerRepository, StoredResult
+from ledger.domain.plans import SpendingPlan
 from ledger.privacy import PrivacyService
 
 
@@ -113,6 +118,86 @@ class RedisLedgerRepository(LedgerRepository):
             idempotency_key,
             lambda: self._update_settings(
                 user_ref, settings, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def get_spending_plan(self, user_ref: str) -> SpendingPlan | None:
+        encrypted = self._redis.get(self._key(user_ref, "spending_plan"))
+        if encrypted is None:
+            return None
+        return SpendingPlan.from_dict(self._privacy.decrypt_json(encrypted))
+
+    def activate_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda: self._store_spending_plan(
+                plan, EVENT_PLAN_ACTIVATED, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def revise_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda: self._store_spending_plan(
+                plan, EVENT_PLAN_REVISED, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def check_in_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda: self._store_spending_plan(
+                plan, EVENT_PLAN_CHECKED_IN, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def match_planned_expense(
+        self,
+        plan: SpendingPlan,
+        planned_expense_id: str,
+        transaction_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda: self._store_spending_plan(
+                plan,
+                EVENT_PLANNED_EXPENSE_MATCHED,
+                idempotency_key,
+                correlation_id,
+                source,
+                metadata={
+                    "planned_expense_id": planned_expense_id,
+                    "transaction_id": transaction_id,
+                },
             ),
         )
 
@@ -611,6 +696,34 @@ class RedisLedgerRepository(LedgerRepository):
             self._incr_metric(pipe, transaction.user_ref, "transactions_recorded")
             pipe.execute()
         return StoredResult(201, {"transaction": payload})
+
+    def _store_spending_plan(
+        self,
+        plan: SpendingPlan,
+        event_type: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> StoredResult:
+        payload = plan.to_dict()
+        plan_key = self._key(plan.user_ref, "spending_plan")
+        with self._redis.pipeline(transaction=True) as pipe:
+            self._append_event(
+                pipe,
+                plan.user_ref,
+                event_type,
+                payload,
+                idempotency_key=idempotency_key,
+                correlation_id=correlation_id,
+                source=source,
+                redacted_metadata={"plan_version": plan.version, **dict(metadata or {})},
+            )
+            pipe.set(plan_key, self._privacy.encrypt_json(payload))
+            self._track_keys(pipe, plan.user_ref, plan_key)
+            pipe.execute()
+        return StoredResult(200, {"plan": payload})
 
     def _update_transaction(
         self,
@@ -1128,6 +1241,7 @@ class RedisLedgerRepository(LedgerRepository):
             self._key(user_ref, "events"),
             self._key(user_ref, "profile"),
             self._key(user_ref, "settings"),
+            self._key(user_ref, "spending_plan"),
             self._key(user_ref, "transactions"),
             self._key(user_ref, "pending_question"),
             self._key(user_ref, "legacy_imported"),

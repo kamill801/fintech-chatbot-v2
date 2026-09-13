@@ -40,17 +40,18 @@ function monthlyRemaining(total: number, budget?: number): number {
 }
 
 export function HomePage() {
-  const { demo, profile, settings, summary, transactions } = useLedger();
+  const { demo, plan, profile, settings, summary, transactions } = useLedger();
   const navigate = useNavigate();
   const pending = settings.roast_enabled
     ? transactions.find((item) => item.status === "awaiting_reason")
     : undefined;
-  const total = summary?.total_spent_krw ?? 0;
+  const total = summary?.budget_spent_krw ?? summary?.total_spent_krw ?? 0;
   const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
   const usage = budget ? Math.min(1, total / budget) : 0;
   const remaining = monthlyRemaining(total, budget);
   const goal = summary?.goal ?? profile?.goal;
   const goalProgress = goal ? Math.min(100, Math.round((goal.current_amount_krw / Math.max(goal.target_amount_krw, 1)) * 100)) : 0;
+  const currentSegment = plan?.progress.segments.find((item) => item.allocation_id === plan.progress.current_segment_id);
 
   return (
     <AppShell active="/" showAdd>
@@ -59,17 +60,21 @@ export function HomePage() {
           <time>{demo ? "8월 3일 월요일" : formatTodayLabel()}</time>
           <Link to={withDemo("/settings", demo)}><ModePill enabled={settings.roast_enabled} /></Link>
         </header>
-        <section className="home-hero reveal-1">
-          <h1>이번 달,<br />아직 <Highlight>괜찮아.</Highlight></h1>
+        {plan ? <section className="home-hero plan-home-hero reveal-1">
+          <h1>계획상 남은<br /><Highlight>생활비</Highlight></h1>
           <BookkeeperMark />
-          <p>이번 달 쓸 수 있는 돈</p>
-          <strong className="hero-amount">{formatWon(remaining)}</strong>
-          <span>예산의 {Math.max(0, Math.round((1 - usage) * 100))}% 남음</span>
-          <div className="budget-track" aria-label={`예산 ${Math.round(usage * 100)}% 사용`}>
-            <span style={{ width: `${Math.round(usage * 100)}%` }} />
-          </div>
-          <div className="budget-labels"><span>사용 {Math.round(usage * 100)}%</span><span>남음 {Math.max(0, Math.round((1 - usage) * 100))}%</span></div>
-        </section>
+          <p>{plan.plan.period_start} ~ {plan.plan.period_end}</p>
+          <strong className={`hero-amount ${plan.progress.flexible_remaining_krw < 0 ? "expense-text" : ""}`}>{formatWon(plan.progress.flexible_remaining_krw)}</strong>
+          <span>{plan.progress.latest_input_at ? `${formatDate(plan.progress.latest_input_at)}까지 직접 입력된 거래 기준` : "아직 입력된 지출이 없는 계획 기준"}</span>
+          <div className="home-week-plan"><span>이번 주 배정 <b>{currentSegment ? formatWon(currentSegment.amount_krw) : "기간 밖"}</b></span><span>이번 주 남음 <b>{currentSegment ? formatWon(currentSegment.flexible_remaining_krw) : "-"}</b></span></div>
+          <Link className="home-plan-action" to={withDemo("/plan", demo)}>{plan.narrative.next_action} <CaretRight size={18} /></Link>
+        </section> : <section className="home-hero plan-empty-hero reveal-1">
+          <h1>이번 달 생활비,<br /><Highlight>계획부터</Highlight> 세워요.</h1>
+          <BookkeeperMark />
+          <p>예산과 예정 지출을 직접 확인하면 남은 생활비를 계산해 드려요.</p>
+          <Link className="home-plan-action" to={withDemo("/plan", demo)}>생활비 계획 만들기 <CaretRight size={18} /></Link>
+          {budget > 0 && <small>기존 월 예산 기준 남은 금액 {formatWon(remaining)} · {Math.round(usage * 100)}% 사용</small>}
+        </section>}
 
         {goal && (
           <Surface className="goal-strip reveal-2">
@@ -296,7 +301,7 @@ export function ReasonPage() {
 
   if (!transaction) return <div className="loading-screen">거래를 불러오는 중</div>;
   const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
-  const budgetUsage = budget > 0 ? Math.round(((summary?.total_spent_krw ?? 0) / budget) * 100) : 0;
+  const budgetUsage = budget > 0 ? Math.round(((summary?.budget_spent_krw ?? summary?.total_spent_krw ?? 0) / budget) * 100) : 0;
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const sameCategoryCount = Math.max(1, transactions.filter((item) => item.category === transaction.category && (demo || new Date(item.occurred_at).getTime() >= weekAgo)).length);
   return (

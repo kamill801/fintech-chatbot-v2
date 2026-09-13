@@ -62,6 +62,37 @@ class RedisRepositoryIntegrationTests(unittest.TestCase):
             idempotency_key="settings-roast",
             correlation_id=correlation_id(),
         )
+        plan = self.service.activate_spending_plan(
+            self.user_ref,
+            {
+                "period_start": "2026-09-01",
+                "period_end": "2026-09-30",
+                "confirmed_budget_krw": 500000,
+                "priorities": ["생활비 안정"],
+                "planned_expenses": [],
+                "confirmed": True,
+            },
+            idempotency_key="plan-1",
+            correlation_id=correlation_id(),
+        )
+        replayed_plan = self.service.activate_spending_plan(
+            self.user_ref,
+            {
+                "period_start": "2026-09-01",
+                "period_end": "2026-09-30",
+                "confirmed_budget_krw": 500000,
+                "priorities": ["생활비 안정"],
+                "planned_expenses": [],
+                "confirmed": True,
+            },
+            idempotency_key="plan-1",
+            correlation_id=correlation_id(),
+        )
+        self.assertEqual(plan.data["plan"], replayed_plan.data["plan"])
+        self.assertEqual(
+            self.repository.get_spending_plan(self.user_ref).confirmed_budget_krw,
+            500000,
+        )
         first = self.service.create_transaction(
             self.user_ref,
             {"amount_krw": 9876543, "category": "shopping"},

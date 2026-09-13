@@ -80,7 +80,7 @@ function dayHeading(dateKey: string): string {
 }
 
 export function LedgerPage() {
-  const { demo, settings, summary, transactions } = useLedger();
+  const { demo, latestPlanImpact, settings, summary, transactions } = useLedger();
   const navigate = useNavigate();
   const initialMonth = summary?.month ?? currentMonthKey();
   const [month, setMonth] = useState(initialMonth);
@@ -145,6 +145,7 @@ export function LedgerPage() {
           </div>
         </header>
         <section className="ledger-summary"><h2>이번 달 <Highlight>{formatWon(monthTotal)}</Highlight> 썼어요.</h2><p><span>수입 <strong className="income-text">{formatWon(monthIncome)}</strong></span><i /><span>지출 <strong>{formatWon(monthTotal)}</strong></span><i /><span>순현금 <strong className={monthNet >= 0 ? "income-text" : "expense-text"}>{monthNet >= 0 ? "+" : ""}{formatWon(monthNet)}</strong></span></p></section>
+        {latestPlanImpact && <InfoCallout>{latestPlanImpact.message}</InfoCallout>}
         <div className="segmented-control ledger-view-toggle" role="group" aria-label="장부 보기 방식"><button type="button" className={view === "calendar" ? "selected" : ""} onClick={() => setView("calendar")}>달력</button><button type="button" className={view === "list" ? "selected" : ""} onClick={() => setView("list")}>목록</button></div>
         <section className="ledger-filters" aria-label="거래 검색과 필터">
           <label className="ledger-search"><MagnifyingGlass size={19} /><span className="sr-only">거래 검색</span><input value={query} placeholder="사용처·메모 검색" onChange={(event) => { setQuery(event.target.value); if (event.target.value) setView("list"); }} /></label>
@@ -280,7 +281,7 @@ export function AgentPage() {
 const barColors: Record<string, string> = { food: "blue", shopping: "gold", cafe: "peach", transport: "green" };
 
 export function ReportPage() {
-  const { demo, profile, summary } = useLedger();
+  const { demo, plan, profile, summary } = useLedger();
   const entries = Object.entries(summary?.by_category_krw ?? {}).sort((a, b) => b[1] - a[1]);
   const max = Math.max(...entries.map(([, amount]) => amount), 1);
   const goal = summary?.goal ?? profile?.goal;
@@ -300,6 +301,7 @@ export function ReportPage() {
         <header><h1>{Number(month.split("-")[1])}월 리포트</h1><span className="month-select" aria-label="현재 리포트 월">{formatMonthLabel(month)}</span></header>
         <h2>{topAmount > 0 ? <>이번 달, <Highlight>{categoryNames[topCategory] ?? topCategory}</Highlight> 지출이 가장 컸어요.</> : "이번 달 지출을 기록해 보세요."}</h2>
         <div className="report-totals"><span>수입 <strong className="income-text">{formatWon(summary?.total_income_krw ?? 0)}</strong></span><i /><span>지출 <strong>{formatWon(summary?.total_spent_krw ?? 0)}</strong></span><i /><span>순현금 <strong className={(summary?.net_cashflow_krw ?? 0) >= 0 ? "income-text" : "expense-text"}>{(summary?.net_cashflow_krw ?? 0) >= 0 ? "+" : ""}{formatWon(summary?.net_cashflow_krw ?? 0)}</strong></span></div>
+        {plan && <Surface className="plan-report-comparison"><h3>생활비 계획 비교</h3><div><span><small>처음 계획</small><strong>{formatWon(plan.original_plan.confirmed_budget_krw)}</strong></span><span><small>현재 계획</small><strong>{formatWon(plan.plan.confirmed_budget_krw)}</strong></span><span><small>실제 사용</small><strong>{formatWon(plan.progress.actual_spent_krw)}</strong></span></div><p>예약을 뺀 남은 생활비 <b className={plan.progress.flexible_remaining_krw < 0 ? "expense-text" : ""}>{formatWon(plan.progress.flexible_remaining_krw)}</b></p></Surface>}
         {previous && <p className="month-comparison">지난달보다 <strong className={previous.change_krw <= 0 ? "income-text" : "expense-text"}>{formatWon(Math.abs(previous.change_krw))} {previous.change_krw <= 0 ? "덜" : "더"}</strong> 썼어요{previous.change_rate !== null ? ` (${Math.round(Math.abs(previous.change_rate) * 100)}%)` : ""}.</p>}
         <Surface className="category-report"><h3>어디에 썼나</h3>{entries.map(([category, amount]) => <div className="report-row" key={category}><CategoryIcon category={category} /><span>{categoryNames[category] || category}</span><strong>{formatWon(amount)}</strong><div className="report-bar"><span className={barColors[category] || "blue"} style={{ width: `${Math.round((amount / max) * 66)}%` }} /></div></div>)}{entries.length === 0 && <p className="empty-copy">지출을 기록하면 카테고리별 흐름을 보여드려요.</p>}</Surface>
         {categoryBudgets.length > 0 && <Surface className="category-budget-report"><div className="section-heading"><h3>카테고리 예산</h3><span>전체 예산 {budgetRemaining}% 남음</span></div>{categoryBudgets.map(([category, values]) => <div className="category-budget-row" key={category}><div><strong>{categoryNames[category] ?? category}</strong><span>{formatWon(values.spent_krw)} / {formatWon(values.budget_krw)}</span></div><div className="report-bar"><span className={values.usage >= 1 ? "danger" : values.usage >= 0.8 ? "peach" : "green"} style={{ width: `${Math.min(100, Math.round(values.usage * 100))}%` }} /></div><small>{values.remaining_krw > 0 ? `남은 기간 하루 ${formatWon(values.daily_allowance_krw)}` : "예산을 모두 사용했어요"}</small></div>)}</Surface>}
@@ -311,7 +313,7 @@ export function ReportPage() {
           </> : <p>거래 상세에서 ‘잘 쓴 돈·애매함·후회함’을 남기면 나만의 소비 기준과 변화가 보여요.</p>}
         </Surface>
         {goal && <Surface className="report-goal"><Target size={28} /><strong>{goal.name} 목표</strong><div><span>현재 {goalProgress}%</span><div className="mini-progress"><span style={{ width: `${goalProgress}%` }} /></div></div><p>목표일<br /><b>{formatKoreanDate(goal.target_date)}</b></p></Surface>}
-        {entries.length > 0 ? <section className="report-advice"><Lightbulb size={28} /><p>{summary?.weekly_briefing?.improvement ?? "가장 큰 지출부터 판단 근거를 확인하고 다음 주 기준을 정해 보세요."}</p><Link to={withDemo("/agent", demo)}>AI 브리핑 보기</Link></section> : <InfoCallout>첫 지출부터 기록하면 월간 패턴을 정리해 드려요.</InfoCallout>}
+        {entries.length > 0 ? <section className="report-advice"><Lightbulb size={28} /><p>{summary?.weekly_briefing?.improvement ?? "가장 큰 지출부터 판단 근거를 확인하고 다음 주 기준을 정해 보세요."}</p><Link to={withDemo("/plan", demo)}>계획과 AI 브리핑 보기</Link></section> : <InfoCallout>첫 지출부터 기록하면 월간 패턴을 정리해 드려요.</InfoCallout>}
       </div>
     </AppShell>
   );

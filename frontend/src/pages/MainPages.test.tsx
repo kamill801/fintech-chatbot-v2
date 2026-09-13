@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter } from "../router";
+import { demoPlanState } from "../demo";
 import { AgentPage, LedgerPage, ReportPage, SettingsPage } from "./MainPages";
 
 const mocks = vi.hoisted(() => ({
@@ -84,6 +85,54 @@ describe("live ledger summaries", () => {
     expect(screen.queryByRole("button", { name: "필터" })).not.toBeInTheDocument();
     expect(screen.getByRole("grid", { name: "2026년 8월 거래 달력" })).toBeInTheDocument();
     expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["일", "월", "화", "수", "목", "금", "토"]);
+    const planLinks = screen.getAllByRole("link", { name: "계획" });
+    expect(planLinks).toHaveLength(2);
+    planLinks.forEach((link) => expect(link).toHaveAttribute("href", "/plan"));
+    expect(screen.queryAllByRole("link", { name: "에이전트" })).toHaveLength(0);
+  });
+
+  it("shows the latest deterministic plan impact after an eligible expense", () => {
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      latestPlanImpact: {
+        transaction_id: "tx-plan-impact",
+        amount_krw: 20_000,
+        total_remaining_krw: 280_000,
+        reserved_remaining_krw: 100_000,
+        flexible_remaining_krw: 180_000,
+        shortfall_krw: 0,
+        message: "계획상 쓸 수 있는 생활비가 180,000원 남았어요.",
+      },
+      profile: null,
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul" },
+      summary: { month: "2026-08", total_spent_krw: 0, by_category_krw: {}, transaction_count: 0 },
+      transactions: [],
+    });
+
+    render(<BrowserRouter><LedgerPage /></BrowserRouter>);
+
+    expect(screen.getByText("계획상 쓸 수 있는 생활비가 180,000원 남았어요.")).toBeInTheDocument();
+  });
+
+  it("compares original plan, current plan, and actual spending in the report", () => {
+    window.history.replaceState({}, "", "/report");
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      plan: {
+        ...demoPlanState,
+        original_plan: { ...demoPlanState.original_plan, confirmed_budget_krw: 700000 },
+        plan: { ...demoPlanState.plan, confirmed_budget_krw: 800000 },
+        progress: { ...demoPlanState.progress, actual_spent_krw: 377500 },
+      },
+      profile: null,
+      summary: { month: "2026-08", total_spent_krw: 377500, by_category_krw: {}, transaction_count: 1 },
+    });
+    render(<BrowserRouter><ReportPage /></BrowserRouter>);
+
+    expect(screen.getByRole("heading", { name: "생활비 계획 비교" })).toBeInTheDocument();
+    expect(screen.getByText("처음 계획")).toBeInTheDocument();
+    expect(screen.getByText("현재 계획")).toBeInTheDocument();
+    expect(screen.getByText("실제 사용")).toBeInTheDocument();
   });
 
   it("uses the calendar as the default ledger and opens entry with the selected date", async () => {

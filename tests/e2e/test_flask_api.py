@@ -181,6 +181,102 @@ class FlaskLedgerE2ETests(unittest.TestCase):
         self.assertIn("headline", summary["weekly_briefing"])
         self.assertIn("improvement", summary["weekly_briefing"])
 
+    def test_plan_preview_activate_revise_check_in_and_match_routes(self) -> None:
+        self.put_profile()
+        plan = {
+            "period_start": "2026-09-01",
+            "period_end": "2026-09-30",
+            "confirmed_budget_krw": 300_000,
+            "priorities": ["건강"],
+            "planned_expenses": [
+                {
+                    "planned_expense_id": "planned-health",
+                    "name": "운동 수업",
+                    "amount_krw": 100_000,
+                    "due_date": "2026-09-20",
+                    "category": "health",
+                }
+            ],
+        }
+        preview = self.client.post(
+            "/api/v1/me/plan/preview", json=plan, headers=self.headers
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertTrue(preview.get_json()["data"]["preview"])
+        self.assertIsNone(
+            self.client.get("/api/v1/me/plan", headers=self.headers).get_json()["data"]["plan"]
+        )
+
+        missing_key = self.client.put(
+            "/api/v1/me/plan", json={**plan, "confirmed": True}, headers=self.headers
+        )
+        self.assertEqual(missing_key.status_code, 400)
+        activated = self.client.put(
+            "/api/v1/me/plan",
+            json={**plan, "confirmed": True},
+            headers=self.mutate_headers("plan-activate"),
+        )
+        replay = self.client.put(
+            "/api/v1/me/plan",
+            json={**plan, "confirmed": True},
+            headers=self.mutate_headers("plan-activate"),
+        )
+        self.assertEqual(activated.status_code, 201)
+        self.assertEqual(
+            activated.get_json()["data"]["plan"]["plan_id"],
+            replay.get_json()["data"]["plan"]["plan_id"],
+        )
+        self.assertIn("narrative", activated.get_json()["data"])
+
+        version = activated.get_json()["data"]["plan"]["version"]
+        revision = {
+            **plan,
+            "confirmed_budget_krw": 350_000,
+            "base_version": version,
+            "reason": "이번 달 일정 반영",
+        }
+        revision_preview = self.client.post(
+            "/api/v1/me/plan/revision-preview",
+            json=revision,
+            headers=self.headers,
+        )
+        self.assertEqual(
+            revision_preview.get_json()["data"]["revision_preview"]["budget_change_krw"],
+            50_000,
+        )
+        revised = self.client.post(
+            "/api/v1/me/plan/revisions",
+            json={**revision, "apply": True},
+            headers=self.mutate_headers("plan-revision"),
+        )
+        self.assertEqual(revised.get_json()["data"]["plan"]["version"], 2)
+        checked = self.client.post(
+            "/api/v1/me/plan/check-ins",
+            json={"decision": "maintain"},
+            headers=self.mutate_headers("plan-check-in"),
+        )
+        self.assertEqual(checked.get_json()["data"]["next_step"], "continue")
+
+        transaction = self.client.post(
+            "/api/v1/me/transactions",
+            json={
+                "amount_krw": 70_000,
+                "category": "health",
+                "occurred_at": "2026-09-20T03:00:00Z",
+            },
+            headers=self.mutate_headers("plan-actual"),
+        )
+        transaction_id = transaction.get_json()["data"]["transaction"]["transaction_id"]
+        matched = self.client.post(
+            "/api/v1/me/plan/planned-expenses/planned-health/match",
+            json={"transaction_id": transaction_id},
+            headers=self.mutate_headers("plan-match"),
+        )
+        self.assertEqual(matched.status_code, 200)
+        self.assertEqual(
+            matched.get_json()["data"]["progress"]["reserved_remaining_krw"], 0
+        )
+
     def test_income_update_and_delete_routes(self) -> None:
         self.put_profile()
         created = self.client.post(

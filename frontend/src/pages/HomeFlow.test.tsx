@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter } from "../router";
-import { demoProfile, demoSettings, demoSummary, demoTransactions } from "../demo";
+import { demoPlanState, demoProfile, demoSettings, demoSummary, demoTransactions } from "../demo";
 import { manualDraftKey } from "../local-drafts";
 import { HomePage, ManualTransactionPage, ReasonPage } from "./HomeFlow";
 
@@ -175,20 +175,40 @@ describe("demo financial consistency", () => {
       demo: true,
       getTransaction: vi.fn().mockResolvedValue({ transaction: demoTransactions[0] }),
       profile: demoProfile,
+      plan: demoPlanState,
       settings: demoSettings,
       summary: demoSummary,
       transactions: demoTransactions,
     });
   });
 
-  it("derives the Home budget and goal values from the shared demo records", () => {
+  it("leads with plan-period flexible living money and input freshness", () => {
     window.history.replaceState({}, "", "/?demo=1");
     render(<BrowserRouter><HomePage /></BrowserRouter>);
 
-    expect(screen.getByText("422,500원")).toBeInTheDocument();
-    expect(screen.getByText("예산의 53% 남음")).toBeInTheDocument();
+    expect(screen.getByText("322,500원")).toBeInTheDocument();
+    expect(screen.getByText(/직접 입력된 거래 기준/)).toBeInTheDocument();
+    expect(screen.getByText("이번 주 배정")).toBeInTheDocument();
+    expect(screen.getByText("이번 주 남음")).toBeInTheDocument();
     expect(screen.getByText("목표까지 30%")).toBeInTheDocument();
     expect(screen.queryByText("623,000원")).not.toBeInTheDocument();
+  });
+
+  it("uses budget spending rather than total expense for the reason signal", async () => {
+    mocks.useLedger.mockReturnValue({
+      answerReason: vi.fn(),
+      demo: true,
+      getTransaction: vi.fn().mockResolvedValue({ transaction: demoTransactions[0] }),
+      profile: demoProfile,
+      plan: demoPlanState,
+      settings: demoSettings,
+      summary: { ...demoSummary, total_spent_krw: 500_000, budget_spent_krw: 100_000 },
+      transactions: demoTransactions,
+    });
+    window.history.replaceState({}, "", "/transactions/tx-cafe/reason?demo=1");
+    render(<BrowserRouter><ReasonPage /></BrowserRouter>);
+
+    expect(await screen.findByText("생활비 예산 13% 사용")).toBeInTheDocument();
   });
 
   it("shows the same weekly recurrence count used by the demo judgment", async () => {

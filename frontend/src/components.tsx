@@ -234,7 +234,7 @@ export function EvidenceList({ judgment, transaction }: { judgment: Judgment; tr
 const navItems = [
   { to: "/", label: "홈", icon: House },
   { to: "/ledger", label: "장부", icon: BookOpenText },
-  { to: "/agent", label: "에이전트", icon: UserCircle },
+  { to: "/plan", label: "계획", icon: CalendarBlank },
   { to: "/report", label: "리포트", icon: ChartBar },
 ];
 

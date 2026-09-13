@@ -6,6 +6,7 @@ import type {
   Signals,
   Summary,
   Transaction,
+  SpendingPlanState,
 } from "./types";
 
 export const demoProfile: Profile = {
@@ -242,6 +243,77 @@ export const demoSummary: Summary = {
       spent_krw: 9_000,
     },
     goal_impact_days: 1,
+  },
+};
+
+export const demoPlanState: SpendingPlanState = {
+  plan: {
+    plan_id: "plan-demo",
+    period_start: "2026-08-01",
+    period_end: "2026-08-31",
+    confirmed_budget_krw: 800_000,
+    priorities: [
+      { priority_id: "priority-1", name: "친구와의 약속", rank: 1 },
+      { priority_id: "priority-2", name: "건강", rank: 2 },
+    ],
+    allocations: [
+      { allocation_id: "segment-1", label: "1주차", start_date: "2026-08-01", end_date: "2026-08-03", amount_krw: 200_000 },
+      { allocation_id: "segment-2", label: "2주차", start_date: "2026-08-04", end_date: "2026-08-10", amount_krw: 200_000 },
+      { allocation_id: "segment-3", label: "3주차", start_date: "2026-08-11", end_date: "2026-08-17", amount_krw: 200_000 },
+      { allocation_id: "segment-4", label: "남은 기간", start_date: "2026-08-18", end_date: "2026-08-31", amount_krw: 200_000 },
+    ],
+    planned_expenses: [
+      { planned_expense_id: "planned-gift", name: "생일 선물", amount_krw: 100_000, due_date: "2026-08-20", category: "shopping", matched_transaction_id: null, matched_at: null },
+    ],
+    status: "active",
+    version: 1,
+    confirmed_at: "2026-08-01T00:00:00Z",
+    created_at: "2026-08-01T00:00:00Z",
+    updated_at: "2026-08-03T03:00:00Z",
+    revisions: [],
+    check_ins: [],
+  },
+  original_plan: {
+    plan_id: "plan-demo",
+    period_start: "2026-08-01",
+    period_end: "2026-08-31",
+    confirmed_budget_krw: 800_000,
+    priorities: [
+      { priority_id: "priority-1", name: "친구와의 약속", rank: 1 },
+      { priority_id: "priority-2", name: "건강", rank: 2 },
+    ],
+    allocations: [],
+    planned_expenses: [],
+    status: "active",
+    version: 1,
+    confirmed_at: "2026-08-01T00:00:00Z",
+    created_at: "2026-08-01T00:00:00Z",
+    updated_at: "2026-08-03T03:00:00Z",
+  },
+  progress: {
+    period_start: "2026-08-01",
+    period_end: "2026-08-31",
+    confirmed_budget_krw: 800_000,
+    actual_spent_krw: 377_500,
+    reserved_remaining_krw: 100_000,
+    total_remaining_krw: 422_500,
+    flexible_remaining_krw: 322_500,
+    shortfall_krw: 0,
+    segments: [
+      { allocation_id: "segment-1", label: "1주차", start_date: "2026-08-01", end_date: "2026-08-03", amount_krw: 200_000, actual_spent_krw: 137_500, reserved_remaining_krw: 0, total_remaining_krw: 62_500, flexible_remaining_krw: 62_500 },
+    ],
+    current_segment_id: "segment-1",
+    latest_input_at: "2026-08-03T02:45:00Z",
+  },
+  next_action: "이번 구간 남은 생활비 안에서 다음 지출 한 건을 기록하세요.",
+  narrative: {
+    headline: "현재 구간은 계획 안에서 움직이고 있어요.",
+    explanation: "입력된 거래와 아직 남은 예약을 분리해 생활비 흐름을 확인했어요.",
+    segment_focuses: [{ allocation_id: "segment-1", focus: "우선순위와 예약을 먼저 확인하세요." }],
+    next_action: "다음 지출 전에 현재 구간의 남은 생활비를 확인하세요.",
+    assumptions: ["사용자가 직접 입력한 거래가 최신 상태라고 가정했어요."],
+    confidence: "medium",
+    fallback_used: true,
   },
 };
 

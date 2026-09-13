@@ -2,8 +2,8 @@
 
 ## Current State
 
-- Phase: 7 - household-ledger parity
-- Active task: Task 7.2 - new Supabase project activation and Kakao production release
+- Phase: 8 - AI spending-plan coach
+- Active task: None - Task 8.0 completed locally and ready for review
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -594,7 +594,7 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 - The comparison distinguishes official claims from code-verified current capabilities and does not claim review, revenue, or subscriber figures that the stores do not publish.
 - Frontend tests, lint, TypeScript/build, and 390px/desktop browser checks pass.
 
-## Task 7.2 - New Supabase Project and Kakao Release (Active)
+## Task 7.2 - New Supabase Project and Kakao Release (Deferred at external production gate)
 
 ### Scope
 
@@ -614,6 +614,46 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 - [ ] Apply matching Vercel/Render settings, commit, push, deploy, and verify service health.
 - [ ] Verify real Kakao login, transaction persistence across logout/login, and both modes.
 - [ ] Report physical-device verification separately; browser resizing is not a real-device test.
+
+The remaining Task 7.2 work requires coordinated provider configuration, release, and owner-controlled authenticated/device verification. It remains deferred at that external production gate while local product work continues; no completed setup evidence is erased.
+
+## Task 8.0 - AI Budget and Spending-Plan Coach (Completed Locally)
+
+### Goal
+
+Evolve the ledger into a plan-led spending coach. The user confirms one discretionary budget for an explicit period, reserves known expenses inside that same budget, follows deterministic date-segment progress, and receives one bounded qualitative AI action without giving the model authority over any financial number.
+
+### Scope
+
+- Add one encrypted active spending-plan projection with append-only activation, revision, check-in, and planned-expense-match events in memory and Redis.
+- Store the plan period, confirmed discretionary budget, up to three priorities, deterministic weekly/date segments, planned expenses, version, history, status, and timestamps.
+- Calculate actual spend only from in-period expense transactions where `exclude_from_budget=false`; keep total expense reporting unchanged.
+- Define `total remaining = confirmed budget - actual spend`, `reserved remaining = unresolved planned expenses`, and `flexible remaining = total remaining - reserved remaining`, preserving negative shortfalls.
+- Support non-persistent setup and revision previews, explicit activation/apply, maintain-or-adjust check-ins, and manual matching of one owned expense to one planned expense.
+- Add a privacy-bounded qualitative plan advisor using OpenAI Responses strict JSON Schema, `store=false`, aggregate allowlisted input, deterministic numeric facts, and an honest fallback.
+- Replace the bottom navigation with 홈/장부/계획/리포트; add the three-step Plan flow, plan-led Home, original/current/actual Report comparison, and post-expense plan impact.
+- Revise `TECHSPEC.md` and `DESIGN.md` under this dedicated approved task and update implementation documentation.
+
+### Ordered Checkpoints
+
+- [x] Add deterministic plan domain models, progress formulas, matching rules, revisions, and check-ins.
+- [x] Persist encrypted plan projections and append-only events in memory and Redis with idempotency and deletion coverage.
+- [x] Add authenticated preview, activation, revision, check-in, and match APIs.
+- [x] Add a strict-schema qualitative plan advisor with an aggregate allowlist and deterministic fallback.
+- [x] Implement Plan setup/editing, active coaching, Agent-content consolidation, Home, Report, navigation, and post-expense impact.
+- [x] Update product, technical, design, handoff, and append-only progress documentation.
+- [x] Run backend, Redis, frontend, compile, lint, build, diff, secret-pattern, and responsive browser verification.
+
+### Acceptance Criteria
+
+- Code owns all budgets, totals, reservations, segment progress, before/after differences, and shortfalls; AI output contains qualitative narrative only.
+- Preview endpoints never persist, and activation/revision/check-in/match mutations require idempotency keys and enforce ownership.
+- Matching replaces an unresolved reservation with an already-counted actual expense and prevents one transaction from matching twice.
+- Memory and Redis keep encrypted current projections, append-only plan events, backward-compatible empty defaults, and complete deletion behavior.
+- The plan advisor never receives merchant, memo, raw reason, reflection note, account name, user identity, or a raw transaction list; timeout/schema/safety failure returns a marked deterministic fallback.
+- Home uses `budget_spent_krw` for the legacy monthly budget fallback and plan/signals respect the configured timezone and excluded-expense flag.
+- Setup, active progress, revision preview/apply, check-in, matching, Home, Report, nav, and post-expense impact are covered by frontend tests.
+- Backend unit/integration/API tests, Redis integration when available, frontend tests/lint/build, compile, and browser QA pass or external limitations are reported precisely.
 
 ## Archived Work
 

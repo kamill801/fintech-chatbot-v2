@@ -123,6 +123,145 @@ export interface TransactionDetail {
 
 export interface TransactionResult extends TransactionDetail {
   signals?: Signals;
+  plan_impact?: PlanImpact;
+}
+
+export interface PlanImpact {
+  transaction_id: string;
+  amount_krw: number;
+  total_remaining_krw: number;
+  reserved_remaining_krw: number;
+  flexible_remaining_krw: number;
+  shortfall_krw: number;
+  message: string;
+}
+
+export interface PlanPriority {
+  priority_id: string;
+  name: string;
+  rank: number;
+}
+
+export interface PlanAllocation {
+  allocation_id: string;
+  label: string;
+  start_date: string;
+  end_date: string;
+  amount_krw: number;
+}
+
+export interface PlannedExpense {
+  planned_expense_id: string;
+  name: string;
+  amount_krw: number;
+  due_date: string;
+  category: string;
+  matched_transaction_id: string | null;
+  matched_at: string | null;
+}
+
+export interface PlanRevision {
+  revision_id: string;
+  from_version: number;
+  to_version: number;
+  reason: string | null;
+  applied_at: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+}
+
+export interface PlanCheckIn {
+  check_in_id: string;
+  decision: "maintain" | "adjust";
+  note: string | null;
+  checked_in_at: string;
+  plan_version: number;
+}
+
+export interface SpendingPlan {
+  plan_id: string;
+  period_start: string;
+  period_end: string;
+  confirmed_budget_krw: number;
+  priorities: PlanPriority[];
+  allocations: PlanAllocation[];
+  planned_expenses: PlannedExpense[];
+  status: "draft" | "active";
+  version: number;
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  narrative?: PlanNarrative | null;
+  revisions: PlanRevision[];
+  check_ins: PlanCheckIn[];
+}
+
+export type SpendingPlanSnapshot = Omit<SpendingPlan, "revisions" | "check_ins">;
+
+export interface PlanSegmentProgress extends PlanAllocation {
+  actual_spent_krw: number;
+  reserved_remaining_krw: number;
+  total_remaining_krw: number;
+  flexible_remaining_krw: number;
+}
+
+export interface PlanProgress {
+  period_start: string;
+  period_end: string;
+  confirmed_budget_krw: number;
+  actual_spent_krw: number;
+  reserved_remaining_krw: number;
+  total_remaining_krw: number;
+  flexible_remaining_krw: number;
+  shortfall_krw: number;
+  segments: PlanSegmentProgress[];
+  current_segment_id: string | null;
+  latest_input_at: string | null;
+}
+
+export interface PlanNarrative {
+  headline: string;
+  explanation: string;
+  segment_focuses: Array<{ allocation_id: string; focus: string }>;
+  next_action: string;
+  assumptions: string[];
+  confidence: "low" | "medium" | "high";
+  fallback_used: boolean;
+}
+
+export interface SpendingPlanState {
+  plan: SpendingPlan;
+  original_plan: SpendingPlanSnapshot;
+  progress: PlanProgress;
+  next_action: string;
+  narrative: PlanNarrative;
+  preview?: boolean;
+}
+
+export interface PlanDraft {
+  period_start: string;
+  period_end: string;
+  confirmed_budget_krw: number;
+  priorities: Array<string | PlanPriority>;
+  planned_expenses: Array<{
+    planned_expense_id?: string;
+    name: string;
+    amount_krw: number;
+    due_date: string;
+    category: string;
+  }>;
+}
+
+export interface PlanRevisionPreview {
+  from_version: number;
+  to_version: number;
+  before: SpendingPlanSnapshot;
+  after: SpendingPlanSnapshot;
+  before_progress: PlanProgress;
+  after_progress: PlanProgress;
+  budget_change_krw: number;
+  flexible_remaining_change_krw: number;
+  narrative: PlanNarrative;
 }
 
 export interface WeeklyConcern {

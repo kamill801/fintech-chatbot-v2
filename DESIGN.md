@@ -367,6 +367,48 @@ Token ownership belongs in one future frontend theme module. Do not duplicate ra
 - Global add remains thumb-reachable on mobile and becomes a labeled rail action on desktop.
 - Hover can reveal secondary actions on desktop, but every action remains tap/click accessible without hover.
 
+## Spending-plan coach screens
+
+### Navigation and hierarchy
+
+The primary bottom navigation is `홈 / 장부 / 계획 / 리포트`. Settings remains reachable from the header. The Plan tab replaces the former Agent tab as the durable coaching surface; transaction-bound judgments remain available from the ledger and transaction detail.
+
+Home uses this order when a plan exists:
+
+1. `계획상 남은 생활비` with the inclusive plan period and flexible remaining amount;
+2. input freshness based on the most recent eligible transaction, using honest wording when no transaction exists;
+3. the current date segment's allowance, actual spend, reservation, and remaining amount;
+4. one qualitative plan action or a weekly maintain/adjust check-in;
+5. recent transactions.
+
+When no plan exists, Home explains that a confirmed plan is needed and links to `계획 만들기`. The legacy monthly card may remain secondary and must use budget-included spend rather than total expenses.
+
+### Plan setup
+
+The setup flow uses one job per step:
+
+1. `기간과 생활비`: choose inclusive start/end dates and enter the total spendable discretionary budget. Copy states that known expenses remain inside this total.
+2. `우선순위와 예정 지출`: add up to three priorities and add, edit, or remove planned expenses with category, amount, and due date.
+3. `확인하고 시작`: show code-calculated allocations, reservation, flexible amount, assumptions, and the qualitative advisor narrative. The primary action is `이 계획 확정하기` and activation requires explicit confirmation.
+
+### Active plan, revision, and check-in
+
+The active Plan screen leads with flexible remaining, then separates actual spend, unresolved reservations, and total remaining. Negative values use shortage language and never display as zero. Weekly/date segments show their exact boundaries and deterministic progress. The former Agent content lives here as weekly briefing, any pending grandma-mode reason question, and the spending-rules link; `/agent` redirects for backward compatibility.
+
+`계획 수정` reuses the setup inputs but cannot apply immediately. It first shows a before/after preview with version, budget change, and flexible-remaining change calculated by the backend; only `변경 적용하기` persists the revision. Revision history preserves the original plan for Report.
+
+Weekly check-in offers `유지하기` and `조정하기`. Maintain records the check-in and returns to progress. Adjust records the choice and opens the revision flow. Planned expenses show an explicit transaction selector; matching requires a deliberate user choice, exposes errors inline, and then displays the matched state.
+
+### Report and transaction impact
+
+Report presents three clearly labeled values: `원래 계획`, `현재 계획`, and `실제 지출`. It also shows unresolved reservations and current flexible remaining so a budget increase cannot be mistaken for improved spending.
+
+After an eligible expense save, the ledger shows one brief plan-impact line with the new flexible remaining amount or shortfall. Excluded, income, transfer, and out-of-period entries do not show plan impact.
+
+### AI narrative states
+
+Narrative supports the plan; it never supplies financial figures. Show one headline, explanation, segment focus where available, one next action, assumptions, and confidence. When fallback is used, label it `입력된 장부 기준 안내` and keep every deterministic amount visible separately. Never render a generic chat composer on Plan.
+
 ## Interaction states
 
 - Loading: preserve layout with neutral ruled placeholders; never display `0원` as a loading value.

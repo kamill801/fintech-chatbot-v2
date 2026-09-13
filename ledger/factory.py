@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from ledger.auth import create_production_verifier, parse_cors_origins
 from ledger.adapters.memory import InMemoryLedgerRepository
 from ledger.adapters.openai_judge import OpenAIResponsesJudge
+from ledger.adapters.openai_planner import OpenAIResponsesPlanAdvisor
 from ledger.adapters.redis_store import RedisLedgerRepository
 from ledger.adapters.synthetic import DisabledProductionAccountAdapter
 from ledger.api import create_api_blueprint
@@ -64,6 +65,9 @@ def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
         DisabledProductionAccountAdapter(),
         telemetry_sink=telemetry_sink,
         judgment_quota=judgment_quota,
+        plan_advisor=OpenAIResponsesPlanAdvisor(
+            model=values.get("OPENAI_LEDGER_PLAN_MODEL") or values.get("OPENAI_LEDGER_MODEL")
+        ),
     )
     return service, privacy, repository, ready_check
 

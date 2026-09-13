@@ -1,8 +1,8 @@
 # AI Household Ledger Agent - Production Handoff
 
-> Date: 2026-08-14
+> Date: 2026-09-13
 > Branch: `main`
-> Status: Task 6.4 production hardening verified; production deployment pending this release
+> Status: Task 8.0 spending-plan coach implemented, verified, and committed locally
 
 ## Product Contract
 
@@ -14,6 +14,7 @@ The product is a privacy-first AI household-ledger agent. The default experience
 - Uncertain spending asks exactly one transaction-bound reason question.
 - The MVP reads, asks, judges, and advises. It cannot block payments, transfer money, save automatically, invest, or recommend financial products.
 - Account linkage remains disabled until a read-only provider and compliance scope are separately approved.
+- One active spending plan owns an explicit period and user-confirmed discretionary budget. Code calculates actual spend, unresolved reservations, flexible remaining, segment progress, and revision differences; AI provides qualitative narrative only.
 
 `TECHSPEC.md` is the immutable product/backend contract. `DESIGN.md` owns the approved UI/UX rules, and `PLAN.md` owns active work.
 
@@ -44,12 +45,12 @@ Secrets remain only in provider dashboards. No OpenAI, Redis, Supabase privilege
 
 ## Verification Evidence
 
-- Backend: 101 discovered tests passed; four Redis-only tests were skipped in the default run and passed separately against an isolated Redis instance.
-- Frontend: 32 tests passed; ESLint and the TypeScript/Vite production build passed.
-- Production dependency audit: zero reported vulnerabilities.
+- Backend: 133 discovered tests passed; four Redis-gated tests were skipped in the default run and all four passed separately against an isolated Redis 8.6.2 instance.
+- Frontend: 55 tests passed; ESLint and the TypeScript/Vite production build passed.
 - Python compilation and `git diff --check` passed.
-- Redis integration covers app/worker projections, encrypted storage, idempotency, direct/legacy judgment indexes, TTL behavior, serialized pending-question mutation, and user deletion.
-- Credential-pattern scanning found no committed secret value in the intended release files.
+- Redis integration covers app/worker projections, encrypted plan storage, plan activation replay, idempotency, TTL behavior, direct/legacy judgment indexes, serialized pending-question mutation, and user deletion.
+- Responsive browser QA covered the active plan, editable revision list, qualitative advisor preview, and `/agent` redirect at 390x844 and 1280x900.
+- Credential-pattern scanning found no secret value in the intended Task 8.0 files.
 
 ## Remaining External Verification
 
@@ -59,6 +60,14 @@ Secrets remain only in provider dashboards. No OpenAI, Redis, Supabase privilege
 - Render Free may cold-start after inactivity; `/health` and `/ready` must be rechecked after each release.
 - Financial-provider linkage, Kakao production transport, and every money-movement capability remain outside the verified MVP.
 
+## Task 8.0 Spending-Plan Coach
+
+- The authenticated plan API supports non-persistent setup/revision previews, explicit activation/apply, maintain-or-adjust check-ins, and manual planned-expense matching.
+- Current plan projections and append-only plan events use the existing encrypted memory/Redis repository boundary and are purged on user deletion.
+- Home leads with the explicit plan period and flexible remaining; Plan provides the three-step setup and revision flow; Report compares original/current/actual; eligible expense responses include deterministic plan impact.
+- The qualitative OpenAI plan advisor uses strict JSON Schema, `store=false`, aggregate-only allowlisted input, and deterministic fallback. Merchant, memo, raw reason, reflection note, account name, user identity, and raw transactions are excluded. Its validated result is encrypted with the plan version, so ordinary reads do not repeat model calls.
+- Task 7.2 remains deferred at its external provider/release gate; no provider setting, production deployment, credential, or stored Redis data changed during Task 8.0.
+
 ## Next Task
 
-No task is active after 6.4. A new product or UI/UX change requires a dedicated approved task in `PLAN.md`. Do not weaken the trusted auth, privacy allowlist, idempotency, quota, or no-money-movement boundaries for convenience.
+Production provider cutover, live OpenAI quality, authenticated production flow, and physical-device E2E remain external gates; Task 7.2 stays deferred.

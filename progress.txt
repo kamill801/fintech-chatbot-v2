@@ -222,3 +222,17 @@ Why: Matching frontend Auth configuration and backend issuer are required before
 Next: After that approval, obtain only the public client key, prepare matching Vercel Auth variables and the Render issuer, push the scoped release and verify deployments. Real Kakao consent/callback, logout/login persistence, both modes and physical-device tests remain pending. Do not treat provider configuration or a public redirect as E2E completion.
 Issues: No production environment values changed in this resume. Preserve Redis and both ledger identity/encryption secrets; no automatic account migration. Push is held to prevent an unmatched issuer deployment. Local-only .agents/ and AGENTS.md remain excluded.
 ---
+
+[2026-09-13 23:10] [Phase 8 / Task 8.0] (local completion)
+What: 명시 기간과 사용자 확정 생활비를 기준으로 한 소비 계획 도메인, 주간 구간 배정, 예정 지출 예약·실제 거래 매칭, 버전별 수정 미리보기·적용, 유지·조정 체크인을 추가했다. 현재 계획과 이벤트는 기존 암호화 경계 안에서 메모리와 Redis에 저장하며, 홈은 계획상 남은 생활비·입력 최신성·이번 주 금액·행동을 우선 표시한다. 계획 화면에는 3단계 생성과 예정 지출 추가·수정·삭제, 주간 AI 브리핑, 대기 중 이유 질문, 소비 기준을 통합했고 `/agent`는 `/plan`으로 연결한다. 리포트는 최초 계획·현재 계획·실제 사용을 비교하고, 예산 포함 지출 뒤에는 결정론적 계획 영향을 보여준다.
+Why: 월 예산과 총지출을 단순 요약하는 장부에서 벗어나, 이미 예정된 지출과 실제 사용을 이중 계산하지 않으면서 사용자가 확인·수정할 수 있는 생활비 실행 계획을 제공하기 위해서다. 모든 금액과 차이는 코드가 계산하고, OpenAI 계획 어드바이저는 엄격한 JSON 스키마와 집계 allowlist 안에서 정성적 설명과 다음 행동만 반환하도록 경계를 고정했다.
+Next: 사용자 검토 후 의도한 Task 8.0 파일만 커밋한다. 라이브 OpenAI 품질, 운영 인증 흐름, 카카오 공급자 전환·배포, 실기기 E2E는 소유자 접근이 필요한 별도 외부 검증으로 유지한다.
+Issues: backend 133개 통과·기본 실행에서 Redis 4개 skip, 격리 Redis 8.6.2 통합 4개 전부 통과, frontend 55개 통과, lint, production build, compileall, diff check, 비밀값 패턴 검사와 390x844·1280x900 브라우저 QA를 통과했다. 라이브 모델 호출·운영 인증·배포는 실행하지 않았고, `.agents/`와 `AGENTS.md`는 기존 로컬 전용 파일로 건드리지 않았다.
+---
+
+[2026-09-13 23:17] [Phase 8 / Task 8.0] (final review)
+What: 최종 검토에서 확정된 AI 계획 코칭 문구를 계획 버전과 함께 암호화 저장하도록 보완했다. 계획 조회는 저장된 문구를 재사용하고, 이전 형식의 계획에는 결정론적 대체 문구만 적용하므로 새로고침이나 재조회가 반복 모델 비용과 문구 변화를 만들지 않는다. 체크인은 저장 성공 후에만 조정 화면으로 이동하도록 실패 처리를 보강했다.
+Why: AI는 명시적인 계획 생성·수정 시점에만 정성적 도움을 주고, 일상적인 장부 조회는 예측 가능하고 비용이 안정적이어야 한다.
+Next: Task 8.0을 한 개 로컬 커밋으로 닫는다. 라이브 OpenAI 품질, 운영 인증, 카카오 공급자 전환·배포, 실기기 E2E는 외부 검증 게이트로 유지한다.
+Issues: 전체 backend 134개 통과(기본 실행에서 Redis 4개 skip), 격리 Redis 8.6.2 통합 4개 전부 통과, frontend 55개 통과, lint, production build, compileall, diff check를 통과했다. 라이브 모델·운영 환경·배포에는 변경을 가하지 않았다. `.agents/`와 `AGENTS.md`는 기존 로컬 전용 파일로 계속 제외한다.
+---

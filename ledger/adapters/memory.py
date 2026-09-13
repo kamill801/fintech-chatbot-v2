@@ -14,6 +14,10 @@ from ledger.domain.events import (
     EVENT_JUDGMENT_REASON_REQUESTED,
     EVENT_LEGACY_IMPORTED,
     EVENT_PROFILE_UPSERTED,
+    EVENT_PLAN_ACTIVATED,
+    EVENT_PLAN_CHECKED_IN,
+    EVENT_PLANNED_EXPENSE_MATCHED,
+    EVENT_PLAN_REVISED,
     EVENT_SETTINGS_UPDATED,
     EVENT_SHARE_CLICKED,
     EVENT_SHARE_SUCCEEDED,
@@ -38,6 +42,7 @@ from ledger.domain.models import (
     utc_now_iso,
 )
 from ledger.domain.ports import LedgerRepository, StoredResult
+from ledger.domain.plans import SpendingPlan
 from ledger.privacy import PrivacyService
 
 
@@ -46,6 +51,7 @@ class _UserStore:
     events: list[EventEnvelope] = field(default_factory=list)
     profile: str | None = None
     settings: str | None = None
+    spending_plan: str | None = None
     transactions: dict[str, str] = field(default_factory=dict)
     transaction_order: dict[str, str] = field(default_factory=dict)
     judgments: dict[str, str] = field(default_factory=dict)
@@ -130,6 +136,87 @@ class InMemoryLedgerRepository(LedgerRepository):
             idempotency_key,
             lambda store: self._update_settings(
                 store, user_ref, settings, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def get_spending_plan(self, user_ref: str) -> SpendingPlan | None:
+        encrypted = self._users[user_ref].spending_plan
+        if encrypted is None:
+            return None
+        return SpendingPlan.from_dict(self._privacy.decrypt_json(encrypted))
+
+    def activate_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda store: self._store_spending_plan(
+                store, plan, EVENT_PLAN_ACTIVATED, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def revise_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda store: self._store_spending_plan(
+                store, plan, EVENT_PLAN_REVISED, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def check_in_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda store: self._store_spending_plan(
+                store, plan, EVENT_PLAN_CHECKED_IN, idempotency_key, correlation_id, source
+            ),
+        )
+
+    def match_planned_expense(
+        self,
+        plan: SpendingPlan,
+        planned_expense_id: str,
+        transaction_id: str,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        return self._mutate(
+            plan.user_ref,
+            idempotency_key,
+            lambda store: self._store_spending_plan(
+                store,
+                plan,
+                EVENT_PLANNED_EXPENSE_MATCHED,
+                idempotency_key,
+                correlation_id,
+                source,
+                metadata={
+                    "planned_expense_id": planned_expense_id,
+                    "transaction_id": transaction_id,
+                },
             ),
         )
 
@@ -574,6 +661,31 @@ class InMemoryLedgerRepository(LedgerRepository):
         store.transaction_order[transaction.transaction_id] = transaction.occurred_at
         store.metrics["transactions_recorded"] += 1
         return StoredResult(201, {"transaction": payload})
+
+    def _store_spending_plan(
+        self,
+        store: _UserStore,
+        plan: SpendingPlan,
+        event_type: str,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> StoredResult:
+        payload = plan.to_dict()
+        self._append_event(
+            store,
+            plan.user_ref,
+            event_type,
+            payload,
+            idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
+            source=source,
+            redacted_metadata={"plan_version": plan.version, **dict(metadata or {})},
+        )
+        store.spending_plan = self._privacy.encrypt_json(payload)
+        return StoredResult(200, {"plan": payload})
 
     def _update_transaction(
         self,

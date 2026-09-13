@@ -13,6 +13,7 @@ from ledger.domain.models import (
     Transaction,
     UserSettings,
 )
+from ledger.domain.plans import SpendingPlan
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,56 @@ class LedgerRepository(ABC):
         self,
         user_ref: str,
         settings: UserSettings,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_spending_plan(self, user_ref: str) -> SpendingPlan | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def activate_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
+    def revise_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
+    def check_in_spending_plan(
+        self,
+        plan: SpendingPlan,
+        *,
+        idempotency_key: str,
+        correlation_id: str,
+        source: str = "api",
+    ) -> StoredResult:
+        raise NotImplementedError
+
+    @abstractmethod
+    def match_planned_expense(
+        self,
+        plan: SpendingPlan,
+        planned_expense_id: str,
+        transaction_id: str,
         *,
         idempotency_key: str,
         correlation_id: str,
