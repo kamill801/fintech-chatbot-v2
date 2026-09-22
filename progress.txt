@@ -236,3 +236,10 @@ Why: AI는 명시적인 계획 생성·수정 시점에만 정성적 도움을 �
 Next: Task 8.0을 한 개 로컬 커밋으로 닫는다. 라이브 OpenAI 품질, 운영 인증, 카카오 공급자 전환·배포, 실기기 E2E는 외부 검증 게이트로 유지한다.
 Issues: 전체 backend 134개 통과(기본 실행에서 Redis 4개 skip), 격리 Redis 8.6.2 통합 4개 전부 통과, frontend 55개 통과, lint, production build, compileall, diff check를 통과했다. 라이브 모델·운영 환경·배포에는 변경을 가하지 않았다. `.agents/`와 `AGENTS.md`는 기존 로컬 전용 파일로 계속 제외한다.
 ---
+
+[2026-09-23 00:16] [Phase 7 / Task 7.2] (production cutover verified; real Kakao consent pending)
+What: 새 Supabase `jangbu-ai` 프로젝트의 production/local redirect, 기존 Kakao 앱 callback, Kakao provider와 email-less 설정을 연결했다. 기존 Vercel `upglow/jangbu-ai`를 새 공개 Auth 값으로 production 배포하고 Render `jangbu-api`의 issuer를 같은 프로젝트로 바꾼 뒤 `7346cd2`를 수동 배포했다. 분리된 브라우저의 production 카카오 버튼이 새 callback을 포함한 카카오계정 로그인 화면까지 이동하는 것을 확인했다.
+Why: 삭제된 이전 Supabase 도메인 때문에 발생한 `DNS_PROBE_FINISHED_NXDOMAIN`을 제거하고 frontend와 backend가 같은 JWT issuer를 사용하게 해야 했다.
+Next: Kakao 앱의 비즈 앱 전환 또는 hosted Supabase의 Kakao email scope 문제를 대체하는 인증 경로를 결정한 뒤 실제 동의→callback→프로필/장부 저장→로그아웃/재로그인 유지 E2E를 수행한다. 실제 OpenAI 계획 어드바이저 품질과 실기기 E2E도 별도 운영 검증으로 유지한다.
+Issues: Render 배포는 `Deploy succeeded | Live`, Vercel/public frontend와 Render `/health`, Redis-backed `/ready`는 모두 200이었다. 새 Supabase authorize endpoint는 302로 Kakao에 연결됐고 배포 번들에는 새 project ref만 남았다. 다만 hosted Supabase Kakao 요청에는 `account_email`이 포함됐고 Kakao 앱 `1567306`은 비즈 앱이 아니므로 실제 consent/token exchange는 완료로 판단하지 않았다. 기존 Redis, ledger encryption/user-ref secrets와 Kakao key 값은 변경하거나 파일에 기록하지 않았다. fresh local verification은 backend 134 passes/4 Redis-gated skips, frontend 55 tests, lint/build, compileall, diff/credential scan을 통과했다. `.agents/`와 `AGENTS.md`는 제외했다.
+---

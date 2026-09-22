@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: None - Task 8.0 completed locally and ready for review
+- Active task: Task 7.2 active at the real Kakao consent gate; Task 8.0 is deployed
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -594,11 +594,11 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 - The comparison distinguishes official claims from code-verified current capabilities and does not claim review, revenue, or subscriber figures that the stores do not publish.
 - Frontend tests, lint, TypeScript/build, and 390px/desktop browser checks pass.
 
-## Task 7.2 - New Supabase Project and Kakao Release (Deferred at external production gate)
+## Task 7.2 - New Supabase Project and Kakao Release (Active at real Kakao consent gate)
 
 ### Scope
 
-- Resume the owner-approved provider setup on Supabase project `cvrmgnjniptpncwuuzmj` (`jangbu-ai`, Short Travel, Seoul, Free).
+- Resume the owner-approved provider setup on Supabase project `kkzsyprcujrxzrsognhb` (`jangbu-ai`, Jangbu AI, Seoul, Free).
 - Connect Kakao app `1567306` (`장부`) using its existing REST API key and client secret only in Supabase Auth.
 - Use optional nickname/profile-image consent and allow Kakao users without email.
 - Update the Vercel public Auth configuration and Render JWT issuer together after provider setup is verified.
@@ -607,12 +607,12 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 
 ### Checkpoints
 
-- [x] Create the dedicated free Supabase project and register the production origin.
-- [x] Create Kakao app and configure Login, callback, and optional profile consent.
-- [x] Connect and verify the Supabase Kakao provider (2026-09-07: persisted credentials matched, enabled and email-less options retained, authorize endpoint returned the correct Kakao redirect; real consent/callback remains below).
-- [x] Run local frontend/backend checks and inspect the release diff for secrets (2026-09-08: 49 frontend tests, lint/build, 115 backend passes and 4 environment-dependent skips; no matches in the scoped credential-pattern scan).
-- [ ] Apply matching Vercel/Render settings, commit, push, deploy, and verify service health.
-- [ ] Verify real Kakao login, transaction persistence across logout/login, and both modes.
+- [x] Create the dedicated free Supabase project and register the production origin plus the two port-3015 local QA origins (2026-09-22).
+- [x] Repoint Kakao app `1567306` to the new Supabase callback and preserve the existing optional profile consent (2026-09-22).
+- [x] Connect and verify the new Supabase Kakao provider with email-less users allowed; its public authorize endpoint returns `302` to `kauth.kakao.com` (2026-09-22).
+- [x] Run fresh frontend/backend checks and inspect the release diff for secrets (2026-09-22: 55 frontend tests, lint/build, 134 backend passes with 4 Redis-gated skips, compileall, diff and scoped credential-pattern checks).
+- [x] Apply matching Vercel/Render settings, push, deploy, and verify service health (2026-09-23: Vercel production bundle contains only the current project ref; Render deployed `7346cd2`; `/health` and Redis-backed `/ready` returned 200).
+- [ ] Verify real Kakao login, transaction persistence across logout/login, and both modes. Production reaches the Kakao account login page with the current callback, but hosted Supabase still requests `account_email` while Kakao app `1567306` is not a business app; resolve that provider/app compatibility before claiming consent or callback completion.
 - [ ] Report physical-device verification separately; browser resizing is not a real-device test.
 
 The remaining Task 7.2 work requires coordinated provider configuration, release, and owner-controlled authenticated/device verification. It remains deferred at that external production gate while local product work continues; no completed setup evidence is erased.

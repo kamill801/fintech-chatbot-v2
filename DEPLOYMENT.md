@@ -31,7 +31,7 @@ Never place these values in Git, Vercel client variables, browser code, screensh
 
 - `APP_ENV=production`
 - `LEDGER_STORE=redis`
-- `SUPABASE_URL=https://cvrmgnjniptpncwuuzmj.supabase.co`: the selected public project URL, committed as non-secret Blueprint configuration. Apply together with the frontend Auth configuration during Task 7.2.
+- `SUPABASE_URL=https://kkzsyprcujrxzrsognhb.supabase.co`: the selected public project URL, committed as non-secret Blueprint configuration. Apply together with the frontend Auth configuration during Task 7.2.
 - `SUPABASE_JWT_AUDIENCE=authenticated`
 - `CORS_ALLOWED_ORIGINS=https://jangbu-ai.vercel.app`
 - `LEDGER_RETENTION_DAYS=365`
@@ -58,24 +58,24 @@ Supabase `service_role`, legacy JWT shared secrets, database passwords, Redis cr
 
 ## Kakao OAuth Activation
 
-The replacement project's Kakao provider was saved and verified on 2026-09-07. Production configuration cutover and real consent/callback tests remain pending. The steps below describe the provider setup, not unfinished activation. Kakao credentials belong only in Supabase Auth provider configuration. Do not put them in Vercel, Render, `.env` files committed to Git, screenshots, commands, or logs.
+The current Supabase project was created on 2026-09-22. Its site and redirect URLs, Kakao provider, and Kakao callback are configured. Vercel and Render production use the matching Auth project, and both public backend health probes pass. The production button reaches the Kakao account login page with the current callback, but real consent/callback remains pending because hosted Supabase still requests `account_email` while Kakao app `1567306` is not a business app. Kakao credentials belong only in Supabase Auth provider configuration. Do not put them in Vercel, Render, `.env` files committed to Git, screenshots, commands, or logs.
 
 ### Kakao Developers
 
 1. Create or select the Kakao application and enable Kakao Login.
 2. Register this redirect URI exactly:
 
-   `https://cvrmgnjniptpncwuuzmj.supabase.co/auth/v1/callback`
+   `https://kkzsyprcujrxzrsognhb.supabase.co/auth/v1/callback`
 
 3. Configure consent for `profile_nickname` and `profile_image`. These values are optional display metadata and are not identity keys.
 4. Do not request legal name, phone number, friends, or KakaoTalk message permissions for this MVP.
 5. Copy the REST API key as the OAuth Client ID and create/activate a client secret. Keep both values out of the repository.
 
-Kakao account email is not required by this product. Requesting it can require additional Kakao business-app configuration and must not block login.
+The product does not use Kakao account email as an identity key. Hosted Supabase currently includes `account_email` in the Kakao authorization request even when email-less users are allowed, so production consent must not be considered complete until the Kakao app is eligible for that scope or the provider path is replaced.
 
 ### Supabase Auth
 
-1. Open Authentication -> Providers -> Kakao for project `cvrmgnjniptpncwuuzmj`.
+1. Open Authentication -> Providers -> Kakao for project `kkzsyprcujrxzrsognhb`.
 2. Enable Kakao and enter the Kakao REST API key as Client ID plus the Kakao client secret.
 3. Enable **Allow users without an email**. Nickname/profile consent is optional; an email is not required for ledger ownership.
 4. Keep the Site URL set to `https://jangbu-ai.vercel.app`. Allowlist this origin and the actual local QA origins (`http://localhost:3015` and `http://127.0.0.1:3015`, matching Vite). Verify the dashboard entries before local OAuth testing; a previously registered port 5173 does not cover port 3015.
@@ -85,7 +85,7 @@ The browser receives only the existing Supabase publishable key. Supabase exchan
 
 ### New Auth Project Cutover
 
-The selected replacement project is `jangbu-ai` (`cvrmgnjniptpncwuuzmj`) in the Short Travel organization, on the Free plan in Seoul. Kakao app `장부` has app ID `1567306`. Provider activation, environment cutover, and deployment must each be verified before reporting the migration complete.
+The selected project is `jangbu-ai` (`kkzsyprcujrxzrsognhb`) in the Jangbu AI organization, on the Free plan in Seoul. Kakao app `장부` has app ID `1567306`. Provider activation, environment cutover, and deployment must each be verified before reporting the migration complete.
 
 Switch `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel together with `SUPABASE_URL` in Render. Keep Redis, `LEDGER_ENCRYPTION_KEY`, and `LEDGER_USER_REF_SECRET` unchanged. Keep the prior deployment and Auth project available for rollback until authenticated tests pass.
 
@@ -99,18 +99,19 @@ Supabase user IDs do not transfer automatically between projects. Existing Redis
 - [x] Verify Render `GET /health` and `GET /ready`; readiness proves current Redis connectivity.
 - [x] Configure Vercel's public API/Supabase variables and set `VITE_DEMO_DEFAULT=0`.
 - [x] Deploy the login-based live frontend at the production alias.
-- [x] Configure Kakao Login in Kakao Developers and the replacement Supabase project (2026-09-07).
-- [ ] Apply matching production Auth settings and complete a real consent/callback session.
+- [x] Update Kakao Login for the current Supabase callback and configure the current project's Kakao provider (2026-09-22).
+- [x] Apply matching production Auth settings and verify Vercel, Render `/health`, and Redis-backed `/ready` (2026-09-23).
+- [ ] Complete a real consent/callback session after resolving the Kakao `account_email` compatibility gate.
 - [ ] Complete an authenticated production profile read/write, transaction, reason, judgment, correction, sign-out, and live OpenAI quality check with an owner-controlled test account.
 
 ## Provider Status and Pending Cutover
 
-The existing deployment observations below are historical unless explicitly dated. On 2026-09-07, the replacement Supabase Kakao provider was saved and re-opened: Kakao and email-less sign-in were enabled, and the stored client secret matched the existing Kakao Login secret. Credential values were not printed or written to files. A public authorization request returned HTTP 302 to `kauth.kakao.com` with the exact new-project callback. This checks provider routing, not consent, token exchange, or application data access. Vercel project `upglow/jangbu-ai` and its four production environment variable names were last verified on 2026-09-05; no production Auth cutover has been completed.
+The existing deployment observations below are historical unless explicitly dated. On 2026-09-22, the current Supabase project was created and its production plus local QA redirect URLs were saved. Kakao app `1567306` now uses the current Supabase callback; Kakao and email-less sign-in are enabled, and a public authorization request returns HTTP 302 to `kauth.kakao.com`. On 2026-09-23, Vercel project `upglow/jangbu-ai` was deployed with the matching public values and Render deployed commit `7346cd2` with the matching `SUPABASE_URL`; the public frontend, `/health`, and Redis-backed `/ready` returned 200. A clean production-browser run reached the Kakao account login page with the current callback. The generated request still contained `account_email`, and Kakao Developers identified the app as non-business. Real consent, token exchange, and authenticated application data access therefore remain unverified.
 
 - Vercel frontend: live-mode login is deployed at `https://jangbu-ai.vercel.app`. Production has `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_DEMO_DEFAULT` registered.
-- Supabase: the previous deployment used project `ijdodqldneduqeblkivo`. The replacement is `cvrmgnjniptpncwuuzmj`; its Kakao provider is configured, but it is not yet wired into production. Do not infer current old-project health or authentication settings from previous checks. Real consent/callback and authenticated persistence remain unverified.
+- Supabase: previous project references are not part of the current account. The current project is `kkzsyprcujrxzrsognhb`; its site and redirect URLs plus Kakao provider are configured, including email-less users. Provider routing is verified, while real consent/callback and authenticated persistence remain unverified.
 - Upstash: the Free Redis database is provisioned in Tokyo. Credentials remain server-side in Render; a successful readiness response proves current connectivity.
-- Render: `https://jangbu-api.onrender.com` runs the Free Flask web service in Singapore. Each release must re-check both `GET /health` and Redis-backed `GET /ready` after auto-deploy.
+- Render: `https://jangbu-api.onrender.com` runs the Free Flask web service in Singapore. Manual deployment `dep-dap9ldbm8hqs73a8ao60` made commit `7346cd2` live on 2026-09-23; both `GET /health` and Redis-backed `GET /ready` returned 200 afterward.
 - OpenAI: the owner configured the server-side key in Render. A live model response and judgment-quality evaluation have not been independently verified.
 - Kakao consent/callback and authenticated profile, transaction, reason, judgment, correction, sign-out, and repeat-login persistence E2E remain separate production verification gates.
 
