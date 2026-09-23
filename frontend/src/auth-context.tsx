@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { authConfigured, supabase } from "./auth-client";
+import { finishKakaoLogin, isKakaoCallback, startKakaoLogin } from "./kakao-login";
 import { clearFinancialDrafts } from "./local-drafts";
 
 interface AuthContextValue {
@@ -47,16 +48,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let active = true;
-    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
-      if (!active) return;
-      setSession(data.session);
-      setError(sessionError ? "로그인 상태를 확인하지 못했어요." : null);
-      setLoading(false);
-    });
+    const callbackPending = isKakaoCallback();
+    if (callbackPending) {
+      void finishKakaoLogin(supabase).then((nextSession) => {
+        if (!active) return;
+        setSession(nextSession);
+      }).catch(() => {
+        if (!active) return;
+        setError("카카오 로그인을 완료하지 못했어요. 다시 시도해 주세요.");
+      }).finally(() => {
+        if (active) setLoading(false);
+      });
+    } else {
+      void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+        if (!active) return;
+        setSession(data.session);
+        setError(sessionError ? "로그인 상태를 확인하지 못했어요." : null);
+        setLoading(false);
+      });
+    }
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!active) return;
       setSession(nextSession);
-      setLoading(false);
+      if (!callbackPending) setLoading(false);
     });
     return () => {
       active = false;
@@ -80,11 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithKakao = useCallback(async () => {
     if (!supabase) throw new Error("auth_not_configured");
     setError(null);
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "kakao",
-      options: { redirectTo: window.location.origin },
-    });
-    if (oauthError) {
+    try {
+      await startKakaoLogin();
+    } catch (oauthError) {
       setError("카카오 로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.");
       throw oauthError;
     }

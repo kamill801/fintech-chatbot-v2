@@ -110,6 +110,8 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             allow_dev_auth=allow_dev_auth,
             auth_verifier=auth_verifier,
             cors_allowed_origins=cors_allowed_origins,
+            kakao_client_id=values.get("KAKAO_REST_API_KEY", ""),
+            kakao_client_secret=values.get("KAKAO_LOGIN_CLIENT_SECRET", ""),
         )
     )
     build_dir = Path(

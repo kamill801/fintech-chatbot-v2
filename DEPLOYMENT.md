@@ -58,7 +58,7 @@ Supabase `service_role`, legacy JWT shared secrets, database passwords, Redis cr
 
 ## Kakao OAuth Activation
 
-The current Supabase project was created on 2026-09-22. Its site and redirect URLs, Kakao provider, and Kakao callback are configured. Vercel and Render production use the matching Auth project, and both public backend health probes pass. The production button reaches the Kakao account login page with the current callback, but real consent/callback remains pending because hosted Supabase still requests `account_email` while Kakao app `1567306` is not a business app. Kakao credentials belong only in Supabase Auth provider configuration. Do not put them in Vercel, Render, `.env` files committed to Git, screenshots, commands, or logs.
+The current Supabase project was created on 2026-09-22. Its site and redirect URLs, Kakao provider, and Kakao callback are configured. Vercel and Render production use the matching Auth project, and both public backend health probes pass. The currently deployed button reaches the Kakao account login page, but real consent/callback remains pending because hosted Supabase still requests `account_email` while Kakao app `1567306` is not a business app. The replacement code path below has passed local checks but is not yet deployed. Kakao credentials must stay in trusted server-side provider settings; never put them in Vercel, committed `.env` files, screenshots, commands, or logs.
 
 ### Kakao Developers
 
@@ -68,10 +68,22 @@ The current Supabase project was created on 2026-09-22. Its site and redirect UR
    `https://kkzsyprcujrxzrsognhb.supabase.co/auth/v1/callback`
 
 3. Configure consent for `profile_nickname` and `profile_image`. These values are optional display metadata and are not identity keys.
-4. Do not request legal name, phone number, friends, or KakaoTalk message permissions for this MVP.
+4. Do not request legal name, phone number, friends, or KakaoTalk message permissions for this login flow.
 5. Copy the REST API key as the OAuth Client ID and create/activate a client secret. Keep both values out of the repository.
 
 The product does not use Kakao account email as an identity key. Hosted Supabase currently includes `account_email` in the Kakao authorization request even when email-less users are allowed, so production consent must not be considered complete until the Kakao app is eligible for that scope or the provider path is replaced.
+
+### Kakao account sign-in without email scope
+
+The web login implementation now requests Kakao authorization directly without a `scope` parameter. The frontend keeps a short-lived state, nonce, and PKCE verifier; Kakao returns to `/auth/kakao`, Render exchanges the one-time code using the existing REST key, client secret, and PKCE verifier, and the browser gives the resulting ID token and original nonce to Supabase `signInWithIdToken`. Supabase still issues the application session; the ledger continues to use its verified user ID. The previous Supabase-hosted OAuth callback can remain registered during the transition, but the new button does not use it.
+
+Before releasing this path:
+
+1. In Kakao app `1567306`, enable OpenID Connect and register `https://jangbu-ai.vercel.app/auth/kakao` as a REST API key redirect URI. Both were saved and verified on 2026-09-23; `account_email` remains unavailable and is not configured as a consent item.
+2. In the existing Render `jangbu-api` service, set `KAKAO_REST_API_KEY` to the app's existing REST API key and `KAKAO_LOGIN_CLIENT_SECRET` to its existing active Kakao Login client secret. Both stay server-side; do not place the client secret in Vercel or Git.
+3. Deploy the backend and frontend, then verify Kakao sign-in, Supabase session creation, a protected profile read, sign-out, and repeat sign-in. An authorization-page redirect alone is not a successful login.
+
+The callback route is served by the existing Vercel SPA rewrite. The callback page strips the authorization code from browser history before exchanging it, and the backend returns the ID token with `Cache-Control: no-store`.
 
 ### Supabase Auth
 
@@ -81,7 +93,7 @@ The product does not use Kakao account email as an identity key. Hosted Supabase
 4. Keep the Site URL set to `https://jangbu-ai.vercel.app`. Allowlist this origin and the actual local QA origins (`http://localhost:3015` and `http://127.0.0.1:3015`, matching Vite). Verify the dashboard entries before local OAuth testing; a previously registered port 5173 does not cover port 3015.
 5. Save the provider, then test Kakao consent -> same-origin return -> authenticated profile load -> transaction persistence -> sign-out and sign-in again.
 
-The browser receives only the existing Supabase publishable key. Supabase exchanges the Kakao authorization code server-side; no Kakao client secret belongs in the frontend bundle.
+The browser receives only the existing Supabase publishable key. In the new Kakao sign-in path, Render exchanges the Kakao authorization code; no Kakao client secret belongs in the frontend bundle.
 
 ### New Auth Project Cutover
 
@@ -101,6 +113,8 @@ Supabase user IDs do not transfer automatically between projects. Existing Redis
 - [x] Deploy the login-based live frontend at the production alias.
 - [x] Update Kakao Login for the current Supabase callback and configure the current project's Kakao provider (2026-09-22).
 - [x] Apply matching production Auth settings and verify Vercel, Render `/health`, and Redis-backed `/ready` (2026-09-23).
+- [x] Enable Kakao OIDC and add the production app callback while retaining the Supabase callback (2026-09-23).
+- [ ] Set the existing Kakao key and secret in Render, then deploy the email-scope-free login path.
 - [ ] Complete a real consent/callback session after resolving the Kakao `account_email` compatibility gate.
 - [ ] Complete an authenticated production profile read/write, transaction, reason, judgment, correction, sign-out, and live OpenAI quality check with an owner-controlled test account.
 

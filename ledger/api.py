@@ -4,11 +4,12 @@ from functools import wraps
 from typing import Any, Callable
 from uuid import uuid4
 
-from flask import Blueprint, Response, current_app, g, jsonify, request
+from flask import Blueprint, Response, current_app, g, jsonify, make_response, request
 
 from ledger.auth import AuthenticationError
 from ledger.application.service import LedgerService, ServiceError, ServiceResult
 from ledger.domain.models import DomainValidationError
+from ledger.kakao_login import KakaoLoginError, authorization_url, exchange_code
 from ledger.privacy import PrivacyService
 
 
@@ -20,6 +21,8 @@ def create_api_blueprint(
     allow_dev_auth: bool,
     auth_verifier: Callable[[str], str] | None = None,
     cors_allowed_origins: frozenset[str] = frozenset(),
+    kakao_client_id: str = "",
+    kakao_client_secret: str = "",
 ) -> Blueprint:
     api = Blueprint("ledger_api", __name__)
 
@@ -62,6 +65,49 @@ def create_api_blueprint(
         if not checker():
             return _error("not_ready", "repository is not ready", 503)
         return _success(ServiceResult(200, {"status": "ready"}))
+
+    def kakao_origin() -> str | None:
+        origin = request.headers.get("Origin", "")
+        allowed = cors_allowed_origins
+        if app_env != "production":
+            allowed = allowed | {"http://localhost:3015", "http://127.0.0.1:3015"}
+        return origin if origin in allowed else None
+
+    @api.post("/api/v1/auth/kakao/start")
+    def start_kakao_login() -> Response:
+        origin = kakao_origin()
+        if not origin:
+            return _error("origin_not_allowed", "request origin is not allowed", 403)
+        if not kakao_client_id or not kakao_client_secret:
+            return _error("auth_not_configured", "Kakao login is not configured", 503)
+        payload = _json_body()
+        try:
+            url = authorization_url(
+                kakao_client_id, origin, payload.get("state"), payload.get("nonce_hash"),
+                payload.get("code_challenge"),
+            )
+        except (KakaoLoginError, TypeError):
+            return _error("invalid_request", "invalid Kakao login request", 400)
+        return _success(ServiceResult(200, {"authorization_url": url}))
+
+    @api.post("/api/v1/auth/kakao/exchange")
+    def exchange_kakao_login() -> Response:
+        origin = kakao_origin()
+        if not origin:
+            return _error("origin_not_allowed", "request origin is not allowed", 403)
+        if not kakao_client_id or not kakao_client_secret:
+            return _error("auth_not_configured", "Kakao login is not configured", 503)
+        try:
+            payload = _json_body()
+            token = exchange_code(
+                kakao_client_id, kakao_client_secret, origin,
+                payload.get("code"), payload.get("code_verifier"),
+            )
+        except KakaoLoginError:
+            return _error("kakao_login_failed", "Kakao login failed", 400)
+        response = make_response(_success(ServiceResult(200, {"id_token": token})))
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     def authenticated(handler: Callable[..., Response]) -> Callable[..., Response]:
         @wraps(handler)

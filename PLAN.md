@@ -612,10 +612,12 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 - [x] Connect and verify the new Supabase Kakao provider with email-less users allowed; its public authorize endpoint returns `302` to `kauth.kakao.com` (2026-09-22).
 - [x] Run fresh frontend/backend checks and inspect the release diff for secrets (2026-09-22: 55 frontend tests, lint/build, 134 backend passes with 4 Redis-gated skips, compileall, diff and scoped credential-pattern checks).
 - [x] Apply matching Vercel/Render settings, push, deploy, and verify service health (2026-09-23: Vercel production bundle contains only the current project ref; Render deployed `7346cd2`; `/health` and Redis-backed `/ready` returned 200).
-- [ ] Verify real Kakao login, transaction persistence across logout/login, and both modes. Production reaches the Kakao account login page with the current callback, but hosted Supabase still requests `account_email` while Kakao app `1567306` is not a business app; resolve that provider/app compatibility before claiming consent or callback completion.
+- [x] Enable Kakao OIDC and add the production `/auth/kakao` redirect URI to the existing REST API key while retaining the Supabase callback (2026-09-23).
+- [ ] Deploy the Kakao OIDC ID-token sign-in path without the `account_email` scope. Local frontend/backend implementation, PKCE, and tests are complete; Render credentials and deployment remain pending.
+- [ ] Verify real Kakao login, transaction persistence across logout/login, and both modes. The currently deployed Supabase-hosted OAuth route reaches the Kakao account login page but requests `account_email`; validate the new OIDC route with an owner-controlled account before claiming login completion.
 - [ ] Report physical-device verification separately; browser resizing is not a real-device test.
 
-The remaining Task 7.2 work requires coordinated provider configuration, release, and owner-controlled authenticated/device verification. It remains deferred at that external production gate while local product work continues; no completed setup evidence is erased.
+The remaining Task 7.2 work requires the two existing Kakao credentials in Render, coordinated deployment, and owner-controlled authenticated verification. Do not mark the Kakao login complete from local tests or an authorization-page redirect alone.
 
 ## Task 8.0 - AI Budget and Spending-Plan Coach (Completed Locally)
 

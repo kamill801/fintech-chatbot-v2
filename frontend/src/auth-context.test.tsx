@@ -8,11 +8,19 @@ const authApi = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   signInWithPassword: vi.fn(),
-  signInWithOAuth: vi.fn(),
+  signInWithIdToken: vi.fn(),
   signOut: vi.fn(),
   signUp: vi.fn(),
   unsubscribe: vi.fn(),
 }));
+
+const kakao = vi.hoisted(() => ({
+  isKakaoCallback: vi.fn(() => false),
+  startKakaoLogin: vi.fn(),
+  finishKakaoLogin: vi.fn(),
+}));
+
+vi.mock("./kakao-login", () => kakao);
 
 vi.mock("./auth-client", () => ({
   authConfigured: true,
@@ -21,7 +29,7 @@ vi.mock("./auth-client", () => ({
       getSession: authApi.getSession,
       onAuthStateChange: authApi.onAuthStateChange,
       signInWithPassword: authApi.signInWithPassword,
-      signInWithOAuth: authApi.signInWithOAuth,
+      signInWithIdToken: authApi.signInWithIdToken,
       signOut: authApi.signOut,
       signUp: authApi.signUp,
     },
@@ -50,7 +58,9 @@ describe("AuthProvider", () => {
     authApi.getSession.mockReset().mockResolvedValue({ data: { session: null }, error: null });
     authApi.onAuthStateChange.mockReset().mockReturnValue({ data: { subscription: { unsubscribe: authApi.unsubscribe } } });
     authApi.signInWithPassword.mockReset().mockResolvedValue({ error: null });
-    authApi.signInWithOAuth.mockReset().mockResolvedValue({ error: null });
+    kakao.startKakaoLogin.mockReset().mockResolvedValue(undefined);
+    kakao.finishKakaoLogin.mockReset();
+    kakao.isKakaoCallback.mockReturnValue(false);
     authApi.signUp.mockReset().mockResolvedValue({ data: { session: { access_token: "token" } }, error: null });
     authApi.signOut.mockReset().mockResolvedValue({ error: null });
     authApi.unsubscribe.mockReset();
@@ -71,25 +81,34 @@ describe("AuthProvider", () => {
       password: "password123",
     });
     await user.click(screen.getByRole("button", { name: "kakao" }));
-    expect(authApi.signInWithOAuth).toHaveBeenCalledWith({
-      provider: "kakao",
-      options: { redirectTo: window.location.origin },
-    });
+    expect(kakao.startKakaoLogin).toHaveBeenCalledTimes(1);
     expect(authApi.signUp).toHaveBeenCalledWith({
       email: "new@example.com",
       password: "password123",
     });
   });
 
-  it("surfaces a Kakao OAuth startup failure without affecting the email path", async () => {
+  it("surfaces a Kakao startup failure without affecting the email path", async () => {
     const user = userEvent.setup();
-    authApi.signInWithOAuth.mockResolvedValue({ error: new Error("provider disabled") });
+    kakao.startKakaoLogin.mockRejectedValue(new Error("provider disabled"));
     render(<AuthProvider><AuthActions /></AuthProvider>);
 
     await waitFor(() => expect(screen.queryByText("loading")).not.toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "kakao" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("카카오 로그인을 시작하지 못했어요.");
+  });
+
+  it("waits for the Kakao callback before showing the signed-in app", async () => {
+    kakao.isKakaoCallback.mockReturnValue(true);
+    const session = { user: { id: "kakao-supabase-user" } };
+    kakao.finishKakaoLogin.mockResolvedValue(session);
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+
+    await waitFor(() => expect(screen.queryByText("loading")).not.toBeInTheDocument());
+    expect(kakao.finishKakaoLogin).toHaveBeenCalledTimes(1);
+    expect(authApi.getSession).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent("kakao-supabase-user");
   });
 
   it("keeps ledger ownership on the Supabase user ID while exposing Kakao metadata for display", async () => {
