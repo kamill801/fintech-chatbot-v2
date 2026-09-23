@@ -1,12 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bank,
   BookOpenText,
   CheckCircle,
-  LockKey,
   PencilSimple,
-  ShieldCheck,
   SignOut,
   Wallet,
 } from "@phosphor-icons/react";
@@ -14,7 +12,7 @@ import { BookkeeperMark, CurrencyInput, Highlight, PrimaryButton, Surface } from
 import { demoProfile } from "../demo";
 import { useAuth } from "../auth-context";
 import { useLedger } from "../ledger-context";
-import { onboardingDraftKey } from "../local-drafts";
+import { onboardingDraftKey, onboardingStageKey } from "../local-drafts";
 import { useNavigate } from "../router";
 import type { Profile } from "../types";
 import { formatWon, withDemo } from "../utils";
@@ -33,15 +31,31 @@ function writeDraft(key: string, profile: Profile) {
 }
 
 function StepHeader({ step }: { step: number }) {
+  const { demo } = useLedger();
+  const { signOut, userKey } = useAuth();
   const navigate = useNavigate();
+  const [logoutError, setLogoutError] = useState(false);
+
+  useEffect(() => {
+    const stage = step === 2 ? "baseline" : step === 3 ? "goal" : "source";
+    try {
+      window.sessionStorage.setItem(onboardingStageKey(userKey, demo), stage);
+    } catch {
+      // The setup flow still works when browser storage is unavailable.
+    }
+  }, [demo, step, userKey]);
+
   return (
-    <div className="step-header">
-      {step > 1 ? (
-        <button className="icon-button" aria-label="이전 단계" onClick={() => navigate(-1)}><ArrowLeft size={28} /></button>
-      ) : <span />}
-      <span><strong>{step}</strong> / 4</span>
-      <span />
-    </div>
+    <>
+      <div className="step-header">
+        {step > 2 ? (
+          <button className="icon-button" aria-label="이전 단계" onClick={() => navigate(-1)}><ArrowLeft size={28} /></button>
+        ) : <span />}
+        <span><strong>{step - 1}</strong> / 3</span>
+        {!demo && <button className="onboarding-signout" type="button" onClick={() => void signOut().catch(() => setLogoutError(true))}>로그아웃</button>}
+      </div>
+      {logoutError && <p className="form-error" role="alert">로그아웃하지 못했어요. 다시 시도해 주세요.</p>}
+    </>
   );
 }
 
@@ -65,10 +79,24 @@ function MoneyEditRow({
 
 export function OnboardingTrust() {
   const { demo } = useLedger();
-  const { signOut } = useAuth();
+  const { markIntroSeen, signOut } = useAuth();
   const navigate = useNavigate();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
+
+  async function start() {
+    setStarting(true);
+    setStartError(false);
+    try {
+      if (!demo) await markIntroSeen();
+      navigate(withDemo("/onboarding/baseline", demo));
+    } catch {
+      setStartError(true);
+      setStarting(false);
+    }
+  }
 
   async function logout() {
     setLoggingOut(true);
@@ -82,25 +110,22 @@ export function OnboardingTrust() {
   }
 
   return (
-    <main className="onboarding-page trust-page">
-      <StepHeader step={1} />
-      <div className="onboarding-copy">
-        <h1>내 돈을<br />맡기는 게 아니라,<br /><Highlight>장부</Highlight>를 맡기는 거야.</h1>
-        <BookkeeperMark />
+    <main className="onboarding-page welcome-page">
+      <div className="welcome-content">
+        <p className="welcome-label">AI 가계부 에이전트</p>
+        <h1>장부 AI</h1>
+        <p>지출을 기록하고, 예산과 소비 계획을 함께 관리하세요.</p>
       </div>
-      <Surface className="trust-list">
-        <div><PencilSimple size={27} /><span>내가 직접 입력한 지출만 기록해</span></div>
-        <div><ShieldCheck size={27} /><span>판단할 때 필요한 정보만 AI가 봐</span></div>
-        <div><ArrowLeft className="undo-icon" size={27} /><span>언제든 수정하고 지울 수 있어</span></div>
-      </Surface>
-      <div className="privacy-strip"><LockKey size={25} /> 계좌 연결 없이 시작할 수 있어요</div>
-      <PrimaryButton onClick={() => navigate(withDemo("/onboarding/baseline", demo))}>수기로 시작하기</PrimaryButton>
-      <details className="disclosure">
-        <summary>데이터 처리 방식 보기</summary>
-        <p>상점명과 메모는 장부에 보관되고, 판단에는 금액·분류·예산 신호와 직접 답한 이유만 최소한으로 사용합니다.</p>
-      </details>
-      {!demo && <button className="logout-button" type="button" disabled={loggingOut} onClick={() => void logout()}><SignOut size={21} /> {loggingOut ? "로그아웃 중" : "로그아웃"}</button>}
-      {logoutError && <p role="alert">로그아웃하지 못했어요. 다시 시도해 주세요.</p>}
+      <div className="welcome-actions">
+        {startError && <p className="form-error" role="alert">시작 상태를 저장하지 못했어요. 다시 시도해 주세요.</p>}
+        <PrimaryButton disabled={starting} onClick={() => void start()}>{starting ? "시작하는 중" : "시작하기"}</PrimaryButton>
+        <details className="disclosure welcome-disclosure">
+          <summary>데이터 처리 방식 보기</summary>
+          <p>직접 입력한 기록은 장부에 보관하고, AI에는 판단에 필요한 정보만 전달합니다. 계좌를 연결하지 않아도 사용할 수 있어요.</p>
+        </details>
+        {!demo && <button className="logout-button" type="button" disabled={loggingOut} onClick={() => void logout()}><SignOut size={18} /> {loggingOut ? "로그아웃 중" : "로그아웃"}</button>}
+        {logoutError && <p role="alert">로그아웃하지 못했어요. 다시 시도해 주세요.</p>}
+      </div>
     </main>
   );
 }
@@ -119,8 +144,8 @@ export function OnboardingBaseline() {
       <StepHeader step={2} />
       <div className="onboarding-title with-mark">
         <div>
-          <h1>내 소비를 볼<br /><Highlight>기준</Highlight>부터 맞춰요.</h1>
-          <p>수입과 고정비를 함께 봐야 같은 지출도 내 상황에 맞게 판단할 수 있어요.</p>
+          <h1>내 <Highlight>예산 기준</Highlight>을<br />정해요.</h1>
+          <p>월 수입과 고정지출을 입력해 생활비 예산을 확인해 보세요.</p>
         </div>
         <BookkeeperMark compact />
       </div>
@@ -133,7 +158,7 @@ export function OnboardingBaseline() {
       </Surface>
       <div className="goal-callout"><Wallet size={27} /><span>매달 자유롭게 쓸 돈의 기준이에요</span><strong>{formatWon(draft.discretionary_budget_krw)}</strong></div>
       {freeMoney > 0 && <p className="baseline-note">기준을 지키면 매달 {formatWon(freeMoney)}을 남길 수 있어요.</p>}
-      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/goal", demo)); }}>기준 저장하기</PrimaryButton>
+      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/goal", demo)); }}>다음: 목표 설정</PrimaryButton>
     </main>
   );
 }
@@ -153,8 +178,8 @@ export function OnboardingGoal() {
     <main className="onboarding-page goal-page">
       <StepHeader step={3} />
       <div className="onboarding-title">
-        <h1><Highlight>딱 하나,</Highlight><br />어디까지 모을까?</h1>
-        <p>지금 가장 중요한 목표만 잡자.</p>
+        <h1><Highlight>저축 목표</Highlight>를<br />설정해요.</h1>
+        <p>목표 금액과 날짜를 정하면 매달 필요한 금액을 보여드려요.</p>
       </div>
       <Surface className="goal-form">
         <label>목표 이름<input value={draft.goal.name} onChange={(event) => updateGoal({ name: event.target.value })} /></label>
@@ -167,7 +192,7 @@ export function OnboardingGoal() {
         <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
         <div><Wallet size={27} /> 매달 <strong>{formatWon(monthly)}</strong>씩 모으면 돼</div>
       </div>
-      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/source", demo)); }}>목표 시작하기</PrimaryButton>
+      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/source", demo)); }}>다음: 기록 방식</PrimaryButton>
     </main>
   );
 }
@@ -187,6 +212,7 @@ export function OnboardingSource() {
     try {
       await saveProfile(draft);
       window.sessionStorage.removeItem(draftKey);
+      window.sessionStorage.removeItem(onboardingStageKey(userKey, demo));
       navigate(withDemo("/", demo));
     } catch {
       setError("기준을 저장하지 못했어요. 입력값을 확인해 주세요.");
@@ -199,13 +225,13 @@ export function OnboardingSource() {
     <main className="onboarding-page source-page">
       <StepHeader step={4} />
       <div className="onboarding-title">
-        <h1>일단 <Highlight>손으로,</Highlight><br />나중엔 연결로.</h1>
-        <p>오늘부터 쓰는 게 먼저야.</p>
+        <h1><Highlight>장부 기록</Highlight>을<br />시작해 볼까요?</h1>
+        <p>계좌 연결 없이 거래를 직접 기록할 수 있어요.</p>
       </div>
       <div className="source-options">
         <button className="source-option selected" type="button">
           <span className="source-icon"><BookOpenText size={33} /></span>
-          <span><strong>수기 입력</strong><em>지금 바로 사용 가능</em><small>직접 기록하고 바로 판단받기</small></span>
+          <span><strong>직접 입력</strong><em>지금 바로 사용 가능</em><small>지출과 수입을 장부에 기록해요</small></span>
           <CheckCircle size={29} weight="fill" />
         </button>
         <button className="source-option disabled" type="button" disabled>
@@ -214,7 +240,7 @@ export function OnboardingSource() {
         </button>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <PrimaryButton disabled={saving} onClick={() => void finish()}>{saving ? "기준 저장 중" : "수기 입력으로 시작"}</PrimaryButton>
+      <PrimaryButton disabled={saving} onClick={() => void finish()}>{saving ? "설정 저장 중" : "설정 완료하고 장부 보기"}</PrimaryButton>
     </main>
   );
 }

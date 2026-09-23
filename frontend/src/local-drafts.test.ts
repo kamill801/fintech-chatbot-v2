@@ -3,6 +3,8 @@ import {
   clearFinancialDrafts,
   manualDraftKey,
   onboardingDraftKey,
+  onboardingResumePath,
+  onboardingStageKey,
 } from "./local-drafts";
 
 describe("financial draft isolation", () => {
@@ -32,5 +34,16 @@ describe("financial draft isolation", () => {
     expect(window.localStorage.getItem("jangbu-manual-draft")).toBeNull();
     expect(window.sessionStorage.getItem("jangbu-onboarding-draft")).toBeNull();
     expect(window.localStorage.getItem(other)).toBe("other");
+  });
+
+  it("resumes a setup step only when that account still has its draft", () => {
+    window.sessionStorage.setItem(onboardingDraftKey("user-a"), "{\"budget\":1}");
+    window.sessionStorage.setItem(onboardingStageKey("user-a"), "goal");
+
+    expect(onboardingResumePath("user-a")).toBe("/onboarding/goal");
+    expect(onboardingResumePath("user-b")).toBe("/onboarding/baseline");
+
+    clearFinancialDrafts("user-a");
+    expect(onboardingResumePath("user-a")).toBe("/onboarding/baseline");
   });
 });

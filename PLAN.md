@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: Task 7.2 active at the real Kakao consent gate; Task 8.0 is deployed
+- Active task: none; Task 7.3 first-run introduction and return routing is deployed
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -617,6 +617,27 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 - [x] Verify owner-controlled Kakao consent without optional nickname/profile-image selections, callback, Supabase session, authenticated API access, session restoration after reload, sign-out, and repeat sign-in (2026-09-23). During the real test, the Render API rejected the valid session because its live `SUPABASE_URL` pointed at a different project despite the correct `render.yaml`; correcting that dashboard value and redeploying resolved the error. The existing Vercel project was redeployed with a logout button available before financial onboarding.
 
 The Kakao login-only scope is verified in production. No financial profile or transaction was created during the login test. Transaction persistence, both modes, live AI quality, and physical-device checks remain separate product verification gates.
+
+## Task 7.3 - First-run Introduction and Return Routing (Completed)
+
+### Goal
+
+Show a short, service-led introduction once per account. After it is acknowledged, resume incomplete financial setup; accounts with a saved profile enter Home directly.
+
+### Scope
+
+- Replace the first onboarding screen with the approved `장부 AI` introduction, one clear `시작하기` action, and a small privacy-details disclosure.
+- Store the introduction acknowledgement in the authenticated user's Supabase metadata, separate from the financial profile and without financial values.
+- Route profile-complete accounts to Home, and profile-incomplete accounts to their locally available setup step or the baseline step. Preserve the profile-load error retry state.
+- Verify first login, reload, repeat login, established accounts, setup return, mobile and desktop layout, then commit, push, and deploy to the existing Vercel project.
+
+### Checkpoints
+
+- [x] Implement introduction copy, layout, and account-scoped acknowledgement.
+- [x] Verify first-run and returning account routes with focused tests and browser checks.
+- [x] Update design and deployment notes, append progress, commit, push, and deploy.
+
+The account-controlled Kakao browser flow showed the introduction, advanced on `시작하기`, stayed on financial setup after reload, and skipped the introduction after logout and repeat login. Profile-complete direct Home routing is covered by a frontend test; no financial values were saved during this browser check.
 
 ## Task 8.0 - AI Budget and Spending-Plan Coach (Completed Locally)
 

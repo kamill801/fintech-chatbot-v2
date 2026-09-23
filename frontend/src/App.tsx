@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "./auth-context";
 import { LedgerProvider } from "./ledger-context";
 import { LoginPage } from "./pages/LoginPage";
 import { PlanPage } from "./pages/PlanPage";
+import { onboardingResumePath } from "./local-drafts";
 
 function LoadingScreen() {
   return (
@@ -32,6 +33,7 @@ function ProfileErrorScreen({ message, onRetry }: { message: string; onRetry(): 
 
 function AppRoutes() {
   const { loading, profile, profileLoadError, refresh, demo } = useLedger();
+  const { introSeen, userKey } = useAuth();
   const location = useLocation();
   if (loading) return <LoadingScreen />;
   if (profileLoadError && !profile) {
@@ -39,8 +41,20 @@ function AppRoutes() {
   }
 
   const onboarding = location.pathname.startsWith("/onboarding");
-  if (!profile && !onboarding) {
-    return <Navigate replace to={demo ? "/onboarding/trust?demo=1" : "/onboarding/trust"} />;
+  if (profile && onboarding) return <Navigate replace to={demo ? "/?demo=1" : "/"} />;
+  if (!profile) {
+    const resume = onboardingResumePath(userKey, demo);
+    const destination = !demo && !introSeen ? "/onboarding/trust" : resume;
+    if (!onboarding || (location.pathname === "/onboarding/trust" && destination !== location.pathname)) {
+      return <Navigate replace to={demo ? `${destination}?demo=1` : destination} />;
+    }
+    if (location.pathname !== "/onboarding/trust" && !demo && !introSeen) {
+      return <Navigate replace to="/onboarding/trust" />;
+    }
+    if ((location.pathname === "/onboarding/goal" || location.pathname === "/onboarding/source")
+      && resume === "/onboarding/baseline") {
+      return <Navigate replace to={demo ? "/onboarding/baseline?demo=1" : "/onboarding/baseline"} />;
+    }
   }
 
   return (

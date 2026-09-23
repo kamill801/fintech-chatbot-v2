@@ -1,4 +1,5 @@
 const ONBOARDING_PREFIX = "jangbu-onboarding-draft";
+const ONBOARDING_STAGE_PREFIX = "jangbu-onboarding-stage";
 const MANUAL_PREFIX = "jangbu-manual-draft";
 
 function scopePart(userKey: string | null | undefined, demo = false): string {
@@ -23,6 +24,21 @@ export function onboardingDraftKey(userKey: string | null | undefined, demo = fa
   return `${ONBOARDING_PREFIX}:${scopePart(userKey, demo)}`;
 }
 
+export function onboardingStageKey(userKey: string | null | undefined, demo = false): string {
+  return `${ONBOARDING_STAGE_PREFIX}:${scopePart(userKey, demo)}`;
+}
+
+export function onboardingResumePath(userKey: string | null | undefined, demo = false): string {
+  try {
+    const draft = window.sessionStorage.getItem(onboardingDraftKey(userKey, demo));
+    const stage = window.sessionStorage.getItem(onboardingStageKey(userKey, demo));
+    if (draft && (stage === "goal" || stage === "source")) return `/onboarding/${stage}`;
+  } catch {
+    // Browser storage is optional; the baseline screen is always a safe resume point.
+  }
+  return "/onboarding/baseline";
+}
+
 export function manualDraftKey(userKey: string | null | undefined, demo = false): string {
   return `${MANUAL_PREFIX}:${scopePart(userKey, demo)}`;
 }
@@ -36,11 +52,13 @@ function removeMatching(storage: Storage, userKey?: string | null) {
     if (!key) continue;
     const financialDraft =
       key === ONBOARDING_PREFIX ||
+      key === ONBOARDING_STAGE_PREFIX ||
       key === MANUAL_PREFIX ||
       key.startsWith(`${ONBOARDING_PREFIX}:`) ||
+      key.startsWith(`${ONBOARDING_STAGE_PREFIX}:`) ||
       key.startsWith(`${MANUAL_PREFIX}:`);
     if (!financialDraft) continue;
-    const legacyBareKey = key === ONBOARDING_PREFIX || key === MANUAL_PREFIX;
+    const legacyBareKey = key === ONBOARDING_PREFIX || key === ONBOARDING_STAGE_PREFIX || key === MANUAL_PREFIX;
     if (legacyBareKey || !scoped || scoped.some((scope) => key.endsWith(`:${scope}`))) {
       storage.removeItem(key);
     }

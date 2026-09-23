@@ -257,3 +257,10 @@ Why: 프론트엔드와 API의 Supabase 프로젝트가 다르면 정상 발급�
 Next: 카카오 로그인 단독 범위는 완료했다. 실제 금융 프로필/거래 저장, AI 판단 품질, 실기기 동작은 별도 제품 E2E로 남긴다.
 Issues: 운영 Vercel 번들은 현재 Supabase 프로젝트를 가리켰고 Render 대시보드의 실값만 달랐다. 수정 후 Render `Deploy succeeded | Live`; Vercel production 배포가 `READY`로 기존 alias에 연결됐다. 프론트엔드 58개 테스트, lint, TypeScript 및 production build가 통과했다. 실제 인증된 온보딩·로그아웃·재로그인·세션 복원을 브라우저로 확인했다. 재무 값은 입력·저장하지 않았고, 비밀값은 코드·로그·노트에 기록하지 않았다. 기존 로컬 전용 `.agents/`와 `AGENTS.md`는 제외한다.
 ---
+
+[2026-09-23 21:38] [Phase 7 / Task 7.3] (first-run introduction production release)
+What: 첫 온보딩을 `장부 AI` 서비스명, 한 문장 소개, `시작하기` 중심으로 간소화하고 이후 금융 설정 문구를 다듬었다. 소개 확인 여부를 Supabase 사용자 메타데이터에 계정별로 저장해 한 번 확인한 계정은 재진입 시 건너뛴다. 저장된 금융 프로필이 있으면 홈으로, 아직 없으면 로컬 초안이 남아 있는 설정 단계 또는 첫 설정 단계로 이동한다. 변경을 기존 Vercel `upglow/jangbu-ai` 운영 프로젝트에 배포했다.
+Why: 금융 프로필을 저장하지 않은 계정이 로그인할 때마다 소개 화면을 다시 보는 문제와 첫 화면의 어색한 문구를 해결하기 위해서다.
+Next: 금융 프로필 저장과 실제 장부 기록, AI 판단의 운영 E2E는 별도 검증한다. 금융 설정의 기존 예시 금액을 신규 사용자 입력값과 더 명확히 구분하는 개선도 별도 작업으로 다룬다.
+Issues: 프런트엔드 64개 테스트, lint, TypeScript production build, diff check 통과. Vercel production 배포 READY 및 기존 alias 연결 확인. 실제 카카오 계정에서 소개 화면, 시작 버튼, 새로고침, 로그아웃 후 재로그인 시 소개 생략을 확인했다. 저장된 프로필 계정의 홈 직행은 프런트엔드 회귀 테스트로 확인했고 실제 운영 계정 E2E는 하지 않았다. 금융 값은 저장하지 않았다. 기존 로컬 전용 `.agents/`와 `AGENTS.md`는 제외한다.
+---

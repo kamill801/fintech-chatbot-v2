@@ -323,17 +323,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .auth-demo-link { grid-column: 2; display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 7px; color: var(--action); font-weight: 650; }
 
 /* Onboarding */
-.step-header { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; min-height: 44px; margin-bottom: 34px; }
+.step-header { display: grid; grid-template-columns: 72px 1fr 72px; align-items: center; min-height: 44px; margin-bottom: 34px; }
 .step-header > span { text-align: left; color: var(--muted); font-size: 16px; }
 .step-header > span strong { color: var(--ink); }
-.onboarding-copy { position: relative; min-height: 300px; }
-.onboarding-copy h1, .onboarding-title h1 { margin: 0; font-size: clamp(39px, 11vw, 47px); line-height: 1.27; letter-spacing: -.055em; }
-.onboarding-copy .bookkeeper { position: absolute; right: 0; bottom: 4px; }
-.trust-list { margin-bottom: 14px; padding: 6px 22px; }
-.trust-list > div { display: flex; align-items: center; gap: 24px; min-height: 70px; border-bottom: 1px solid var(--line); font-size: 15px; }
-.trust-list > div:last-child { border: 0; }
-.undo-icon { transform: scaleX(-1); }
-.privacy-strip { display: flex; align-items: center; gap: 20px; min-height: 60px; margin-bottom: 26px; padding: 12px 20px; border: 1px solid #bedbf5; border-radius: 10px; background: var(--action-soft); color: #0961bd; font-size: 15px; }
+.onboarding-signout { justify-self: end; min-height: 44px; border: 0; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; }
+.welcome-page { display: flex; flex-direction: column; padding-top: 32px; padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+.welcome-content { display: flex; flex: 1; flex-direction: column; justify-content: center; padding: 38px 0; }
+.welcome-label { margin: 0 0 14px; color: var(--safe); font-size: 14px; font-weight: 750; }
+.welcome-content h1 { margin: 0 0 18px; font-size: clamp(48px, 12vw, 64px); line-height: 1.13; letter-spacing: -.06em; }
+.welcome-content > p:last-child { max-width: 340px; margin: 0; color: var(--muted); font-size: 18px; line-height: 1.6; }
+.welcome-actions { display: grid; gap: 6px; }
+.welcome-disclosure { margin-top: 4px; color: var(--muted); font-size: 13px; }
+.welcome-actions .logout-button { margin-top: 0; }
+.onboarding-title h1 { margin: 0; font-size: clamp(39px, 11vw, 47px); line-height: 1.27; letter-spacing: -.055em; }
 .disclosure { margin-top: 14px; color: var(--action); text-align: center; }
 .disclosure summary { min-height: 44px; cursor: pointer; }
 .disclosure p { color: var(--muted); font-size: 13px; line-height: 1.6; text-align: left; }

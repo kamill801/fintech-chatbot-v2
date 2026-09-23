@@ -6,7 +6,9 @@ import { manualDraftKey, onboardingDraftKey } from "./local-drafts";
 
 const authApi = vi.hoisted(() => ({
   getSession: vi.fn(),
+  getUser: vi.fn(),
   onAuthStateChange: vi.fn(),
+  updateUser: vi.fn(),
   signInWithPassword: vi.fn(),
   signInWithIdToken: vi.fn(),
   signOut: vi.fn(),
@@ -27,7 +29,9 @@ vi.mock("./auth-client", () => ({
   supabase: {
     auth: {
       getSession: authApi.getSession,
+      getUser: authApi.getUser,
       onAuthStateChange: authApi.onAuthStateChange,
+      updateUser: authApi.updateUser,
       signInWithPassword: authApi.signInWithPassword,
       signInWithIdToken: authApi.signInWithIdToken,
       signOut: authApi.signOut,
@@ -37,7 +41,7 @@ vi.mock("./auth-client", () => ({
 }));
 
 function AuthActions() {
-  const { avatarUrl, displayName, error, loading, provider, signIn, signInWithKakao, signOut, signUp, userKey } = useAuth();
+  const { avatarUrl, displayName, error, introSeen, loading, markIntroSeen, provider, signIn, signInWithKakao, signOut, signUp, userKey } = useAuth();
   if (loading) return <span>loading</span>;
   return (
     <>
@@ -45,6 +49,8 @@ function AuthActions() {
       <button type="button" onClick={() => void signInWithKakao().catch(() => undefined)}>kakao</button>
       <button type="button" onClick={() => void signUp("new@example.com", "password123")}>signup</button>
       <button type="button" onClick={() => void signOut()}>logout</button>
+      <button type="button" onClick={() => void markIntroSeen().catch(() => undefined)}>mark intro</button>
+      <output aria-label="intro state">{introSeen ? "seen" : "new"}</output>
       <output aria-label="auth identity">{JSON.stringify({ avatarUrl, displayName, provider, userKey })}</output>
       {error && <p role="alert">{error}</p>}
     </>
@@ -56,6 +62,8 @@ describe("AuthProvider", () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     authApi.getSession.mockReset().mockResolvedValue({ data: { session: null }, error: null });
+    authApi.getUser.mockReset().mockResolvedValue({ data: { user: null }, error: null });
+    authApi.updateUser.mockReset();
     authApi.onAuthStateChange.mockReset().mockReturnValue({ data: { subscription: { unsubscribe: authApi.unsubscribe } } });
     authApi.signInWithPassword.mockReset().mockResolvedValue({ error: null });
     kakao.startKakaoLogin.mockReset().mockResolvedValue(undefined);
@@ -138,6 +146,36 @@ describe("AuthProvider", () => {
       provider: "kakao",
       userKey: "supabase-user-id",
     }));
+  });
+
+  it("loads the account's latest introduction state and saves it without financial data", async () => {
+    const user = userEvent.setup();
+    const account = { id: "user-a", user_metadata: { jangbu_intro_seen: false } };
+    authApi.getSession.mockResolvedValueOnce({ data: { session: { user: account } }, error: null });
+    authApi.getUser.mockResolvedValueOnce({ data: { user: account }, error: null });
+    authApi.updateUser.mockResolvedValueOnce({
+      data: { user: { ...account, user_metadata: { jangbu_intro_seen: true } } },
+      error: null,
+    });
+
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+    expect(await screen.findByLabelText("intro state")).toHaveTextContent("new");
+    await user.click(screen.getByRole("button", { name: "mark intro" }));
+
+    expect(authApi.updateUser).toHaveBeenCalledWith({ data: { jangbu_intro_seen: true } });
+    expect(screen.getByLabelText("intro state")).toHaveTextContent("seen");
+  });
+
+  it("uses refreshed account metadata rather than an older cached session", async () => {
+    authApi.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: "user-a", user_metadata: {} } } }, error: null,
+    });
+    authApi.getUser.mockResolvedValueOnce({
+      data: { user: { id: "user-a", user_metadata: { jangbu_intro_seen: true } } }, error: null,
+    });
+
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+    expect(await screen.findByLabelText("intro state")).toHaveTextContent("seen");
   });
 
   it("clears user-scoped financial drafts after sign-out succeeds", async () => {

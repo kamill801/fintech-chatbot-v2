@@ -20,7 +20,9 @@ interface AuthContextValue {
   displayName: string | null;
   avatarUrl: string | null;
   provider: string | null;
+  introSeen: boolean;
   error: string | null;
+  markIntroSeen(): Promise<void>;
   signIn(email: string, password: string): Promise<void>;
   signInWithKakao(): Promise<void>;
   signUp(email: string, password: string): Promise<boolean>;
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
+    const auth = supabase.auth;
     let active = true;
     const callbackPending = isKakaoCallback();
     if (callbackPending) {
@@ -60,17 +63,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (active) setLoading(false);
       });
     } else {
-      void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      void auth.getSession().then(async ({ data, error: sessionError }) => {
+        let nextSession = data.session;
+        if (nextSession) {
+          try {
+            const { data: userData } = await auth.getUser();
+            if (userData.user?.id === nextSession.user.id) {
+              nextSession = { ...nextSession, user: userData.user };
+            }
+          } catch {
+            // A cached session remains usable when the metadata refresh is unavailable.
+          }
+        }
         if (!active) return;
-        setSession(data.session);
+        setSession(nextSession);
         setError(sessionError ? "로그인 상태를 확인하지 못했어요." : null);
         setLoading(false);
+      }).catch(() => {
+        if (active) setLoading(false);
       });
     }
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
+      if (event === "INITIAL_SESSION") return;
       setSession(nextSession);
-      if (!callbackPending) setLoading(false);
     });
     return () => {
       active = false;
@@ -133,6 +149,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [session]);
 
+  const markIntroSeen = useCallback(async () => {
+    if (!supabase || !session) throw new Error("auth_not_configured");
+    const { data, error: updateError } = await supabase.auth.updateUser({
+      data: { jangbu_intro_seen: true },
+    });
+    if (updateError || !data.user) throw updateError ?? new Error("intro_update_failed");
+    setSession((current) => current?.user.id === data.user.id
+      ? { ...current, user: data.user }
+      : current);
+  }, [session]);
+
   const value = useMemo<AuthContextValue>(() => {
     const metadata = (session?.user?.user_metadata ?? {}) as Record<string, unknown>;
     const provider = session?.user?.app_metadata?.provider;
@@ -143,7 +170,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ?? session?.user?.email?.split("@")[0]
         ?? null,
       error,
+      introSeen: metadata.jangbu_intro_seen === true,
       loading,
+      markIntroSeen,
       provider: typeof provider === "string" ? provider : null,
       session,
       signIn,
@@ -152,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       userKey: session?.user?.id ?? null,
     };
-  }, [error, loading, session, signIn, signInWithKakao, signOut, signUp]);
+  }, [error, loading, markIntroSeen, session, signIn, signInWithKakao, signOut, signUp]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

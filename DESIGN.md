@@ -128,7 +128,7 @@ Settings, privacy, data source, profile, and mode controls open from the home he
 
 | Screen | Primary action | Required content |
 | --- | --- | --- |
-| Trust onboarding | Continue with manual entry | Read-only promise, what AI sees, deletion and correction rights |
+| First-login introduction | Start setup | Service name, one-sentence value proposition, concise data handling disclosure |
 | Financial baseline | Save baseline | Income, liquid assets, fixed expenses, debt payment, discretionary budget |
 | Goal setup | Start goal | One goal, current/target amount, target date |
 | Data source | Use manual entry | Manual active; account connection labeled future/read-only, never implied available |
@@ -155,7 +155,9 @@ Character never outranks the amount or evidence.
 
 ### First run
 
-`trust disclosure -> financial baseline -> one goal -> manual source -> 기본 말투 -> home`
+`one-time service introduction -> financial baseline -> one goal -> manual source -> 기본 말투 -> home`
+
+The introduction is acknowledged per authenticated account when the user presses Start. Returning accounts with a saved financial profile go directly Home; accounts without a profile continue setup. An unfinished setup can resume at its last locally saved step while its draft remains in the same browser session.
 
 `욕쟁이 할머니 모드` setup is offered after the first completed judgment, not during baseline onboarding. This avoids asking for entertainment consent before the user has seen the product's financial value.
 
@@ -503,7 +505,7 @@ The exact user-facing name is `욕쟁이 할머니 모드`. `Roast` is retained 
 
 | Flow | Reference |
 | --- | --- |
-| Trust onboarding | `design/screens/v1/01-trust-onboarding.png` |
+| First-login introduction (historical visual reference) | `design/screens/v1/01-trust-onboarding.png` |
 | Financial baseline | `design/screens/v1/02-financial-baseline.png` |
 | Goal setup | `design/screens/v1/03-goal-setup.png` |
 | Data-source choice | `design/screens/v1/04-data-source.png` |
