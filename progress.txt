@@ -243,3 +243,10 @@ Why: 삭제된 이전 Supabase 도메인 때문에 발생한 `DNS_PROBE_FINISHED
 Next: Kakao 앱의 비즈 앱 전환 또는 hosted Supabase의 Kakao email scope 문제를 대체하는 인증 경로를 결정한 뒤 실제 동의→callback→프로필/장부 저장→로그아웃/재로그인 유지 E2E를 수행한다. 실제 OpenAI 계획 어드바이저 품질과 실기기 E2E도 별도 운영 검증으로 유지한다.
 Issues: Render 배포는 `Deploy succeeded | Live`, Vercel/public frontend와 Render `/health`, Redis-backed `/ready`는 모두 200이었다. 새 Supabase authorize endpoint는 302로 Kakao에 연결됐고 배포 번들에는 새 project ref만 남았다. 다만 hosted Supabase Kakao 요청에는 `account_email`이 포함됐고 Kakao 앱 `1567306`은 비즈 앱이 아니므로 실제 consent/token exchange는 완료로 판단하지 않았다. 기존 Redis, ledger encryption/user-ref secrets와 Kakao key 값은 변경하거나 파일에 기록하지 않았다. fresh local verification은 backend 134 passes/4 Redis-gated skips, frontend 55 tests, lint/build, compileall, diff/credential scan을 통과했다. `.agents/`와 `AGENTS.md`는 제외했다.
 ---
+
+[2026-09-23 15:28] [Phase 7 / Task 7.2] (Kakao OIDC login deployed; owner consent pending)
+What: 기존 Kakao 앱 1567306에 OIDC 및 Vercel /auth/kakao callback을 저장했다. Direct OIDC + nonce + PKCE 구현 commit 3efc705를 기존 Git main에 push하고, 기존 Render jangbu-api와 Vercel upglow/jangbu-ai에 수동 배포했다. 사용자가 승인한 기존 Kakao REST API key와 Kakao Login client secret은 Render 환경 변수에만 입력하고 UI의 마스킹 상태 및 재배포 성공을 확인했다. 실제 브라우저는 새 Kakao 동의 화면에 도착했고 account_email 항목은 없으며 닉네임/프로필 사진만 선택 동의로 표시된다.
+Why: 기존 Supabase-hosted OAuth가 비즈 앱이 아닌 Kakao 앱에도 account_email을 요청해 실제 로그인 동의가 막힐 수 있었으므로, 이메일 범위 없이 Kakao ID token을 Supabase Auth로 전달하는 경로가 필요했다.
+Next: 현재 열린 Kakao 동의 화면에서 사용자 본인의 선택을 기다린다. 동의 후 callback, Supabase session, sign-out, repeat sign-in을 검증한다. 거래 저장 및 다른 제품 E2E는 이번 로그인 전용 작업의 범위 밖이다.
+Issues: Backend 140 tests 중 136 pass/4 external Redis skips, frontend 58 tests pass, lint/build/diff check pass. Render /health 및 /ready는 200, live login start API는 올바른 redirect, nonce, S256 PKCE와 scope 없음으로 응답했다. Vercel root 및 /auth/kakao는 200이고 production alias가 새 배포를 가리킨다. 실제 consent/token exchange/session은 아직 검증되지 않았다. 기존 로컬 전용 .agents/ 및 AGENTS.md는 계속 제외한다. 비밀값은 코드, 로그, 노트에 기록하지 않았다.
+---

@@ -58,7 +58,7 @@ Supabase `service_role`, legacy JWT shared secrets, database passwords, Redis cr
 
 ## Kakao OAuth Activation
 
-The current Supabase project was created on 2026-09-22. Its site and redirect URLs, Kakao provider, and Kakao callback are configured. Vercel and Render production use the matching Auth project, and both public backend health probes pass. The currently deployed button reaches the Kakao account login page, but real consent/callback remains pending because hosted Supabase still requests `account_email` while Kakao app `1567306` is not a business app. The replacement code path below has passed local checks but is not yet deployed. Kakao credentials must stay in trusted server-side provider settings; never put them in Vercel, committed `.env` files, screenshots, commands, or logs.
+The current Supabase project was created on 2026-09-22. Its site and redirect URLs, Kakao provider, and Kakao callback are configured. Vercel and Render production use the matching Auth project. The direct OIDC login path is deployed to the existing services and reaches Kakao consent without requesting `account_email`; owner-controlled consent/callback remains pending. Kakao credentials must stay in trusted server-side provider settings; never put them in Vercel, committed `.env` files, screenshots, commands, or logs.
 
 ### Kakao Developers
 
@@ -114,20 +114,20 @@ Supabase user IDs do not transfer automatically between projects. Existing Redis
 - [x] Update Kakao Login for the current Supabase callback and configure the current project's Kakao provider (2026-09-22).
 - [x] Apply matching production Auth settings and verify Vercel, Render `/health`, and Redis-backed `/ready` (2026-09-23).
 - [x] Enable Kakao OIDC and add the production app callback while retaining the Supabase callback (2026-09-23).
-- [ ] Set the existing Kakao key and secret in Render, then deploy the email-scope-free login path.
-- [ ] Complete a real consent/callback session after resolving the Kakao `account_email` compatibility gate.
+- [x] Set the existing Kakao key and secret in Render, then deploy the email-scope-free login path to the existing Render and Vercel services (2026-09-23).
+- [ ] Complete a real consent/callback session and repeat sign-in with an owner-controlled Kakao account.
 - [ ] Complete an authenticated production profile read/write, transaction, reason, judgment, correction, sign-out, and live OpenAI quality check with an owner-controlled test account.
 
 ## Provider Status and Pending Cutover
 
-The existing deployment observations below are historical unless explicitly dated. On 2026-09-22, the current Supabase project was created and its production plus local QA redirect URLs were saved. Kakao app `1567306` now uses the current Supabase callback; Kakao and email-less sign-in are enabled, and a public authorization request returns HTTP 302 to `kauth.kakao.com`. On 2026-09-23, Vercel project `upglow/jangbu-ai` was deployed with the matching public values and Render deployed commit `7346cd2` with the matching `SUPABASE_URL`; the public frontend, `/health`, and Redis-backed `/ready` returned 200. A clean production-browser run reached the Kakao account login page with the current callback. The generated request still contained `account_email`, and Kakao Developers identified the app as non-business. Real consent, token exchange, and authenticated application data access therefore remain unverified.
+The existing deployment observations below are historical unless explicitly dated. On 2026-09-22, the current Supabase project was created and its production plus local QA redirect URLs were saved. On 2026-09-23, the existing Kakao app's OIDC setting and production callback were saved, existing Kakao credentials were stored in Render, commit `3efc705` was deployed to the existing Render service, and the existing Vercel `jangbu-ai` alias was updated. Render `/health` and Redis-backed `/ready` returned 200. The production login-start API generated a Kakao URL with the correct callback, nonce, S256 PKCE challenge, and no `scope`; the live browser reached the Kakao consent screen with optional nickname/profile-image items and no email item. Real consent, token exchange, and authenticated application session remain unverified.
 
 - Vercel frontend: live-mode login is deployed at `https://jangbu-ai.vercel.app`. Production has `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_DEMO_DEFAULT` registered.
 - Supabase: previous project references are not part of the current account. The current project is `kkzsyprcujrxzrsognhb`; its site and redirect URLs plus Kakao provider are configured, including email-less users. Provider routing is verified, while real consent/callback and authenticated persistence remain unverified.
 - Upstash: the Free Redis database is provisioned in Tokyo. Credentials remain server-side in Render; a successful readiness response proves current connectivity.
-- Render: `https://jangbu-api.onrender.com` runs the Free Flask web service in Singapore. Manual deployment `dep-dap9ldbm8hqs73a8ao60` made commit `7346cd2` live on 2026-09-23; both `GET /health` and Redis-backed `GET /ready` returned 200 afterward.
+- Render: `https://jangbu-api.onrender.com` runs the Free Flask web service in Singapore. Commit `3efc705` is live with the Kakao key and client secret stored as environment variables; both `GET /health` and Redis-backed `GET /ready` returned 200 afterward.
 - OpenAI: the owner configured the server-side key in Render. A live model response and judgment-quality evaluation have not been independently verified.
-- Kakao consent/callback and authenticated profile, transaction, reason, judgment, correction, sign-out, and repeat-login persistence E2E remain separate production verification gates.
+- Kakao consent/callback, Supabase session, sign-out, and repeat sign-in remain the login verification gate. Authenticated ledger persistence and AI quality are separate product verification gates.
 
 Provider dashboard state and free-tier terms can change. Re-check them at activation time and distinguish successful configuration from verified end-to-end behavior.
 
