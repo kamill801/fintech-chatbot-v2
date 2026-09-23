@@ -594,12 +594,12 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 - The comparison distinguishes official claims from code-verified current capabilities and does not claim review, revenue, or subscriber figures that the stores do not publish.
 - Frontend tests, lint, TypeScript/build, and 390px/desktop browser checks pass.
 
-## Task 7.2 - New Supabase Project and Kakao Release (Active at real Kakao consent gate)
+## Task 7.2 - New Supabase Project and Kakao Login (Completed for login-only scope)
 
 ### Scope
 
 - Resume the owner-approved provider setup on Supabase project `kkzsyprcujrxzrsognhb` (`jangbu-ai`, Jangbu AI, Seoul, Free).
-- Connect Kakao app `1567306` (`장부`) using its existing REST API key and client secret only in Supabase Auth.
+- Connect Kakao app `1567306` (`장부`) through direct OIDC code exchange on Render and Supabase ID-token sign-in; keep the existing Kakao key and secret server-side.
 - Use optional nickname/profile-image consent and allow Kakao users without email.
 - Update the Vercel public Auth configuration and Render JWT issuer together after provider setup is verified.
 - Preserve Redis data and encryption keys. A new Supabase project issues new user IDs; historical accounts/data are not automatically migrated or merged.
@@ -614,9 +614,9 @@ Reduce Korea-first onboarding friction with Kakao Login while preserving the exi
 - [x] Apply matching Vercel/Render settings, push, deploy, and verify service health (2026-09-23: Vercel production bundle contains only the current project ref; Render deployed `7346cd2`; `/health` and Redis-backed `/ready` returned 200).
 - [x] Enable Kakao OIDC and add the production `/auth/kakao` redirect URI to the existing REST API key while retaining the Supabase callback (2026-09-23).
 - [x] Deploy the Kakao OIDC ID-token sign-in path without the `account_email` scope. The existing Kakao key and secret are stored in Render; commit `3efc705` is live on Render and the existing Vercel production alias. The production start API returned an authorization URL with the correct callback, nonce, and S256 PKCE challenge and no `scope`; the real Kakao screen shows only optional nickname/profile-image consent (2026-09-23).
-- [ ] Verify consent, callback, Supabase session, sign-out, and repeat sign-in with an owner-controlled Kakao account. The login screen and authorization page alone do not prove completion.
+- [x] Verify owner-controlled Kakao consent without optional nickname/profile-image selections, callback, Supabase session, authenticated API access, session restoration after reload, sign-out, and repeat sign-in (2026-09-23). During the real test, the Render API rejected the valid session because its live `SUPABASE_URL` pointed at a different project despite the correct `render.yaml`; correcting that dashboard value and redeploying resolved the error. The existing Vercel project was redeployed with a logout button available before financial onboarding.
 
-The remaining Task 7.2 work is owner-controlled authenticated verification. Transaction persistence, both modes, and physical-device checks are separate product verification gates outside this login-only task.
+The Kakao login-only scope is verified in production. No financial profile or transaction was created during the login test. Transaction persistence, both modes, live AI quality, and physical-device checks remain separate product verification gates.
 
 ## Task 8.0 - AI Budget and Spending-Plan Coach (Completed Locally)
 

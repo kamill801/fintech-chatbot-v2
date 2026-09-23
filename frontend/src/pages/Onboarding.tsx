@@ -7,6 +7,7 @@ import {
   LockKey,
   PencilSimple,
   ShieldCheck,
+  SignOut,
   Wallet,
 } from "@phosphor-icons/react";
 import { BookkeeperMark, CurrencyInput, Highlight, PrimaryButton, Surface } from "../components";
@@ -64,7 +65,22 @@ function MoneyEditRow({
 
 export function OnboardingTrust() {
   const { demo } = useLedger();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+
+  async function logout() {
+    setLoggingOut(true);
+    setLogoutError(false);
+    try {
+      await signOut();
+    } catch {
+      setLogoutError(true);
+      setLoggingOut(false);
+    }
+  }
+
   return (
     <main className="onboarding-page trust-page">
       <StepHeader step={1} />
@@ -83,6 +99,8 @@ export function OnboardingTrust() {
         <summary>데이터 처리 방식 보기</summary>
         <p>상점명과 메모는 장부에 보관되고, 판단에는 금액·분류·예산 신호와 직접 답한 이유만 최소한으로 사용합니다.</p>
       </details>
+      {!demo && <button className="logout-button" type="button" disabled={loggingOut} onClick={() => void logout()}><SignOut size={21} /> {loggingOut ? "로그아웃 중" : "로그아웃"}</button>}
+      {logoutError && <p role="alert">로그아웃하지 못했어요. 다시 시도해 주세요.</p>}
     </main>
   );
 }

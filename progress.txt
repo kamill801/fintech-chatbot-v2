@@ -250,3 +250,10 @@ Why: 기존 Supabase-hosted OAuth가 비즈 앱이 아닌 Kakao 앱에도 accoun
 Next: 현재 열린 Kakao 동의 화면에서 사용자 본인의 선택을 기다린다. 동의 후 callback, Supabase session, sign-out, repeat sign-in을 검증한다. 거래 저장 및 다른 제품 E2E는 이번 로그인 전용 작업의 범위 밖이다.
 Issues: Backend 140 tests 중 136 pass/4 external Redis skips, frontend 58 tests pass, lint/build/diff check pass. Render /health 및 /ready는 200, live login start API는 올바른 redirect, nonce, S256 PKCE와 scope 없음으로 응답했다. Vercel root 및 /auth/kakao는 200이고 production alias가 새 배포를 가리킨다. 실제 consent/token exchange/session은 아직 검증되지 않았다. 기존 로컬 전용 .agents/ 및 AGENTS.md는 계속 제외한다. 비밀값은 코드, 로그, 노트에 기록하지 않았다.
 ---
+
+[2026-09-23 15:42] [Phase 7 / Task 7.2] (Kakao login-only production E2E completed)
+What: 사용자 승인에 따라 카카오 선택 동의인 닉네임·프로필 사진을 체크하지 않고 진행했다. 카카오 콜백과 Supabase 세션 생성은 성공했지만 Render 장부 API가 처음에는 `valid bearer token is required`를 반환했다. 운영 Render의 `SUPABASE_URL`이 현재 장부 AI 프로젝트가 아닌 다른 프로젝트를 가리키는 것을 확인하고 현재 프로젝트로 수정해 재배포했다. 같은 세션에서 인증된 온보딩이 열렸고 새로고침 후에도 유지됐다. 신규 사용자가 금융 기준 입력 전 로그아웃할 수 있도록 첫 온보딩 화면에 로그아웃 버튼을 추가해 기존 Vercel jangbu-ai 프로젝트에 배포했다. 로그아웃으로 로그인 화면에 돌아온 뒤 동일 카카오 계정 재로그인과 새로고침 세션 유지도 확인했다.
+Why: 프론트엔드와 API의 Supabase 프로젝트가 다르면 정상 발급된 토큰도 issuer/JWKS 검증을 통과하지 못한다. 로그인만 검증하는 작업에서 금융 프로필을 임의 생성하지 않고 로그아웃·재진입을 확인할 수 있어야 한다.
+Next: 카카오 로그인 단독 범위는 완료했다. 실제 금융 프로필/거래 저장, AI 판단 품질, 실기기 동작은 별도 제품 E2E로 남긴다.
+Issues: 운영 Vercel 번들은 현재 Supabase 프로젝트를 가리켰고 Render 대시보드의 실값만 달랐다. 수정 후 Render `Deploy succeeded | Live`; Vercel production 배포가 `READY`로 기존 alias에 연결됐다. 프론트엔드 58개 테스트, lint, TypeScript 및 production build가 통과했다. 실제 인증된 온보딩·로그아웃·재로그인·세션 복원을 브라우저로 확인했다. 재무 값은 입력·저장하지 않았고, 비밀값은 코드·로그·노트에 기록하지 않았다. 기존 로컬 전용 `.agents/`와 `AGENTS.md`는 제외한다.
+---
