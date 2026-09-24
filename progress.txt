@@ -264,3 +264,10 @@ Why: 금융 프로필을 저장하지 않은 계정이 로그인할 때마다 �
 Next: 금융 프로필 저장과 실제 장부 기록, AI 판단의 운영 E2E는 별도 검증한다. 금융 설정의 기존 예시 금액을 신규 사용자 입력값과 더 명확히 구분하는 개선도 별도 작업으로 다룬다.
 Issues: 프런트엔드 64개 테스트, lint, TypeScript production build, diff check 통과. Vercel production 배포 READY 및 기존 alias 연결 확인. 실제 카카오 계정에서 소개 화면, 시작 버튼, 새로고침, 로그아웃 후 재로그인 시 소개 생략을 확인했다. 저장된 프로필 계정의 홈 직행은 프런트엔드 회귀 테스트로 확인했고 실제 운영 계정 E2E는 하지 않았다. 금융 값은 저장하지 않았다. 기존 로컬 전용 `.agents/`와 `AGENTS.md`는 제외한다.
 ---
+
+[2026-09-25 03:53] [Phase 7 / Task 7.4] (iPhone Home Screen web app assets deployed; physical add pending)
+What: 기존 장부 AI SVG를 기준으로 iOS 180px touch icon과 192/512px PWA PNG 아이콘을 추가했다. HTML의 Apple 웹 앱 메타데이터, 제목, 매니페스트 이름/범위/아이콘, 서비스 워커 캐시를 갱신하고 기존 Vercel upglow/jangbu-ai 운영 프로젝트에 수동 배포했다. 설치 방법을 README에 기록했다.
+Why: Safari에서 URL을 여는 것만으로는 홈 화면 아이콘이 만들어지지 않으며, 기존 앱에는 iPhone 홈 화면용 PNG 아이콘 지정이 없었다.
+Next: 사용자가 아이폰 Safari에서 https://jangbu-ai.vercel.app 을 열어 공유 → 홈 화면에 추가 → 웹 앱으로 열기 → 추가를 누른 뒤, 장부 AI 아이콘과 단독 실행을 실기기에서 확인한다.
+Issues: 프런트엔드 64개 테스트, lint, TypeScript/Vite 빌드, PNG 180/192/512px 크기, 매니페스트 JSON, git diff check 통과. Vercel 배포 READY 및 기존 production alias 연결, 운영 루트/manifest/아이콘 3종/sw.js HTTP 200과 콘텐츠 형식 확인. 이 세션의 CoreDeviceService 초기화 오류로 연결된 iPhone의 Safari 원격 실행은 실패했으며, 실제 홈 화면 추가/실기기 실행은 확인 전이다. 기존 로컬 전용 .agents/와 AGENTS.md는 변경·커밋에서 제외한다.
+---

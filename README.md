@@ -97,6 +97,8 @@ Production variables are managed in the Vercel dashboard or CLI and must never b
 
 Current public frontend: `https://jangbu-ai.vercel.app`
 
+For ongoing iPhone testing, open that URL directly in Safari, tap Share → **Add to Home Screen**, enable **Open as Web App**, and tap **Add**. The Home Screen app is named **장부 AI** and uses the blue ledger icon. Reopen the app while online after a deployment to load the latest release. Home Screen installation is a device action; opening the URL from a connected Mac does not install the icon.
+
 The selected production topology is Vercel for the web app, Supabase Auth with Kakao as the primary sign-in and email/password as a fallback, a Render Free Flask web service in Singapore, and Upstash Redis over TLS. Kakao nickname and profile-image metadata are optional display fields only; financial-record ownership remains keyed by the verified Supabase `user.id`. The free web deployment does not run RQ or claim always-on availability; Render may cold-start after idle periods. See `DEPLOYMENT.md` for the environment-variable boundary and activation order.
 
 For frontend hot reload, run these in separate terminals:

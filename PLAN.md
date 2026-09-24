@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: none; Task 7.3 first-run introduction and return routing is deployed
+- Active task: Task 7.4 iPhone Home Screen web app setup
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -638,6 +638,25 @@ Show a short, service-led introduction once per account. After it is acknowledge
 - [x] Update design and deployment notes, append progress, commit, push, and deploy.
 
 The account-controlled Kakao browser flow showed the introduction, advanced on `시작하기`, stayed on financial setup after reload, and skipped the introduction after logout and repeat login. Profile-complete direct Home routing is covered by a frontend test; no financial values were saved during this browser check.
+
+## Task 7.4 - iPhone Home Screen Web App Setup (Active)
+
+### Goal
+
+Make the existing Vercel `jangbu-ai` site install cleanly from iPhone Safari as a persistent Home Screen web app with the correct name and icon for ongoing device testing.
+
+### Scope and checks
+
+- Reuse the existing PWA, Vercel project, and production domain; add iOS touch icon metadata and PNG assets derived from the existing icon.
+- Set a consistent `장부 AI` install name, scope, and standalone launch behavior; refresh the service-worker shell cache.
+- Verify asset dimensions, metadata, frontend tests, lint, build, and production HTTP responses, then commit, push, and deploy to the existing Vercel project.
+- Open the deployed URL on the paired iPhone when available. Safari's Home Screen Add action remains an on-device user action; verify the icon with the user rather than claiming remote installation.
+
+### Checkpoints
+
+- [x] Add and verify iPhone/PWA icon assets and metadata.
+- [x] Run local frontend checks and deploy the existing production project.
+- [ ] Verify the physical Home Screen icon and launch after the owner taps Add on the iPhone. Production asset responses are already verified; CoreDeviceService currently prevents a remote Safari launch.
 
 ## Task 8.0 - AI Budget and Spending-Plan Coach (Completed Locally)
 
