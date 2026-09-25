@@ -639,24 +639,27 @@ Show a short, service-led introduction once per account. After it is acknowledge
 
 The account-controlled Kakao browser flow showed the introduction, advanced on `시작하기`, stayed on financial setup after reload, and skipped the introduction after logout and repeat login. Profile-complete direct Home routing is covered by a frontend test; no financial values were saved during this browser check.
 
-## Task 7.4 - iPhone Home Screen Web App Setup (Active)
+## Task 7.4 - iPhone Home Screen Test App Setup (Active)
 
 ### Goal
 
-Make the existing Vercel `jangbu-ai` site install cleanly from iPhone Safari as a persistent Home Screen web app with the correct name and icon for ongoing device testing.
+Put a persistent `장부 AI` icon on the paired iPhone XR for ongoing testing of the existing Vercel site. The user clarified that, as with their other test apps, Codex should install the icon directly rather than require Safari's Add to Home Screen action.
 
 ### Scope and checks
 
 - Reuse the existing PWA, Vercel project, and production domain; add iOS touch icon metadata and PNG assets derived from the existing icon.
 - Set a consistent `장부 AI` install name, scope, and standalone launch behavior; refresh the service-worker shell cache.
 - Verify asset dimensions, metadata, frontend tests, lint, build, and production HTTP responses, then commit, push, and deploy to the existing Vercel project.
-- Open the deployed URL on the paired iPhone when available. Safari's Home Screen Add action remains an on-device user action; verify the icon with the user rather than claiming remote installation.
+- Keep Safari Add to Home Screen as an optional PWA path; the direct-install test app is the primary path requested for this device.
+- Add a small, development-only iOS WKWebView shell whose source of truth remains the existing production web app. Reuse the Mac's already configured personal development signing and Xcode device-install flow; do not create a new backend or financial-data store.
+- Build, sign, install, and launch the shell on the paired iPhone XR. Verify installation and launch using device tools; record any remaining on-screen authentication or rendering checks separately.
 
 ### Checkpoints
 
 - [x] Add and verify iPhone/PWA icon assets and metadata.
 - [x] Run local frontend checks and deploy the existing production project.
-- [ ] Verify the physical Home Screen icon and launch after the owner taps Add on the iPhone. Production asset responses are already verified; CoreDeviceService currently prevents a remote Safari launch.
+- [x] Build and install the directly launchable iOS test shell on the paired iPhone XR; verify its bundle and launch. Note AI was removed at the user's request to free a Personal Team app slot; Short Travel and Trust First Nutrition remain installed.
+- [ ] Confirm on-screen icon, web loading, and Kakao sign-in behavior on the physical device when device viewing is available.
 
 ## Task 8.0 - AI Budget and Spending-Plan Coach (Completed Locally)
 

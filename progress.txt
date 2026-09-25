@@ -271,3 +271,17 @@ Why: Safari에서 URL을 여는 것만으로는 홈 화면 아이콘이 만들�
 Next: 사용자가 아이폰 Safari에서 https://jangbu-ai.vercel.app 을 열어 공유 → 홈 화면에 추가 → 웹 앱으로 열기 → 추가를 누른 뒤, 장부 AI 아이콘과 단독 실행을 실기기에서 확인한다.
 Issues: 프런트엔드 64개 테스트, lint, TypeScript/Vite 빌드, PNG 180/192/512px 크기, 매니페스트 JSON, git diff check 통과. Vercel 배포 READY 및 기존 production alias 연결, 운영 루트/manifest/아이콘 3종/sw.js HTTP 200과 콘텐츠 형식 확인. 이 세션의 CoreDeviceService 초기화 오류로 연결된 iPhone의 Safari 원격 실행은 실패했으며, 실제 홈 화면 추가/실기기 실행은 확인 전이다. 기존 로컬 전용 .agents/와 AGENTS.md는 변경·커밋에서 제외한다.
 ---
+
+[2026-09-25 07:39] [Phase 7 / Task 7.4] (direct iPhone installation attempt blocked by free provisioning limit)
+What: 사용자 피드백에 따라 Safari 수동 추가 대신 기존 Note AI·Short Travel과 동일한 Xcode 실기기 설치 경로를 조사했다. 기존 Vercel 운영 사이트를 영구 WebKit 저장소로 여는 개발용 JangbuAI iOS 셸과 1024px 아이콘을 로컬에 준비했다. XcodeGen 프로젝트 생성, 시뮬레이터 컴파일, 기존 개인 팀으로 iPhone XR 대상 빌드는 성공했다.
+Why: 사용자 요청은 Mac에서 직접 홈 화면 아이콘을 추가하는 것이고, 기존 세 서비스는 실제 iPhone에 개발 서명 앱으로 설치돼 있었다.
+Next: iPhone의 무료 개발자 앱 3개 한도 때문에 새 앱 설치가 거부됐다. 기존 앱을 삭제하지 않았다. 사용자에게 기존 앱을 보존하면서 iPhone 미러링을 켜 PWA 추가를 대신 조작할지, 세 앱 중 하나를 교체할지 선택을 요청했다. 미러링 초기 설정은 Mac에 iPhone 화면 제어와 알림 접근을 부여하므로 승인 전 진행하지 않는다.
+Issues: 기기는 iPhone XR, iOS 18.6.2, 개발자 모드 활성화 및 paired/available. `devicectl install app`은 Note AI, Short Travel, Trust First Nutrition 세 앱이 무료 프로필 한도를 차지한다는 명시적 오류로 실패했다. Xcode 개인 팀 프로비저닝은 Apple 공식 문서상 7일 만료라 장기 반복 테스트에는 웹 앱이 더 적합하다. 로컬 JangbuAI 셸/PLAN 변경은 아직 커밋·푸시·배포하지 않았고 실제 기기 설치·화면 검증은 미완료다.
+---
+
+[2026-09-25 10:01] [Phase 7 / Task 7.4] (direct iPhone installation succeeded)
+What: 사용자 지시에 따라 iPhone XR에서 Note AI 개발 앱만 제거하고, 기존 Vercel 장부 AI 운영 사이트를 여는 서명된 JangbuAI iOS 테스트 앱을 설치·실행했다. 기기 앱 목록에서 `com.jangbuai.local`이 설치되고 Note AI가 사라진 반면 Short Travel과 Trust First Nutrition은 유지됨을 확인했다. 기기에서 실제 장부 AI 아이콘을 placeholder 없이 생성했다. iOS 소스와 재설치 안내를 저장했다.
+Why: Personal Team의 기기당 개발 앱 3개 한도 안에서 장부 AI를 사용자가 요청한 직접 설치 앱으로 홈 화면에서 반복 테스트할 수 있게 하기 위해서다.
+Next: 사용자가 아이폰 화면에서 아이콘 위치, 웹 로딩, 카카오 로그인을 직접 확인한다. 무료 Personal Team 서명은 만료 전 재설치해야 하며, 웹 콘텐츠는 기존 Vercel 배포로 갱신된다.
+Issues: `devicectl install app`, `process launch`, `info apps`, `info processes`, `info appIcon`이 모두 성공했다. 원격 화면 미러링이 설정되지 않아 홈 화면 배치와 실기기 카카오 로그인 화면은 시각적으로 확인하지 못했다. Note AI 제거는 앱의 기기 내 로컬 데이터도 제거했을 수 있으므로 기존 데이터 복원을 보장하지 않는다. `.agents/`와 `AGENTS.md`는 계속 제외한다.
+---

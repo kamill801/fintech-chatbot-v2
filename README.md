@@ -97,7 +97,9 @@ Production variables are managed in the Vercel dashboard or CLI and must never b
 
 Current public frontend: `https://jangbu-ai.vercel.app`
 
-For ongoing iPhone testing, open that URL directly in Safari, tap Share → **Add to Home Screen**, enable **Open as Web App**, and tap **Add**. The Home Screen app is named **장부 AI** and uses the blue ledger icon. Reopen the app while online after a deployment to load the latest release. Home Screen installation is a device action; opening the URL from a connected Mac does not install the icon.
+For ongoing iPhone testing, the `ios/JangbuAI/` Xcode project installs a small **장부 AI** app directly on a paired iPhone. It displays the existing production URL in a persistent WebKit browser and uses the blue ledger icon; web releases continue through the existing Vercel project. On a Mac with Xcode and XcodeGen installed, regenerate the project with `cd ios/JangbuAI && xcodegen generate`, select the connected device and your Personal Team in Xcode, then build and run the `JangbuAI` scheme. Reinstall before the free Personal Team provisioning profile expires (typically seven days). A Personal Team allows only three development apps per device at once. This app is a device test shell, not an App Store release.
+
+Alternatively, open the URL directly in iPhone Safari, tap Share → **Add to Home Screen**, enable **Open as Web App**, and tap **Add**. This web-app installation does not use a Personal Team development-app slot. Reopen either installed app while online after a web deployment to load the latest release.
 
 The selected production topology is Vercel for the web app, Supabase Auth with Kakao as the primary sign-in and email/password as a fallback, a Render Free Flask web service in Singapore, and Upstash Redis over TLS. Kakao nickname and profile-image metadata are optional display fields only; financial-record ownership remains keyed by the verified Supabase `user.id`. The free web deployment does not run RQ or claim always-on availability; Render may cold-start after idle periods. See `DEPLOYMENT.md` for the environment-variable boundary and activation order.
 
