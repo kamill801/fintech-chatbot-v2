@@ -34,6 +34,7 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly status: number,
+    public readonly correlationId: string | null = null,
   ) {
     super(message);
   }
@@ -83,10 +84,11 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
       payload?.error?.code ?? "request_failed",
       payload?.error?.message ?? "요청을 처리하지 못했어요.",
       response.status,
+      payload?.meta?.correlation_id ?? response.headers.get("X-Correlation-Id"),
     );
   }
   if (!payload?.data) {
-    throw new ApiError("invalid_response", "서버 응답을 읽지 못했어요.", response.status);
+    throw new ApiError("invalid_response", "서버 응답을 읽지 못했어요.", response.status, response.headers.get("X-Correlation-Id"));
   }
   return payload.data;
 }

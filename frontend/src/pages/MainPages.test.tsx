@@ -172,6 +172,47 @@ describe("live ledger summaries", () => {
     expect(addLink).toHaveAttribute("href", "/add?date=2026-08-16");
   });
 
+  it("opens the calendar on the saved transaction date from the URL", () => {
+    window.history.replaceState({}, "", "/ledger?date=2026-07-12&view=calendar&saved=tx-july");
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      profile: null,
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul" },
+      summary: {
+        month: "2026-08",
+        total_spent_krw: 0,
+        by_category_krw: {},
+        transaction_count: 0,
+        discretionary_budget_krw: 800000,
+      },
+      transactions: [{
+        transaction_id: "tx-july",
+        amount_krw: 9600,
+        merchant: "분식집",
+        category: "food",
+        description: null,
+        occurred_at: "2026-07-12T03:00:00Z",
+        source: "manual",
+        source_reference: null,
+        reason: null,
+        status: "judged",
+        created_at: "2026-07-12T03:00:00Z",
+        transaction_type: "expense",
+        account_id: "cash",
+        destination_account_id: null,
+        exclude_from_budget: false,
+      }],
+    });
+
+    render(<BrowserRouter><LedgerPage /></BrowserRouter>);
+
+    expect(screen.getByRole("grid", { name: "2026년 7월 거래 달력" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "7월 12일 내역" })).toBeInTheDocument();
+    expect(screen.getByText("분식집")).toBeInTheDocument();
+    expect(screen.getByText("거래를 기록했어요. 선택한 날짜의 내역에서 확인할 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "7월 12일에 거래 추가" })).toHaveAttribute("href", "/add?date=2026-07-12");
+  });
+
   it("searches the list and narrows records by type, category, and account", async () => {
     const user = userEvent.setup();
     mocks.useLedger.mockReturnValue({
@@ -194,6 +235,7 @@ describe("live ledger summaries", () => {
 
     render(<BrowserRouter><LedgerPage /></BrowserRouter>);
     await user.click(screen.getByRole("button", { name: "목록" }));
+    await user.click(screen.getByRole("button", { name: "검색·필터" }));
     expect(screen.getByText("카페 온도")).toBeInTheDocument();
     expect(screen.getByText("회사")).toBeInTheDocument();
 

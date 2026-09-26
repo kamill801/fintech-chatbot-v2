@@ -19,8 +19,9 @@ import {
   Wallet,
   X,
 } from "@phosphor-icons/react";
+import { useAuth } from "./auth-context";
 import { useLedger } from "./ledger-context";
-import { NavLink, useNavigate } from "./router";
+import { Link, NavLink, useNavigate } from "./router";
 import type { Judgment, JudgmentLabel, Transaction } from "./types";
 import { categoryNames, formatTime, formatWon, labelText, withDemo } from "./utils";
 
@@ -150,12 +151,17 @@ export function Toggle({
   );
 }
 
-export function BookkeeperMark({ compact = false }: { compact?: boolean }) {
+export function ProfileButton({ demo }: { demo: boolean }) {
+  const { avatarUrl } = useAuth();
+  const [imageFailed, setImageFailed] = useState(false);
+  const showAvatar = Boolean(avatarUrl && !imageFailed);
+
   return (
-    <div className={`bookkeeper ${compact ? "bookkeeper-compact" : ""}`} aria-label="장부지기">
-      <UserCircle size={compact ? 36 : 64} weight="duotone" />
-      {!compact && <span>장부지기</span>}
-    </div>
+    <Link className="profile-button" to={withDemo("/settings", demo)} aria-label="내 프로필 및 설정">
+      {showAvatar
+        ? <img src={avatarUrl ?? ""} alt="" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} />
+        : <UserCircle size={30} />}
+    </Link>
   );
 }
 

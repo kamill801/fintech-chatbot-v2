@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarBlank,
@@ -18,7 +18,6 @@ import {
 } from "@phosphor-icons/react";
 import {
   AppShell,
-  BookkeeperMark,
   CategoryIcon,
   FieldRow,
   Highlight,
@@ -32,20 +31,9 @@ import {
 import { demoJudgment } from "../demo";
 import { useAuth } from "../auth-context";
 import { useLedger } from "../ledger-context";
-import { Link, useNavigate } from "../router";
+import { Link, useLocation, useNavigate } from "../router";
 import type { LedgerAccount, Transaction, TransactionType } from "../types";
-import { categoryNames, createClientId, currentMonthKey, formatCalendarWon, formatKoreanDate, formatMonthLabel, formatWon, withDemo } from "../utils";
-
-function transactionDateKey(transaction: Transaction): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(transaction.occurred_at));
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
+import { categoryNames, createClientId, currentMonthKey, formatCalendarWon, formatKoreanDate, formatMonthLabel, formatWon, isValidDateKey, transactionDateKey, withDemo } from "../utils";
 
 function transactionTypeOf(transaction: Transaction): TransactionType {
   return transaction.transaction_type ?? "expense";
@@ -80,21 +68,34 @@ function dayHeading(dateKey: string): string {
 }
 
 export function LedgerPage() {
-  const { demo, latestPlanImpact, settings, summary, transactions } = useLedger();
+  const { demo, latestPlanImpact, refresh, settings, summary, syncWarning, transactions } = useLedger();
   const navigate = useNavigate();
-  const initialMonth = summary?.month ?? currentMonthKey();
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const requestedDate = params.get("date");
+  const validRequestedDate = requestedDate && isValidDateKey(requestedDate) ? requestedDate : null;
+  const initialMonth = validRequestedDate?.slice(0, 7) ?? summary?.month ?? currentMonthKey();
   const [month, setMonth] = useState(initialMonth);
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [view, setView] = useState<"calendar" | "list">(params.get("view") === "list" && !params.has("saved") ? "list" : "calendar");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | TransactionType>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [accountFilter, setAccountFilter] = useState("all");
   const monthTransactions = useMemo(
-    () => transactions.filter((transaction) => transactionDateKey(transaction).startsWith(month)),
+    () => transactions.filter((transaction) => transactionDateKey(transaction.occurred_at).startsWith(month)),
     [month, transactions],
   );
-  const initialTransactionDate = monthTransactions[0] ? transactionDateKey(monthTransactions[0]) : `${month}-01`;
+  const initialTransactionDate = validRequestedDate ?? (month === currentMonthKey() ? transactionDateKey(new Date()) : monthTransactions[0] ? transactionDateKey(monthTransactions[0].occurred_at) : `${month}-01`);
   const [selectedDate, setSelectedDate] = useState(initialTransactionDate);
+  const savedTransactionId = params.get("saved");
+  useEffect(() => {
+    if (validRequestedDate) {
+      setMonth(validRequestedDate.slice(0, 7));
+      setSelectedDate(validRequestedDate);
+      if (savedTransactionId) setView("calendar");
+    }
+  }, [validRequestedDate, savedTransactionId]);
   const filteredMonthTransactions = useMemo(() => monthTransactions.filter((transaction) => {
     const searchable = `${transaction.merchant ?? ""} ${transaction.description ?? ""} ${categoryNames[transaction.category] ?? transaction.category}`.toLowerCase();
     return (typeFilter === "all" || transactionTypeOf(transaction) === typeFilter)
@@ -103,26 +104,26 @@ export function LedgerPage() {
       && (!query.trim() || searchable.includes(query.trim().toLowerCase()));
   }), [accountFilter, categoryFilter, monthTransactions, query, typeFilter]);
   const selectedTransactions = useMemo(
-    () => filteredMonthTransactions.filter((transaction) => transactionDateKey(transaction) === selectedDate),
+    () => filteredMonthTransactions.filter((transaction) => transactionDateKey(transaction.occurred_at) === selectedDate),
     [filteredMonthTransactions, selectedDate],
   );
   const totalsByDate = useMemo(() => filteredMonthTransactions.reduce<Record<string, { expense: number; income: number }>>((totals, transaction) => {
-    const date = transactionDateKey(transaction);
+    const date = transactionDateKey(transaction.occurred_at);
     const current = totals[date] ?? { expense: 0, income: 0 };
     if (transactionTypeOf(transaction) === "expense") current.expense += transaction.amount_krw;
     if (transactionTypeOf(transaction) === "income") current.income += transaction.amount_krw;
     totals[date] = current;
     return totals;
   }, {}), [filteredMonthTransactions]);
-  const monthTotal = month === summary?.month
+  const monthTotal = month === summary?.month && !syncWarning
     ? summary.total_spent_krw
     : monthTransactions.filter((item) => transactionTypeOf(item) === "expense").reduce((total, transaction) => total + transaction.amount_krw, 0);
-  const monthIncome = month === summary?.month
+  const monthIncome = month === summary?.month && !syncWarning
     ? summary.total_income_krw ?? 0
     : monthTransactions.filter((item) => transactionTypeOf(item) === "income").reduce((total, transaction) => total + transaction.amount_krw, 0);
   const monthNet = monthIncome - monthTotal;
   const groupedList = useMemo(() => filteredMonthTransactions.reduce<Record<string, Transaction[]>>((groups, transaction) => {
-    const date = transactionDateKey(transaction);
+    const date = transactionDateKey(transaction.occurred_at);
     (groups[date] ??= []).push(transaction);
     return groups;
   }, {}), [filteredMonthTransactions]);
@@ -131,6 +132,7 @@ export function LedgerPage() {
     const nextMonth = shiftMonth(month, delta);
     setMonth(nextMonth);
     setSelectedDate(`${nextMonth}-01`);
+    navigate(withDemo(`/ledger?date=${nextMonth}-01&view=calendar`, demo), { replace: true });
   }
 
   return (
@@ -145,14 +147,17 @@ export function LedgerPage() {
           </div>
         </header>
         <section className="ledger-summary"><h2>이번 달 <Highlight>{formatWon(monthTotal)}</Highlight> 썼어요.</h2><p><span>수입 <strong className="income-text">{formatWon(monthIncome)}</strong></span><i /><span>지출 <strong>{formatWon(monthTotal)}</strong></span><i /><span>순현금 <strong className={monthNet >= 0 ? "income-text" : "expense-text"}>{monthNet >= 0 ? "+" : ""}{formatWon(monthNet)}</strong></span></p></section>
+        {savedTransactionId && transactions.some((transaction) => transaction.transaction_id === savedTransactionId) && <p className="ledger-save-status" role="status">거래를 기록했어요. 선택한 날짜의 내역에서 확인할 수 있어요.</p>}
+        {syncWarning && <p className="ledger-sync-warning" role="status">{syncWarning} <button type="button" onClick={() => void refresh()}>다시 불러오기</button></p>}
         {latestPlanImpact && <InfoCallout>{latestPlanImpact.message}</InfoCallout>}
         <div className="segmented-control ledger-view-toggle" role="group" aria-label="장부 보기 방식"><button type="button" className={view === "calendar" ? "selected" : ""} onClick={() => setView("calendar")}>달력</button><button type="button" className={view === "list" ? "selected" : ""} onClick={() => setView("list")}>목록</button></div>
-        <section className="ledger-filters" aria-label="거래 검색과 필터">
+        <button type="button" className="ledger-filter-toggle" aria-expanded={filtersOpen} aria-controls="ledger-filters" onClick={() => setFiltersOpen((open) => !open)}>검색·필터{[query.trim(), typeFilter !== "all", categoryFilter !== "all", accountFilter !== "all"].filter(Boolean).length ? ` · ${[query.trim(), typeFilter !== "all", categoryFilter !== "all", accountFilter !== "all"].filter(Boolean).length}개 적용` : ""}</button>
+        {filtersOpen && <section id="ledger-filters" className="ledger-filters" aria-label="거래 검색과 필터">
           <label className="ledger-search"><MagnifyingGlass size={19} /><span className="sr-only">거래 검색</span><input value={query} placeholder="사용처·메모 검색" onChange={(event) => { setQuery(event.target.value); if (event.target.value) setView("list"); }} /></label>
           <select aria-label="거래 유형 필터" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as "all" | TransactionType)}><option value="all">전체 유형</option><option value="expense">지출</option><option value="income">수입</option><option value="transfer">이체</option></select>
           <select aria-label="분류 필터" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">전체 분류</option>{Object.entries(categoryNames).map(([category, name]) => <option key={category} value={category}>{name}</option>)}</select>
           <select aria-label="계좌 필터" value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)}><option value="all">전체 계좌</option>{(settings.accounts ?? []).map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}</select>
-        </section>
+        </section>}
         {view === "calendar" ? <Surface className="ledger-calendar">
           <div className="ledger-calendar-grid" role="grid" aria-label={`${formatMonthLabel(month)} 거래 달력`}>
             <div className="calendar-weekdays" role="row">{["일", "월", "화", "수", "목", "금", "토"].map((weekday) => <span key={weekday} role="columnheader">{weekday}</span>)}</div>
@@ -171,7 +176,7 @@ export function LedgerPage() {
                           className={`${totals.expense ? "has-spend" : ""} ${totals.income ? "has-income" : ""} ${selected ? "selected" : ""}`.trim()}
                           aria-label={`${Number(month.split("-")[1])}월 ${day}일, 수입 ${formatWon(totals.income)}, 지출 ${formatWon(totals.expense)}`}
                           aria-pressed={selected}
-                          onClick={() => setSelectedDate(dateKey)}
+                          onClick={() => { setSelectedDate(dateKey); navigate(withDemo(`/ledger?date=${dateKey}&view=calendar`, demo), { replace: true }); }}
                         >
                           <span className="calendar-day-number">{day}</span>
                           {totals.income > 0 && <small className="calendar-income">+{formatCalendarWon(totals.income)}</small>}
@@ -192,7 +197,7 @@ export function LedgerPage() {
           </div>
           <Surface className="selected-day-list">
             {selectedTransactions.length
-              ? selectedTransactions.map((transaction) => <TransactionRow key={transaction.transaction_id} transaction={transaction} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))} />)
+              ? selectedTransactions.map((transaction) => <div key={transaction.transaction_id} className={transaction.transaction_id === savedTransactionId ? "saved-transaction" : undefined}><TransactionRow transaction={transaction} onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))} /></div>)
               : <p className="empty-copy">이 날짜에 기록한 거래가 없어요.</p>}
           </Surface>
         </section>}
@@ -215,7 +220,7 @@ export function AgentPage() {
     <AppShell active="/agent">
       <div className="screen agent-screen">
         <header><h1>에이전트</h1><Link to={withDemo("/settings", demo)}><ModePill enabled={settings.roast_enabled} /></Link></header>
-        <section className="agent-intro"><h2>{settings.roast_enabled ? <>이유는 듣고, 장부는 <Highlight>매섭게.</Highlight></> : <>장부는 자동으로, 중요한 건 <Highlight>또렷하게.</Highlight></>}</h2><BookkeeperMark compact /></section>
+        <section className="agent-intro"><h2>{settings.roast_enabled ? <>이유는 듣고, 장부는 <Highlight>매섭게.</Highlight></> : <>장부는 자동으로, 중요한 건 <Highlight>또렷하게.</Highlight></>}</h2></section>
         {settings.roast_enabled && (
           <section className="roast-queue">
             <h3>답변 대기 <b>{pending ? 1 : 0}</b></h3>
@@ -463,18 +468,17 @@ export function SettingsPage() {
         <div><small>로그인 계정</small><strong>{displayName ?? "장부 사용자"}</strong><span>{provider === "kakao" ? "카카오 계정" : "이메일 계정"}</span></div>
       </Surface>}
       <section className="roast-setting">
-        <BookkeeperMark />
-        <div><h2>욕쟁이 할머니 모드</h2><p>켜면 모든 지출의 이유를 묻고, 할머니 말투로 판단해요</p><button onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
+        <div><h2>욕쟁이 할머니 모드</h2><p>켜면 모든 지출의 이유를 묻고, 할머니 말투로 판단해요</p><button className="roast-preview-button" onClick={() => setPreview(!preview)}>말투 미리보기 <CaretRight size={18} /></button></div>
         <div className="setting-toggle"><Toggle checked={settings.roast_enabled} label="욕쟁이 할머니 모드" onChange={(checked) => void updateMode(checked)} /><span>{savingSetting ? "저장 중" : settings.roast_enabled ? "켜짐" : "꺼짐"}</span></div>
       </section>
       {preview && <div className="roast-preview"><strong>기본 말투</strong><p>{demoJudgment(false).message}</p><strong>욕쟁이 할머니 말투</strong><p>{demoJudgment(true).message}</p></div>}
       <Surface className="settings-list">
-        <FieldRow icon={<Wallet />} label="내 자금 기준" value={profile ? `생활비 예산 ${formatWon(profile.discretionary_budget_krw)}` : "기준 미설정"} onClick={() => navigate(withDemo("/onboarding/baseline", demo))} />
-        <FieldRow icon={<Target />} label="목표" value={profile ? `${profile.goal.name} · 현재 ${Math.round((profile.goal.current_amount_krw / Math.max(profile.goal.target_amount_krw, 1)) * 100)}%` : "목표 미설정"} onClick={() => navigate(withDemo("/onboarding/goal", demo))} />
+        <FieldRow icon={<Wallet />} label="내 자금 기준" value={profile ? `생활비 예산 ${formatWon(profile.discretionary_budget_krw)}` : "기준 미설정"} onClick={() => navigate(withDemo("/settings/budget", demo))} />
+        <FieldRow icon={<Target />} label="목표" value={profile ? `${profile.goal.name} · 현재 ${Math.round((profile.goal.current_amount_krw / Math.max(profile.goal.target_amount_krw, 1)) * 100)}%` : "목표 미설정"} onClick={() => navigate(withDemo("/settings/goal", demo))} />
         <FieldRow icon={<Wallet />} label="계좌" value={`${(settings.accounts ?? []).filter((account) => !account.archived).length}개 사용 중`} onClick={() => { setAccountDraft((settings.accounts ?? []).map((account) => ({ ...account }))); setEditingAccounts(true); }} />
         <FieldRow icon={<Target />} label="카테고리 예산" value={Object.keys(settings.category_budgets_krw ?? {}).length ? `${Object.keys(settings.category_budgets_krw ?? {}).length}개 설정` : "예산 추가"} onClick={() => { setBudgetDraft({ ...(settings.category_budgets_krw ?? {}) }); setEditingBudgets(true); }} />
         <FieldRow icon={<Lightbulb />} label="내 소비 기준" value={(settings.spending_rules ?? []).length ? `${(settings.spending_rules ?? []).length}개 기준 학습 중` : "기준 추가"} onClick={() => { setRuleDraft((settings.spending_rules ?? []).join("\n")); setEditingRules(true); }} />
-        <FieldRow icon={<FileText />} label="데이터 방식" value="수기 입력 중 · 계좌 연결 준비 중" onClick={() => navigate(withDemo("/onboarding/source", demo))} />
+        <FieldRow icon={<FileText />} label="데이터 방식" value="직접 입력" />
         <FieldRow icon={<DownloadSimple />} label="거래 내보내기" value={`${safeTransactions.length}건 · CSV`} onClick={exportCsv} />
       </Surface>
       <Surface className="settings-list privacy-settings"><h2>개인정보와 데이터</h2>

@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "./auth-context";
 import { LedgerProvider } from "./ledger-context";
 import { LoginPage } from "./pages/LoginPage";
 import { PlanPage } from "./pages/PlanPage";
+import { ProfileSettingsPage } from "./pages/ProfileSettings";
 import { onboardingResumePath } from "./local-drafts";
 
 function LoadingScreen() {
@@ -73,6 +74,8 @@ function AppRoutes() {
       <Route path="/plan" element={<PlanPage />} />
       <Route path="/report" element={<ReportPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/settings/budget" element={<ProfileSettingsPage section="budget" />} />
+      <Route path="/settings/goal" element={<ProfileSettingsPage section="goal" />} />
       <Route path="/share/:transactionId" element={<SharePage />} />
       <Route path="*" element={<Navigate replace to={demo ? "/?demo=1" : "/"} />} />
     </Routes>

@@ -2,9 +2,9 @@
 
 ## Source of truth
 
-- Status: Implemented - post-deployment correction release approved
-- Last refreshed: 2026-08-05
-- Product name: undecided; screen copy uses `내 장부` as a neutral working label
+- Status: Mobile UX and transaction reliability update in Task 8.2
+- Last refreshed: 2026-09-27
+- Product name: `장부 AI`
 - Primary product surfaces: mobile app first, responsive web second, Kakao transport retained as a thin secondary surface
 - Primary authentication: Kakao Login first, email/password fallback retained
 - Product contract: `TECHSPEC.md`
@@ -55,7 +55,7 @@ The home screen must answer four questions in this order:
 - Input before decoration: authentication and money-entry controls must appear before large character or editorial decoration.
 - Replaceable money: KRW inputs must allow a temporarily empty field and whole-value replacement; state validation happens on commit, not on every deleted digit.
 - Live-data integrity: zero is valid financial data. Demo amounts and dates can appear only in explicit demo mode.
-- One mark, one symbol: the bookkeeper avatar uses one icon with a separately laid-out label; layered icons and stamps are not an implementation target.
+- One profile entry: the Home header has a functional 44px profile button linked to Settings. No bookkeeper avatar decorates or covers financial content.
 - Korea-first sign-in: use one prominent `카카오로 시작하기` action, then a visually secondary email login/signup fallback. Do not force Kakao email consent.
 - Identity separation: nickname and profile image personalize the shell only. Missing or changed Kakao metadata must never change ledger ownership, which remains bound to the verified Supabase user ID.
 
@@ -118,11 +118,20 @@ Use four bottom destinations and one global add action:
 | --- | --- | --- |
 | 홈 | Understand the current month and next action | Spendable amount, goal pace, agent brief, recent activity |
 | 장부 | Find, add, and correct money records | Monthly calendar, daily totals, selected-day records, transaction detail |
-| 에이전트 | Review AI guidance or resolve grandma-mode questions | Learned regret pattern, goal impact, one weekly action; pending reasons first only while grandma mode is on |
+| 계획 | Confirm and manage a spending plan | Period, budget, planned expenses, progress, and an explicit preview before activation |
 | 리포트 | Understand patterns and plan a correction | Monthly trend, category bars, reflection summary, goal forecast |
 | `+` | Record a transaction | Amount-first manual entry sheet |
 
 Settings, privacy, data source, profile, and mode controls open from the home header. Goals are not a fifth tab; the active goal is surfaced on Home and managed from its detail view.
+
+### Mobile correction rules (2026-09-27)
+
+- Home prioritizes the current spendable amount, a short recent-transaction list, and one next action. Decorative people icons and `장부지기` copy are removed.
+- After confirmed manual save, return to the transaction's KST calendar date and highlight its row. A failed summary or plan refresh does not change a confirmed save into a failure; provide a retry for the stale summary.
+- A pending reason in opt-in grandma mode remains tied to its transaction. Skipping the question returns to that transaction's calendar date; the final judgment links there too.
+- Plan form cards have internal padding, bounded date and currency inputs, and content starts below the header without stretched blank rows. A changed draft requires a new successful preview before confirmation.
+- Real new accounts start financial setup with empty values. Demo values appear only in explicit demo mode. Income shortfall stays visible instead of being clamped to zero.
+- Existing profile owners edit their budget and goal from Settings. Every touch target and long financial value must remain usable at narrow mobile widths.
 
 ### Core screens
 

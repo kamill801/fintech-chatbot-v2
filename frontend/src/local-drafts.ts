@@ -1,6 +1,7 @@
 const ONBOARDING_PREFIX = "jangbu-onboarding-draft";
 const ONBOARDING_STAGE_PREFIX = "jangbu-onboarding-stage";
 const MANUAL_PREFIX = "jangbu-manual-draft";
+const PLAN_PREFIX = "jangbu-plan-draft";
 
 function scopePart(userKey: string | null | undefined, demo = false): string {
   if (demo) return "demo";
@@ -43,6 +44,10 @@ export function manualDraftKey(userKey: string | null | undefined, demo = false)
   return `${MANUAL_PREFIX}:${scopePart(userKey, demo)}`;
 }
 
+export function planDraftKey(userKey: string | null | undefined, demo = false): string {
+  return `${PLAN_PREFIX}:${scopePart(userKey, demo)}`;
+}
+
 function removeMatching(storage: Storage, userKey?: string | null) {
   const scoped = userKey
     ? [scopePart(userKey), legacyScopePart(userKey), "anonymous"]
@@ -54,11 +59,13 @@ function removeMatching(storage: Storage, userKey?: string | null) {
       key === ONBOARDING_PREFIX ||
       key === ONBOARDING_STAGE_PREFIX ||
       key === MANUAL_PREFIX ||
+      key === PLAN_PREFIX ||
       key.startsWith(`${ONBOARDING_PREFIX}:`) ||
       key.startsWith(`${ONBOARDING_STAGE_PREFIX}:`) ||
-      key.startsWith(`${MANUAL_PREFIX}:`);
+      key.startsWith(`${MANUAL_PREFIX}:`) ||
+      key.startsWith(`${PLAN_PREFIX}:`);
     if (!financialDraft) continue;
-    const legacyBareKey = key === ONBOARDING_PREFIX || key === ONBOARDING_STAGE_PREFIX || key === MANUAL_PREFIX;
+    const legacyBareKey = key === ONBOARDING_PREFIX || key === ONBOARDING_STAGE_PREFIX || key === MANUAL_PREFIX || key === PLAN_PREFIX;
     if (legacyBareKey || !scoped || scoped.some((scope) => key.endsWith(`:${scope}`))) {
       storage.removeItem(key);
     }

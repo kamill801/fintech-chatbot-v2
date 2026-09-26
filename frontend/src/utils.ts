@@ -91,6 +91,23 @@ export function currentMonthKey(value = new Date()): string {
   return year && month ? `${year}-${month}` : "";
 }
 
+export function transactionDateKey(value: string | Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(typeof value === "string" ? new Date(value) : value);
+  const result = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${result.year}-${result.month}-${result.day}`;
+}
+
+export function isValidDateKey(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T12:00:00+09:00`);
+  return !Number.isNaN(parsed.getTime()) && transactionDateKey(parsed) === value;
+}
+
 export function formatMonthLabel(value: string): string {
   const [year, month] = value.split("-").map(Number);
   return Number.isInteger(year) && Number.isInteger(month) ? `${year}년 ${month}월` : value;

@@ -14,7 +14,6 @@ import {
   Wallet,
 } from "@phosphor-icons/react";
 import {
-  BookkeeperMark,
   EvidenceList,
   Highlight,
   JudgmentBadge,
@@ -28,7 +27,7 @@ import {
 import { useLedger } from "../ledger-context";
 import { Link, useNavigate, useParams } from "../router";
 import type { Judgment, JudgmentLabel, SharePayload, SpendingReflection, TransactionDetail, TransactionDraft, TransactionType } from "../types";
-import { categoryNames, confidenceText, formatDate, formatTime, formatWon, labelText, withDemo } from "../utils";
+import { categoryNames, confidenceText, formatDate, formatTime, formatWon, labelText, transactionDateKey, withDemo } from "../utils";
 
 function useTransactionDetail(transactionId: string) {
   const { getTransaction, settings } = useLedger();
@@ -96,7 +95,6 @@ export function JudgmentPage() {
       <div className="judgment-meta"><JudgmentBadge label={judgment.effective_label || judgment.label} /><span>{confidenceText(judgment.confidence)} · {Math.round(judgment.confidence * 100)}%</span></div>
       <section className="judgment-headline">
         <h1>{currentJudgmentMessage(judgment)}</h1>
-        {settings.roast_enabled && <BookkeeperMark compact />}
       </section>
       <h2>판단 근거</h2>
       <EvidenceList judgment={judgment} transaction={transaction} />
@@ -104,6 +102,7 @@ export function JudgmentPage() {
       {modeError && <p className="form-error" role="alert">{modeError}</p>}
       <TextButton onClick={() => navigate(withDemo(`/transactions/${transaction.transaction_id}`, demo))}>판단 수정</TextButton>
       <Link className="secondary-link" to={withDemo(`/share/${transaction.transaction_id}`, demo)}>결과 공유</Link>
+      <Link className="secondary-link" to={withDemo(`/ledger?date=${transactionDateKey(transaction.occurred_at)}&view=calendar&saved=${encodeURIComponent(transaction.transaction_id)}`, demo)}>장부에서 확인하기</Link>
     </main>
   );
 }
@@ -349,7 +348,7 @@ async function shareCardImage(
   roundedRect(context, 80, 90, 920, 1170, 44);
   context.fillStyle = "#E95B43";
   context.font = "700 42px sans-serif";
-  context.fillText("장부지기의 한마디", 155, 220);
+  context.fillText("장부 AI · 소비 판단", 155, 220);
   context.fillStyle = "#FFF8E7";
   context.font = "700 65px sans-serif";
   const words = payload.roast_message.split(" ");
@@ -452,7 +451,7 @@ export function SharePage() {
       <PageHeader title="결과 공유" close />
       <h1>웃기더라도, <Highlight>내 돈</Highlight>은 가리고.</h1>
       <section className="share-card" aria-label="공유 이미지 미리보기">
-        <div className="share-stamp"><BookkeeperMark compact /><strong>장부지기의 한마디</strong></div>
+        <div className="share-stamp"><strong>장부 AI · 소비 판단</strong></div>
         <blockquote>{copy}</blockquote>
         <div className="share-meta"><span><CalendarBlank size={20} /> {categoryNames[payload.category] ?? "같은 분류"} 지출</span><strong>판단 · {labelText(payload.label)}</strong><span><Copy size={22} /> 내 장부</span></div>
       </section>

@@ -1,7 +1,7 @@
 import { ChatCircleDots, LockKey } from "@phosphor-icons/react";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "../auth-context";
-import { BookkeeperMark, Highlight, PrimaryButton, Surface } from "../components";
+import { Highlight, PrimaryButton, Surface } from "../components";
 
 type AuthMode = "login" | "signup";
 
@@ -70,7 +70,6 @@ export function LoginPage() {
           <h1>쓴 돈은 기록하고,<br /><Highlight>후회할 소비</Highlight>는 줄이게.</h1>
           <p>예산과 목표, 내가 남긴 소비 평가를 함께 보고 다음 주에 바꿀 행동 하나를 알려드려요.</p>
         </div>
-        <BookkeeperMark />
       </section>
 
       <Surface className="auth-card">

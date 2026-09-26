@@ -8,7 +8,7 @@ import {
   SignOut,
   Wallet,
 } from "@phosphor-icons/react";
-import { BookkeeperMark, CurrencyInput, Highlight, PrimaryButton, Surface } from "../components";
+import { CurrencyInput, Highlight, PrimaryButton, Surface } from "../components";
 import { demoProfile } from "../demo";
 import { useAuth } from "../auth-context";
 import { useLedger } from "../ledger-context";
@@ -17,12 +17,32 @@ import { useNavigate } from "../router";
 import type { Profile } from "../types";
 import { formatWon, withDemo } from "../utils";
 
-function readDraft(key: string): Profile {
+function emptyProfileDraft(): Profile {
+  const today = new Date();
+  const targetDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+  const localDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`;
+  return {
+    monthly_income_krw: 0,
+    liquid_assets_krw: 0,
+    fixed_expenses_krw: 0,
+    monthly_debt_payment_krw: 0,
+    discretionary_budget_krw: 0,
+    goal: {
+      goal_id: "goal-draft",
+      name: "",
+      target_amount_krw: 0,
+      current_amount_krw: 0,
+      target_date: localDate,
+    },
+  };
+}
+
+function readDraft(key: string, demo: boolean): Profile {
   try {
     const saved = window.sessionStorage.getItem(key);
-    return saved ? (JSON.parse(saved) as Profile) : demoProfile;
+    return saved ? (JSON.parse(saved) as Profile) : demo ? demoProfile : emptyProfileDraft();
   } catch {
-    return demoProfile;
+    return demo ? demoProfile : emptyProfileDraft();
   }
 }
 
@@ -136,10 +156,10 @@ export function OnboardingBaseline() {
   const { userKey } = useAuth();
   const navigate = useNavigate();
   const draftKey = onboardingDraftKey(userKey, demo);
-  const [draft, setDraft] = useState(() => readDraft(draftKey));
+  const [draft, setDraft] = useState(() => readDraft(draftKey, demo));
   const [saveError, setSaveError] = useState(false);
   const update = (key: keyof Profile, value: number) => setDraft((current) => ({ ...current, [key]: value }));
-  const freeMoney = Math.max(0, draft.monthly_income_krw - draft.fixed_expenses_krw - draft.monthly_debt_payment_krw - draft.discretionary_budget_krw);
+  const freeMoney = draft.monthly_income_krw - draft.fixed_expenses_krw - draft.monthly_debt_payment_krw - draft.discretionary_budget_krw;
 
   function continueToGoal() {
     setSaveError(false);
@@ -159,7 +179,6 @@ export function OnboardingBaseline() {
           <h1>내 <Highlight>예산 기준</Highlight>을<br />정해요.</h1>
           <p>월 수입과 고정지출을 입력해 생활비 예산을 확인해 보세요.</p>
         </div>
-        <BookkeeperMark compact />
       </div>
       <Surface className="edit-sheet">
         <MoneyEditRow label="보유 현금·예금" value={draft.liquid_assets_krw} onChange={(value) => update("liquid_assets_krw", value)} />
@@ -169,7 +188,8 @@ export function OnboardingBaseline() {
         <MoneyEditRow label="생활비 예산" value={draft.discretionary_budget_krw} onChange={(value) => update("discretionary_budget_krw", Math.max(1, value))} />
       </Surface>
       <div className="goal-callout"><Wallet size={27} /><span>매달 자유롭게 쓸 돈의 기준이에요</span><strong>{formatWon(draft.discretionary_budget_krw)}</strong></div>
-      {freeMoney > 0 && <p className="baseline-note">기준을 지키면 매달 {formatWon(freeMoney)}을 남길 수 있어요.</p>}
+      {freeMoney > 0 && <p className="baseline-note">입력한 기준대로라면 매달 {formatWon(freeMoney)}이 남아요.</p>}
+      {freeMoney < 0 && <p className="baseline-note" role="status">월 수입보다 지출과 생활비 예산이 {formatWon(Math.abs(freeMoney))} 많아요. 금액을 다시 확인해 주세요.</p>}
       {saveError && <p className="form-error" role="alert">입력 내용을 임시 저장하지 못했어요. 브라우저 저장소 설정을 확인한 뒤 다시 시도해 주세요.</p>}
       <PrimaryButton onClick={continueToGoal}>다음: 목표 설정</PrimaryButton>
     </main>
@@ -181,7 +201,7 @@ export function OnboardingGoal() {
   const { userKey } = useAuth();
   const navigate = useNavigate();
   const draftKey = onboardingDraftKey(userKey, demo);
-  const [draft, setDraft] = useState(() => readDraft(draftKey));
+  const [draft, setDraft] = useState(() => readDraft(draftKey, demo));
   const [saveError, setSaveError] = useState(false);
   const progress = Math.min(100, Math.round((draft.goal.current_amount_krw / Math.max(draft.goal.target_amount_krw, 1)) * 100));
   const months = Math.max(1, Math.ceil((new Date(draft.goal.target_date).getTime() - Date.now()) / 2_629_800_000));
@@ -214,7 +234,7 @@ export function OnboardingGoal() {
       <div className="goal-progress-card">
         <span>현재 {progress}%</span>
         <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
-        <div><Wallet size={27} /> 매달 <strong>{formatWon(monthly)}</strong>씩 모으면 돼</div>
+        <div><Wallet size={27} /> 매달 <strong>{formatWon(monthly)}</strong>씩 모으면 돼요.</div>
       </div>
       {saveError && <p className="form-error" role="alert">목표를 임시 저장하지 못했어요. 브라우저 저장소 설정을 확인한 뒤 다시 시도해 주세요.</p>}
       <PrimaryButton onClick={continueToSource}>다음: 기록 방식</PrimaryButton>
@@ -229,7 +249,7 @@ export function OnboardingSource() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const draftKey = onboardingDraftKey(userKey, demo);
-  const draft = useMemo(() => readDraft(draftKey), [draftKey]);
+  const draft = useMemo(() => readDraft(draftKey, demo), [draftKey, demo]);
 
   async function finish() {
     setSaving(true);

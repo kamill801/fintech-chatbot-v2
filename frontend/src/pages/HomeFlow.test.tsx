@@ -45,19 +45,36 @@ describe("manual transaction drafts", () => {
     mocks.createTransaction
       .mockRejectedValueOnce(new Error("gateway"))
       .mockResolvedValueOnce({
-        transaction: { transaction_id: "tx-1" },
+        transaction: { transaction_id: "tx-1", occurred_at: "2026-08-19T03:00:00Z" },
         pending_question: { transaction_id: "tx-1" },
       });
 
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
-    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
+    await user.click(screen.getByRole("button", { name: "지출 저장하기" }));
     await screen.findByRole("alert");
-    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
+    await user.click(screen.getByRole("button", { name: "같은 요청으로 확인하기" }));
 
     await waitFor(() => expect(mocks.createTransaction).toHaveBeenCalledTimes(2));
     expect(mocks.createTransaction.mock.calls[0][1]).toBe("manual-op-1");
     expect(mocks.createTransaction.mock.calls[1][1]).toBe("manual-op-1");
+    expect(mocks.createTransaction.mock.calls[1][0]).toEqual(mocks.createTransaction.mock.calls[0][0]);
     expect(window.localStorage.getItem(manualDraftKey("user-a"))).toBeNull();
+  });
+
+  it("submits a rapid double tap only once", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(manualDraftKey("user-a"), JSON.stringify({
+      draft: { amount_krw: 9600, category: "food", merchant: "분식집" },
+      operationId: "one-tap-op",
+    }));
+    mocks.createTransaction.mockImplementation(() => new Promise(() => undefined));
+
+    render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
+    const saveButton = screen.getByRole("button", { name: "지출 저장하기" });
+    await user.click(saveButton);
+    await user.click(saveButton);
+
+    expect(mocks.createTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("supports each ledger transaction type and an accessible native date field", async () => {
@@ -69,7 +86,7 @@ describe("manual transaction drafts", () => {
     expect(within(typeControl).getByRole("button", { name: "수입" })).toBeInTheDocument();
     expect(within(typeControl).getByRole("button", { name: "이체" })).toBeInTheDocument();
     await user.click(within(typeControl).getByRole("button", { name: "수입" }));
-    expect(screen.getByRole("heading", { name: "얼마 들어왔어?" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "수입 금액" })).toBeInTheDocument();
     expect(screen.queryByText("이번 달 예산에서 제외")).not.toBeInTheDocument();
 
     const dateInput = screen.getAllByLabelText("날짜").at(-1)!;
@@ -87,14 +104,15 @@ describe("manual transaction drafts", () => {
       }),
     );
     mocks.createTransaction.mockResolvedValue({
-      transaction: { transaction_id: "tx-normal" },
+      transaction: { transaction_id: "tx-normal", occurred_at: "2026-08-19T03:00:00Z" },
       judgment: { judgment_id: "judgment-normal" },
     });
 
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
-    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
+    await user.click(screen.getByRole("button", { name: "지출 저장하기" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/ledger"));
+    expect(window.location.search).toBe("?date=2026-08-19&view=calendar&saved=tx-normal");
     expect(screen.queryByText("정보가 부족하면 이유를 한 번 물어봐요")).not.toBeInTheDocument();
   });
 
@@ -113,15 +131,15 @@ describe("manual transaction drafts", () => {
       }),
     );
     mocks.createTransaction.mockResolvedValue({
-      transaction: { transaction_id: "tx-roast" },
+      transaction: { transaction_id: "tx-roast", occurred_at: "2026-08-19T03:00:00Z" },
       pending_question: { transaction_id: "tx-roast" },
     });
 
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
-    await user.click(screen.getByRole("button", { name: "기록하고 이유 답하기" }));
+    await user.click(screen.getByRole("button", { name: "저장하고 이유 답하기" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/transactions/tx-roast/reason"));
-    expect(screen.getByText("욕쟁이 할머니가 지출 이유를 한 번 확인해요")).toBeInTheDocument();
+    expect(screen.getByText("저장 후 지출 이유를 한 번 물어요.")).toBeInTheDocument();
   });
 
   it("records income without opening the expense reason flow", async () => {
@@ -140,14 +158,15 @@ describe("manual transaction drafts", () => {
       }),
     );
     mocks.createTransaction.mockResolvedValue({
-      transaction: { transaction_id: "tx-income", transaction_type: "income" },
+      transaction: { transaction_id: "tx-income", transaction_type: "income", occurred_at: "2026-08-19T03:00:00Z" },
     });
 
     render(<BrowserRouter><ManualTransactionPage /></BrowserRouter>);
     await user.click(screen.getByRole("button", { name: "수입" }));
-    await user.click(screen.getByRole("button", { name: "거래 기록하기" }));
+    await user.click(screen.getByRole("button", { name: "수입 저장하기" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/ledger"));
+    expect(window.location.search).toBe("?date=2026-08-19&view=calendar&saved=tx-income");
     expect(mocks.createTransaction).toHaveBeenCalledWith(expect.objectContaining({
       amount_krw: 3500000,
       transaction_type: "income",
@@ -190,7 +209,7 @@ describe("demo financial consistency", () => {
     expect(screen.getByText(/직접 입력된 거래 기준/)).toBeInTheDocument();
     expect(screen.getByText("이번 주 배정")).toBeInTheDocument();
     expect(screen.getByText("이번 주 남음")).toBeInTheDocument();
-    expect(screen.getByText("목표까지 30%")).toBeInTheDocument();
+    expect(screen.getByText("30% 달성")).toBeInTheDocument();
     expect(screen.queryByText("623,000원")).not.toBeInTheDocument();
   });
 
@@ -217,5 +236,16 @@ describe("demo financial consistency", () => {
 
     expect(await screen.findByText("생활비 예산 47% 사용")).toBeInTheDocument();
     expect(screen.getByText("이번 주 같은 분류 3번째")).toBeInTheDocument();
+  });
+
+  it("returns from an unanswered reason to that transaction's calendar date", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/transactions/tx-cafe/reason?demo=1");
+    render(<BrowserRouter><ReasonPage /></BrowserRouter>);
+
+    await screen.findByText("생활비 예산 47% 사용");
+    await user.click(screen.getByRole("button", { name: "나중에 답하기 · 장부로" }));
+    expect(window.location.pathname).toBe("/ledger");
+    expect(window.location.search).toBe("?date=2026-08-03&view=calendar&saved=tx-cafe&demo=1");
   });
 });

@@ -90,6 +90,18 @@ describe("production API client", () => {
     });
   });
 
+  it("keeps the correlation id from a failed response for support diagnostics", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(
+      JSON.stringify({ error: { code: "invalid_account", message: "계좌를 확인해 주세요." }, meta: { correlation_id: "trace-42" } }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    ));
+
+    await expect(ledgerApi.createTransaction({ amount_krw: 9600, category: "food" }, "op-42")).rejects.toMatchObject({
+      code: "invalid_account",
+      correlationId: "trace-42",
+    });
+  });
+
   it("rejects an empty successful API response instead of throwing a JSON parse error", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 200 }));
 

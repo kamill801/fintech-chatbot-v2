@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: Task 8.1 mobile UX and transaction-reliability audit handoff (documentation complete; implementation awaits the user's next-model request)
+- Active task: none; Task 8.2 released, authenticated iPhone transaction/layout verification remains a separate follow-up
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -736,12 +736,34 @@ Turn the user's three iPhone defect reports into an executable, evidence-backed 
 - [x] Reproduce successful POST followed by summary/plan/storage failure, loss of entered calendar date, and stale plan-preview confirmation using isolated synthetic responses.
 - [x] Inspect six local mobile-sized screens and measure grid spacing; keep iOS-native overflow and the production POST cause explicitly unconfirmed.
 - [x] Prepare detailed screen-by-screen repair instructions and a successor-model execution prompt.
-- [ ] On the user's implementation request, activate one implementation slice at a time in the order A → B → C → D in the handoff. Preserve unfinished physical-device verification of Task 7.5.
+- [x] On the user's implementation request, activate one implementation slice at a time in the order A → B → C → D in the handoff. Preserve unfinished physical-device verification of Task 7.5.
 - [ ] Complete authenticated storage/calendar persistence and real iPhone layout verification before reporting those release claims.
 
 ### Boundary
 
 No application implementation, remote push/deployment, provider mutation, or real financial writes were performed by this planning task. Existing local-only `.agents/` and `AGENTS.md` stay excluded. `TECHSPEC.md` remains unchanged.
+
+## Task 8.2 - Mobile UX and Transaction Reliability Implementation (Released)
+
+### Goal
+
+Implement the approved `docs/plans/2026-09-27-mobile-ux-repair-handoff.md` as one coordinated release: trustworthy transaction recording and date return, functional profile/settings, contained and readable mobile forms, current-plan-only confirmation, and consistent supporting screens.
+
+### Ordered checkpoints
+
+- [x] Repair transaction mutation success boundaries, draft/retry behavior, and recorded-date calendar return with regression tests.
+- [x] Repair Home profile and navigation, plan form layout, onboarding, settings, and stale preview behavior.
+- [x] Check responsive screens and complete frontend tests/lint/build. No backend code changed, so Render deployment is unnecessary.
+- [x] Commit and push the reviewed change; deploy to the existing Vercel project.
+- [x] Verify live assets/routes and report separately what remains unproven in an authenticated account and physical iPhone.
+
+### Boundary
+
+The user authorized implementation, commit, push, and deployment for this task. No new provider project, account, dependency, financial test transaction, or TECHSPEC amendment is authorized. Preserve the existing local-only `.agents/` and `AGENTS.md`.
+
+### Release evidence and residual validation
+
+See `docs/qa/2026-09-27/implementation.md`. The original failed production POST has no captured response, so its precise server-side cause remains unconfirmed. An authenticated transaction persistence test and physical iPhone WKWebView layout/keyboard check remain open; neither is claimed as complete by this release.
 
 ## Archived Work
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confidenceText, createClientId, currentMonthKey, formatCalendarWon, formatCompactWon, formatMonthLabel, formatTodayLabel, formatWon, labelText, withDemo } from "./utils";
+import { confidenceText, createClientId, currentMonthKey, formatCalendarWon, formatCompactWon, formatMonthLabel, formatTodayLabel, formatWon, isValidDateKey, labelText, transactionDateKey, withDemo } from "./utils";
 
 describe("Korean ledger formatting", () => {
   it("formats won without decimals", () => {
@@ -35,5 +35,11 @@ describe("Korean ledger formatting", () => {
     } as unknown as Crypto;
 
     expect(createClientId(localCrypto)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it("uses the Korean calendar day across UTC month boundaries", () => {
+    expect(transactionDateKey("2026-08-31T15:30:00Z")).toBe("2026-09-01");
+    expect(isValidDateKey("2026-02-29")).toBe(false);
+    expect(isValidDateKey("2028-02-29")).toBe(true);
   });
 });

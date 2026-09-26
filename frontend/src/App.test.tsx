@@ -84,6 +84,32 @@ describe("App profile loading", () => {
     expect(screen.queryByRole("heading", { name: "장부 AI" })).not.toBeInTheDocument();
   });
 
+  it("starts a real new account with empty financial fields instead of demo money", async () => {
+    mocks.useAuth.mockReturnValue({ ...mocks.useAuth(), introSeen: true });
+    mocks.useLedger.mockReturnValue({ demo: false, loading: false, profile: null, profileLoadError: null });
+    render(<BrowserRouter><App /></BrowserRouter>);
+
+    expect(await screen.findByRole("heading", { name: /내 예산 기준/ })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "월 수입 금액" })).toHaveValue("0");
+    expect(screen.getByRole("textbox", { name: "생활비 예산 금액" })).toHaveValue("0");
+    expect(screen.queryByDisplayValue("3,500,000")).not.toBeInTheDocument();
+  });
+
+  it("shows a shortfall instead of hiding it when the entered budget exceeds income", async () => {
+    const user = userEvent.setup();
+    mocks.useAuth.mockReturnValue({ ...mocks.useAuth(), introSeen: true });
+    mocks.useLedger.mockReturnValue({ demo: false, loading: false, profile: null, profileLoadError: null });
+    render(<BrowserRouter><App /></BrowserRouter>);
+
+    const income = await screen.findByRole("textbox", { name: "월 수입 금액" });
+    await user.clear(income);
+    await user.type(income, "100000");
+    const budget = screen.getByRole("textbox", { name: "생활비 예산 금액" });
+    await user.clear(budget);
+    await user.type(budget, "200000");
+    expect(screen.getByText(/월 수입보다 지출과 생활비 예산이/)).toBeInTheDocument();
+  });
+
   it("advances from the budget baseline through the goal step without bouncing back", async () => {
     const user = userEvent.setup();
     mocks.useAuth.mockReturnValue({ ...mocks.useAuth(), introSeen: true });

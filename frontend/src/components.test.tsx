@@ -2,7 +2,7 @@ import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { BookkeeperMark, CurrencyInput, ModePill, Toggle, TransactionRow } from "./components";
+import { CurrencyInput, ModePill, Toggle, TransactionRow } from "./components";
 import { demoTransactions } from "./demo";
 
 function CurrencyHarness() {
@@ -69,8 +69,4 @@ describe("shared UI", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("renders one clear bookkeeper symbol without stacked icons", () => {
-    render(<BookkeeperMark />);
-    expect(screen.getByLabelText("장부지기").querySelectorAll("svg")).toHaveLength(1);
-  });
 });
