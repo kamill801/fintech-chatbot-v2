@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: Task 7.5 onboarding budget-to-goal navigation repair
+- Active task: Task 8.1 mobile UX and transaction-reliability audit handoff (documentation complete; implementation awaits the user's next-model request)
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -717,6 +717,31 @@ Evolve the ledger into a plan-led spending coach. The user confirms one discreti
 - Home uses `budget_spent_krw` for the legacy monthly budget fallback and plan/signals respect the configured timezone and excluded-expense flag.
 - Setup, active progress, revision preview/apply, check-in, matching, Home, Report, nav, and post-expense impact are covered by frontend tests.
 - Backend unit/integration/API tests, Redis integration when available, frontend tests/lint/build, compile, and browser QA pass or external limitations are reported precisely.
+
+## Task 8.1 - Mobile UX and Transaction Reliability Handoff (Plan Ready)
+
+### Goal
+
+Turn the user's three iPhone defect reports into an executable, evidence-backed repair plan for another model. This turn is planning and diagnosis only; do not implement or deploy application changes.
+
+### Artifacts
+
+- `docs/plans/2026-09-27-mobile-ux-repair-handoff.md` — priorities, exact code evidence, screen structures, file map, persistence/date/preview contracts, implementation order, and QA criteria.
+- `docs/plans/2026-09-27-execution-prompt.md` — ready-to-send implementation request.
+- `docs/qa/2026-09-27/README.md` — five synthetic defect reproductions and six local Chromium screenshots with verification boundaries.
+
+### Checkpoints
+
+- [x] Inspect current contracts, code, and the user's iPhone screenshots without changing financial records.
+- [x] Reproduce successful POST followed by summary/plan/storage failure, loss of entered calendar date, and stale plan-preview confirmation using isolated synthetic responses.
+- [x] Inspect six local mobile-sized screens and measure grid spacing; keep iOS-native overflow and the production POST cause explicitly unconfirmed.
+- [x] Prepare detailed screen-by-screen repair instructions and a successor-model execution prompt.
+- [ ] On the user's implementation request, activate one implementation slice at a time in the order A → B → C → D in the handoff. Preserve unfinished physical-device verification of Task 7.5.
+- [ ] Complete authenticated storage/calendar persistence and real iPhone layout verification before reporting those release claims.
+
+### Boundary
+
+No application implementation, remote push/deployment, provider mutation, or real financial writes were performed by this planning task. Existing local-only `.agents/` and `AGENTS.md` stay excluded. `TECHSPEC.md` remains unchanged.
 
 ## Archived Work
 

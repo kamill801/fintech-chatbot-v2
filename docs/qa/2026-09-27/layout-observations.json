@@ -1,0 +1,67 @@
+{
+  "environment": "Local Chromium at 414x896, synthetic demo state; not iOS/WebKit evidence",
+  "results": [
+    {
+      "screen": "home",
+      "viewport": 414,
+      "documentWidth": 414,
+      "overflow": [],
+      "planGrid": null
+    },
+    {
+      "screen": "plan",
+      "viewport": 414,
+      "documentWidth": 414,
+      "overflow": [],
+      "planGrid": {
+        "alignContent": "normal",
+        "gridRows": "145px 94px 487px",
+        "children": [
+          {
+            "class": "",
+            "top": 24,
+            "height": 145
+          },
+          {
+            "class": "setup-progress",
+            "top": 187,
+            "height": 5
+          },
+          {
+            "class": "surface plan-form",
+            "top": 299,
+            "height": 487
+          }
+        ]
+      }
+    },
+    {
+      "screen": "add",
+      "viewport": 414,
+      "documentWidth": 414,
+      "overflow": [],
+      "planGrid": null
+    },
+    {
+      "screen": "ledger",
+      "viewport": 414,
+      "documentWidth": 414,
+      "overflow": [],
+      "planGrid": null
+    },
+    {
+      "screen": "report",
+      "viewport": 414,
+      "documentWidth": 414,
+      "overflow": [],
+      "planGrid": null
+    },
+    {
+      "screen": "settings",
+      "viewport": 414,
+      "documentWidth": 414,
+      "overflow": [],
+      "planGrid": null
+    }
+  ]
+}

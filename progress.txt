@@ -292,3 +292,10 @@ Why: 기존 구현은 draft만 저장하고 단계는 화면 진입 효과에 �
 Next: iPhone 앱 새로고침 후 실제 목표 화면 이동을 확인한다. 실계정에 데모 금액이 기본값으로 노출되는 현상과 과도하게 확신하는 잔여금 문구 등 화면 개선은 별도 디자인 검토 대상으로 남긴다.
 Issues: 수정 전 회귀 테스트가 예산 화면으로 되돌아오는 현상으로 실패했고, 수정 후 예산 → 목표 → 기록 방식, 사용자 입력 보존, 저장소 오류 테스트가 통과했다. 전체 프런트엔드 66개 테스트, lint, TypeScript/Vite 빌드, diff check 통과. Vercel deployment READY, 기존 production alias 루트와 새 JS 번들 HTTP 200 확인. 인증된 실기기 화면은 원격으로 볼 수 없어 사용자 확인을 요청했다. 금융 프로필을 저장하거나 변경하지 않았다. `.agents/`와 `AGENTS.md`는 제외한다.
 ---
+
+[2026-09-27] [Phase 8 / Task 8.1] (mobile UX diagnosis and successor-model handoff complete; implementation pending)
+What: 사용자의 홈 장식/프로필 혼동, 거래 저장 실패, 계획 입력칸 넘침 보고를 코드와 합성 테스트로 조사했다. 화면별 구조·문구·CSS 기준·저장/날짜/초안/미리보기 계약·파일별 변경 지도·우선순위·검증 기준을 docs/plans/2026-09-27-mobile-ux-repair-handoff.md에 작성하고, 다음 모델에 전달할 실행 프롬프트와 docs/qa/2026-09-27 증거를 준비했다. PLAN.md의 active task를 이번 진단 인계 작업으로 갱신했다.
+Why: 사용자는 즉시 구현 대신 개선 내용을 자세히 정리해 다른 모델이 바로 작업할 수 있게 해 달라고 요청했다. 시각적 결함과 기록 신뢰성 결함을 함께 다루되 운영 실패 원인을 추정으로 확정하지 않아야 한다.
+Next: 사용자 구현 요청 후 명세의 A 거래 저장 신뢰성 → B 공통 헤더/폼 → C 계획/설정/신규 입력 → D 통합 QA 순서로 한 번에 하나의 active task를 진행한다. 실제 실패 HTTP 증거와 iPhone WKWebView 날짜 필드 측정, Task 7.5의 실기기 확인은 미완료로 유지한다.
+Issues: 실제 Provider/페이지와 합성 API로 진단 테스트 5건을 실행해 summary/plan 후속 조회 실패, localStorage 삭제 예외에 의한 잘못된 실패 표시, 캘린더 날짜 소실, 오래된 preview 확정 가능을 재현했다. 이 테스트들은 결함 존재를 검증하며 수정 완료의 증거가 아니다. 외부 요청을 차단한 Chromium 414x896 데모 6화면을 캡처했고 계획의 grid stretch를 측정했다. iOS 날짜 입력 넘침은 Chromium에서 재현되지 않았고 운영 계정 POST/서버 로그/실제 금융 저장은 수행하지 않았다. 제품 코드, TECHSPEC, 공급자 설정 및 배포는 변경하지 않았다. 원본 사용자 이미지/금융정보는 새 산출물에 복사하지 않았으며 기존 로컬 전용 .agents/와 AGENTS.md는 제외한다.
+---
