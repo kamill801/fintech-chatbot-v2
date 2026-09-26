@@ -285,3 +285,10 @@ Why: Personal Team의 기기당 개발 앱 3개 한도 안에서 장부 AI를 �
 Next: 사용자가 아이폰 화면에서 아이콘 위치, 웹 로딩, 카카오 로그인을 직접 확인한다. 무료 Personal Team 서명은 만료 전 재설치해야 하며, 웹 콘텐츠는 기존 Vercel 배포로 갱신된다.
 Issues: `devicectl install app`, `process launch`, `info apps`, `info processes`, `info appIcon`이 모두 성공했다. 원격 화면 미러링이 설정되지 않아 홈 화면 배치와 실기기 카카오 로그인 화면은 시각적으로 확인하지 못했다. Note AI 제거는 앱의 기기 내 로컬 데이터도 제거했을 수 있으므로 기존 데이터 복원을 보장하지 않는다. `.agents/`와 `AGENTS.md`는 계속 제외한다.
 ---
+
+[2026-09-26 09:07] [Phase 7 / Task 7.5] (onboarding forward navigation repaired and production deployed)
+What: 사용자가 보고한 iPhone 예산 화면의 `다음: 목표 설정` 무반응을 인증된 라우트 테스트로 재현했다. 예산·목표의 다음 버튼이 임시 입력값과 목적지 단계를 함께 저장한 뒤 이동하도록 고쳤고, 세션 저장소 실패 시 오류를 표시한다. 기존 Vercel `upglow/jangbu-ai` production에 수정된 프런트엔드를 배포했다.
+Why: 기존 구현은 draft만 저장하고 단계는 화면 진입 효과에 맡겼다. 목표 화면이 렌더되기 전 App 라우트 가드가 이전 baseline 단계로 되돌려 버튼이 작동하지 않는 것처럼 보였다.
+Next: iPhone 앱 새로고침 후 실제 목표 화면 이동을 확인한다. 실계정에 데모 금액이 기본값으로 노출되는 현상과 과도하게 확신하는 잔여금 문구 등 화면 개선은 별도 디자인 검토 대상으로 남긴다.
+Issues: 수정 전 회귀 테스트가 예산 화면으로 되돌아오는 현상으로 실패했고, 수정 후 예산 → 목표 → 기록 방식, 사용자 입력 보존, 저장소 오류 테스트가 통과했다. 전체 프런트엔드 66개 테스트, lint, TypeScript/Vite 빌드, diff check 통과. Vercel deployment READY, 기존 production alias 루트와 새 JS 번들 HTTP 200 확인. 인증된 실기기 화면은 원격으로 볼 수 없어 사용자 확인을 요청했다. 금융 프로필을 저장하거나 변경하지 않았다. `.agents/`와 `AGENTS.md`는 제외한다.
+---

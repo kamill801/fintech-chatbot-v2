@@ -26,8 +26,9 @@ function readDraft(key: string): Profile {
   }
 }
 
-function writeDraft(key: string, profile: Profile) {
+function writeDraft(key: string, stageKey: string, profile: Profile, nextStage: "goal" | "source") {
   window.sessionStorage.setItem(key, JSON.stringify(profile));
+  window.sessionStorage.setItem(stageKey, nextStage);
 }
 
 function StepHeader({ step }: { step: number }) {
@@ -136,8 +137,19 @@ export function OnboardingBaseline() {
   const navigate = useNavigate();
   const draftKey = onboardingDraftKey(userKey, demo);
   const [draft, setDraft] = useState(() => readDraft(draftKey));
+  const [saveError, setSaveError] = useState(false);
   const update = (key: keyof Profile, value: number) => setDraft((current) => ({ ...current, [key]: value }));
   const freeMoney = Math.max(0, draft.monthly_income_krw - draft.fixed_expenses_krw - draft.monthly_debt_payment_krw - draft.discretionary_budget_krw);
+
+  function continueToGoal() {
+    setSaveError(false);
+    try {
+      writeDraft(draftKey, onboardingStageKey(userKey, demo), draft, "goal");
+      navigate(withDemo("/onboarding/goal", demo));
+    } catch {
+      setSaveError(true);
+    }
+  }
 
   return (
     <main className="onboarding-page baseline-page">
@@ -158,7 +170,8 @@ export function OnboardingBaseline() {
       </Surface>
       <div className="goal-callout"><Wallet size={27} /><span>매달 자유롭게 쓸 돈의 기준이에요</span><strong>{formatWon(draft.discretionary_budget_krw)}</strong></div>
       {freeMoney > 0 && <p className="baseline-note">기준을 지키면 매달 {formatWon(freeMoney)}을 남길 수 있어요.</p>}
-      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/goal", demo)); }}>다음: 목표 설정</PrimaryButton>
+      {saveError && <p className="form-error" role="alert">입력 내용을 임시 저장하지 못했어요. 브라우저 저장소 설정을 확인한 뒤 다시 시도해 주세요.</p>}
+      <PrimaryButton onClick={continueToGoal}>다음: 목표 설정</PrimaryButton>
     </main>
   );
 }
@@ -169,10 +182,21 @@ export function OnboardingGoal() {
   const navigate = useNavigate();
   const draftKey = onboardingDraftKey(userKey, demo);
   const [draft, setDraft] = useState(() => readDraft(draftKey));
+  const [saveError, setSaveError] = useState(false);
   const progress = Math.min(100, Math.round((draft.goal.current_amount_krw / Math.max(draft.goal.target_amount_krw, 1)) * 100));
   const months = Math.max(1, Math.ceil((new Date(draft.goal.target_date).getTime() - Date.now()) / 2_629_800_000));
   const monthly = Math.max(0, Math.ceil((draft.goal.target_amount_krw - draft.goal.current_amount_krw) / months / 1000) * 1000);
   const updateGoal = (patch: Partial<Profile["goal"]>) => setDraft((current) => ({ ...current, goal: { ...current.goal, ...patch } }));
+
+  function continueToSource() {
+    setSaveError(false);
+    try {
+      writeDraft(draftKey, onboardingStageKey(userKey, demo), draft, "source");
+      navigate(withDemo("/onboarding/source", demo));
+    } catch {
+      setSaveError(true);
+    }
+  }
 
   return (
     <main className="onboarding-page goal-page">
@@ -192,7 +216,8 @@ export function OnboardingGoal() {
         <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
         <div><Wallet size={27} /> 매달 <strong>{formatWon(monthly)}</strong>씩 모으면 돼</div>
       </div>
-      <PrimaryButton onClick={() => { writeDraft(draftKey, draft); navigate(withDemo("/onboarding/source", demo)); }}>다음: 기록 방식</PrimaryButton>
+      {saveError && <p className="form-error" role="alert">목표를 임시 저장하지 못했어요. 브라우저 저장소 설정을 확인한 뒤 다시 시도해 주세요.</p>}
+      <PrimaryButton onClick={continueToSource}>다음: 기록 방식</PrimaryButton>
     </main>
   );
 }

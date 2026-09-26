@@ -3,7 +3,7 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: Task 7.4 iPhone Home Screen web app setup
+- Active task: Task 7.5 onboarding budget-to-goal navigation repair
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
@@ -639,7 +639,7 @@ Show a short, service-led introduction once per account. After it is acknowledge
 
 The account-controlled Kakao browser flow showed the introduction, advanced on `시작하기`, stayed on financial setup after reload, and skipped the introduction after logout and repeat login. Profile-complete direct Home routing is covered by a frontend test; no financial values were saved during this browser check.
 
-## Task 7.4 - iPhone Home Screen Test App Setup (Active)
+## Task 7.4 - iPhone Home Screen Test App Setup (Device Install Verified; Screen Check Pending)
 
 ### Goal
 
@@ -660,6 +660,25 @@ Put a persistent `장부 AI` icon on the paired iPhone XR for ongoing testing of
 - [x] Run local frontend checks and deploy the existing production project.
 - [x] Build and install the directly launchable iOS test shell on the paired iPhone XR; verify its bundle and launch. Note AI was removed at the user's request to free a Personal Team app slot; Short Travel and Trust First Nutrition remain installed.
 - [ ] Confirm on-screen icon, web loading, and Kakao sign-in behavior on the physical device when device viewing is available.
+
+## Task 7.5 - Onboarding Budget-to-Goal Navigation Repair (Active)
+
+### Goal
+
+Make `다음: 목표 설정` advance from the financial baseline to goal setup without a route-guard bounce, preserving the account-scoped draft. Apply the same forward-step correction to goal-to-source navigation.
+
+### Scope and checks
+
+- Save the draft and the destination stage together before each forward navigation; show an actionable inline error if browser session storage fails.
+- Reproduce the original failure in an authenticated route test, then verify baseline → goal → source, entered amount preservation, and the storage-error state.
+- Run frontend tests, lint, and production build; deploy only the existing `upglow/jangbu-ai` Vercel frontend and verify the production alias serves the new bundle.
+- Review the supplied iPhone baseline screenshot for clarity and trust issues. Keep broader UI changes as recommendations pending visual design approval.
+
+### Checkpoints
+
+- [x] Reproduce the route-guard bounce in a failing test and repair both forward transitions.
+- [x] Verify 66 frontend tests, lint, production build, deployment READY, alias, and new bundle HTTP 200.
+- [ ] Confirm the corrected transition on the physical iPhone after the user refreshes the installed app.
 
 ## Task 8.0 - AI Budget and Spending-Plan Coach (Completed Locally)
 

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { onboardingDraftKey, onboardingStageKey } from "./local-drafts";
 import { BrowserRouter } from "./router";
 
 const mocks = vi.hoisted(() => ({
@@ -81,6 +82,45 @@ describe("App profile loading", () => {
     expect(await screen.findByRole("heading", { name: /내 예산 기준/ })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/onboarding/baseline");
     expect(screen.queryByRole("heading", { name: "장부 AI" })).not.toBeInTheDocument();
+  });
+
+  it("advances from the budget baseline through the goal step without bouncing back", async () => {
+    const user = userEvent.setup();
+    mocks.useAuth.mockReturnValue({ ...mocks.useAuth(), introSeen: true });
+    mocks.useLedger.mockReturnValue({ demo: false, loading: false, profile: null, profileLoadError: null });
+    render(<BrowserRouter><App /></BrowserRouter>);
+
+    expect(await screen.findByRole("heading", { name: /내 예산 기준/ })).toBeInTheDocument();
+    const assets = screen.getByRole("textbox", { name: "보유 현금·예금 금액" });
+    await user.clear(assets);
+    await user.type(assets, "40000000");
+    await user.click(screen.getByRole("button", { name: "다음: 목표 설정" }));
+    expect(await screen.findByRole("heading", { name: /저축 목표/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/onboarding/goal");
+    expect(JSON.parse(window.sessionStorage.getItem(onboardingDraftKey("user-a")) ?? "{}").liquid_assets_krw).toBe(40_000_000);
+    expect(window.sessionStorage.getItem(onboardingStageKey("user-a"))).toBe("goal");
+
+    await user.click(screen.getByRole("button", { name: "다음: 기록 방식" }));
+    expect(await screen.findByRole("heading", { name: /장부 기록/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/onboarding/source");
+    expect(window.sessionStorage.getItem(onboardingStageKey("user-a"))).toBe("source");
+  });
+
+  it("shows an actionable error instead of silently staying on the budget step when draft storage fails", async () => {
+    const user = userEvent.setup();
+    mocks.useAuth.mockReturnValue({ ...mocks.useAuth(), introSeen: true });
+    mocks.useLedger.mockReturnValue({ demo: false, loading: false, profile: null, profileLoadError: null });
+    render(<BrowserRouter><App /></BrowserRouter>);
+
+    expect(await screen.findByRole("heading", { name: /내 예산 기준/ })).toBeInTheDocument();
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("storage unavailable"); });
+    try {
+      await user.click(screen.getByRole("button", { name: "다음: 목표 설정" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("입력 내용을 임시 저장하지 못했어요");
+      expect(window.location.pathname).toBe("/onboarding/baseline");
+    } finally {
+      setItem.mockRestore();
+    }
   });
 
   it("takes a returning account with a profile straight to Home", async () => {
