@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from ledger.application.signals import POLICY_VERSION
 from ledger.domain.models import DeterministicSignalSet, JudgmentResult
+from ledger.language import validate_korean_user_text
 from ledger.privacy import build_prompt_payload
 from ledger.rendering import grandma_mode_fallback
 
@@ -122,17 +123,18 @@ def parse_judgment_payload(payload: dict) -> dict:
     cleaned_factors = [item.strip() for item in factors if item.strip()]
     if not cleaned_factors:
         raise ValueError("invalid decision_factors")
-    for field in ("rationale", "recommended_action", "normal_message", "roast_message"):
-        if not isinstance(payload[field], str) or not payload[field].strip():
-            raise ValueError(f"invalid {field}")
+    cleaned_text = {
+        field: validate_korean_user_text(payload[field], field_name=field)
+        for field in ("rationale", "recommended_action", "normal_message", "roast_message")
+    }
     return {
         "label": payload["label"],
         "confidence": float(confidence),
-        "rationale": payload["rationale"].strip(),
-        "recommended_action": payload["recommended_action"].strip(),
+        "rationale": cleaned_text["rationale"],
+        "recommended_action": cleaned_text["recommended_action"],
         "decision_factors": cleaned_factors,
-        "normal_message": payload["normal_message"].strip(),
-        "roast_message": payload["roast_message"].strip(),
+        "normal_message": cleaned_text["normal_message"],
+        "roast_message": cleaned_text["roast_message"],
     }
 
 
@@ -241,7 +243,10 @@ class OpenAIResponsesJudge:
                     "role": "system",
                     "content": (
                         "You judge Korean household-ledger spending from allowlisted "
-                        "signals only. Return strict JSON. "
+                        "signals only. Return strict JSON. Every user-visible prose field "
+                        "(rationale, recommended_action, normal_message, roast_message) "
+                        "must be written in Korean only; short technical terms such as AI "
+                        "are allowed only when necessary. "
                         "Use spending_rules as user-stated preferences, not as proof by itself. "
                         "Treat reflection_context as the user's observed category feedback and "
                         "explain any conflict with budget or goal signals. "

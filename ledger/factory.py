@@ -16,6 +16,7 @@ from ledger.adapters.synthetic import DisabledProductionAccountAdapter
 from ledger.api import create_api_blueprint
 from ledger.application.service import LedgerService
 from ledger.privacy import PrivacyConfig, PrivacyError, PrivacyService
+from ledger.plan_preview import PlanPreviewTokens
 from ledger.quota import JudgmentQuotaConfig, RedisJudgmentQuotaLimiter
 from ledger.web import create_web_blueprint
 from sheets_logger import save_telemetry_event
@@ -32,7 +33,8 @@ def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
     store_kind = values.get(
         "LEDGER_STORE", "redis" if app_env == "production" else "memory"
     )
-    privacy = PrivacyService(PrivacyConfig.from_env(values))
+    privacy_config = PrivacyConfig.from_env(values)
+    privacy = PrivacyService(privacy_config)
 
     if app_env == "production" and store_kind != "redis":
         raise PrivacyError("production requires LEDGER_STORE=redis")
@@ -65,6 +67,7 @@ def create_ledger_runtime(config: dict[str, Any] | None = None) -> tuple[
         DisabledProductionAccountAdapter(),
         telemetry_sink=telemetry_sink,
         judgment_quota=judgment_quota,
+        preview_tokens=PlanPreviewTokens(privacy_config.encryption_key),
         plan_advisor=OpenAIResponsesPlanAdvisor(
             model=values.get("OPENAI_LEDGER_PLAN_MODEL") or values.get("OPENAI_LEDGER_MODEL")
         ),

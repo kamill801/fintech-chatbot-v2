@@ -3,12 +3,38 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: none; Task 8.2 released, authenticated iPhone transaction/layout verification remains a separate follow-up
+- Active task: Task 8.3 — Korean coaching and reviewed-plan reliability release verification (implementation reviewed; user authorized commit, push, and production deployment on 2026-10-11)
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
 - Sources of truth: `TECHSPEC.md` for product/backend invariants, `DESIGN.md` for UI/UX decisions
 - Last pre-pivot commit: `64b46ae`
+
+## Task 8.3 — Korean Coaching and Reviewed-plan Reliability Repair
+
+### Goal and authorized scope
+
+Repair the defects observed during authenticated web use: English AI prose, stale plan explanations, a new reservation inheriting a removed reservation's transaction match, changing advice between review and confirmation, and missing check-in feedback. Preserve existing financial records, provider accounts, privacy allowlists, deterministic calculations, and append-only audit history. TECHSPEC section 18 remains unchanged.
+
+### Ordered checkpoints
+
+- [x] Inspect the live-use evidence and current implementation; define regression cases before edits.
+- [x] Require Korean model prose and safely display existing English artifacts in Korean without rewriting audit history.
+- [x] Give new reservations independent identities and validate retained transaction matches against the current plan period.
+- [x] Bind advice to current aggregate evidence; stale reads use current deterministic guidance without another model call.
+- [x] Reuse the reviewed result through an encrypted, owner-bound, expiring preview token; reject changed evidence and preserve the draft.
+- [x] Show check-in confirmation and distinguish current AI advice from updated calculation-based guidance.
+- [ ] Verify backend, frontend, storage, and real authenticated web scenarios; record evidence.
+- [ ] Perform the authorized scoped commit, push, and release to the existing Render/Vercel projects. Record release evidence in the linked QA artifact.
+
+### Verification and release evidence
+
+- Unit/integration/API regressions cover language, identity, stale advice, preview ownership/tampering/expiry, evidence changes, and idempotency.
+- Frontend regressions cover preview-token submission, recoverable confirmation errors, and successful check-in feedback; lint/typecheck/build must pass.
+- Release target: Vercel `upglow/jangbu-ai`, Render `jangbu-api`; no new infrastructure or credential changes.
+- Authenticated production evidence: `/Users/dd/.codex/visualizations/2026/09/13/01a09a1a-720c-7b51-bce2-8bb9d40591bf/jangbu-korean-repair-2026-10-11/RESULTS.md`.
+- Pre-release verification: 161 backend tests passed with an isolated local Redis and no skips; all 83 frontend tests, lint, TypeScript/Vite build, compile checks, and diff checks passed. Independent review approved the final scope.
+- The final two checkpoints are intentionally pending at source-commit time. The linked QA artifact records exact commit/deployment identities and authenticated release outcomes without another source-only bookkeeping commit.
 
 ## Task 2.0 - AI Ledger Backend Pivot (Completed)
 

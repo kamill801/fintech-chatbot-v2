@@ -241,9 +241,10 @@ export function TransactionDetailPage() {
       </Surface>
       {judgment && (
         <Surface className="detail-judgment">
-          <h2>AI 판단</h2>
+          <h2>기록 당시 AI 판단</h2>
           <JudgmentBadge label={judgment.effective_label || judgment.label} confidence={judgment.confidence} />
           <p>{judgment.rationale}</p>
+          {judgment.language_repaired && <small>이전 설명을 한국어로 표시했어요. 당시 판단 결과는 유지돼요.</small>}
           {judgment.correction && <small>원래 판단: {labelText(judgment.original_label || judgment.label)} · 내가 수정함</small>}
         </Surface>
       )}
@@ -253,7 +254,7 @@ export function TransactionDetailPage() {
           <div><span>소비 돌아보기</span><h2>지금 생각하면 이 소비 어땠나요?</h2></div>
           {transaction.reflection && <small>저장됨</small>}
         </div>
-        <p>AI가 일반적인 과소비가 아니라, 내가 실제로 후회하는 패턴을 배우는 기준이에요.</p>
+        <p>내 평가는 다음 소비 조언에 반영돼요. 기록 당시 AI 판단은 그대로 남아요.</p>
         <div className="reflection-options" role="group" aria-label="소비 평가">
           {([
             ["well_spent", "잘 쓴 돈", "만족했어요"],
@@ -276,7 +277,7 @@ export function TransactionDetailPage() {
             한 줄 메모 <span>선택</span>
             <textarea
               maxLength={160}
-              placeholder="왜 그렇게 느꼈는지 남기면 다음 조언이 더 정확해져요."
+              placeholder="나중에 돌아볼 수 있도록 이유를 남겨 보세요."
               value={reflectionNote}
               onChange={(event) => setReflectionNote(event.target.value)}
             />

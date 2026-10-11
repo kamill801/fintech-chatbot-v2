@@ -139,6 +139,24 @@ class StrictOpenAIJudgeTests(unittest.TestCase):
         judge.judge(request())
         self.assertEqual(fake_responses.calls[0]["max_output_tokens"], 321)
 
+    def test_rejects_english_user_visible_judgment_and_retries_to_fallback(self) -> None:
+        english_payload = {
+            **VALID_MODEL_PAYLOAD,
+            "normal_message": "Current spending review says slow down shopping.",
+        }
+        fake_responses = FakeResponses([english_payload, english_payload])
+        judge = OpenAIResponsesJudge(
+            model="test-model",
+            max_retries=2,
+            client_factory=lambda: FakeClient(fake_responses),
+        )
+
+        result = judge.judge(request())
+
+        self.assertTrue(result.fallback_used)
+        self.assertIn("예산", result.normal_message)
+        self.assertEqual(len(fake_responses.calls), 2)
+
     def test_omits_raw_merchant_from_model_input(self) -> None:
         fake_responses = FakeResponses([VALID_MODEL_PAYLOAD.copy()])
         judge = OpenAIResponsesJudge(

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from ledger.adapters.openai_planner import (
     OpenAIResponsesPlanAdvisor,
     PlanAdviceRequest,
+    deterministic_plan_narrative,
+    parse_plan_narrative,
 )
 
 
@@ -52,6 +54,7 @@ def advice_request() -> PlanAdviceRequest:
             "flexible_remaining_krw": 150_000,
             "shortfall_krw": 0,
             "current_segment_id": "segment-1",
+            "period_status": "active",
         },
         allocations=[
             {
@@ -78,6 +81,9 @@ def advice_request() -> PlanAdviceRequest:
             "category_spend_krw": {"health": 50_000},
             "reflection_counts": {"well_spent": 1, "unsure": 0, "regretted": 0},
             "judgment_counts": {"justified": 1, "caution": 0},
+            "category_reflection_counts": {
+                "food": {"well_spent": 1, "unsure": 0, "regretted": 2}
+            },
         },
     )
 
@@ -138,6 +144,124 @@ class OpenAIPlanAdvisorTests(unittest.TestCase):
         self.assertTrue(result.fallback_used)
         self.assertEqual(len(fake_responses.calls), 2)
         self.assertIn("입력된", result.explanation)
+
+    def test_accepts_korean_words_containing_won_syllable_without_amount_copy(self) -> None:
+        narrative = parse_plan_narrative(
+            {
+                **VALID_NARRATIVE,
+                "next_action": "원하는 약속은 지키고 배달은 한 번 미루세요.",
+            },
+            {"segment-1"},
+        )
+
+        self.assertEqual(narrative.next_action, "원하는 약속은 지키고 배달은 한 번 미루세요.")
+
+    def test_rejects_english_model_text_and_uses_korean_fallback(self) -> None:
+        invalid = {
+            **VALID_NARRATIVE,
+            "headline": "Current Spending Review and Recommendations",
+        }
+        fake_responses = FakeResponses([invalid, invalid])
+        advisor = OpenAIResponsesPlanAdvisor(
+            model="test-model",
+            client_factory=lambda: FakeClient(fake_responses),
+        )
+
+        result = advisor.advise(advice_request())
+
+        self.assertTrue(result.fallback_used)
+        self.assertIn("계획", result.headline)
+        self.assertEqual(len(fake_responses.calls), 2)
+
+    def test_rejects_short_english_phrase_mixed_into_korean_text(self) -> None:
+        invalid = {
+            **VALID_NARRATIVE,
+            "next_action": "다음 지출 전에 Go to it.",
+        }
+        fake_responses = FakeResponses([invalid, invalid])
+        advisor = OpenAIResponsesPlanAdvisor(
+            model="test-model",
+            client_factory=lambda: FakeClient(fake_responses),
+        )
+
+        result = advisor.advise(advice_request())
+
+        self.assertTrue(result.fallback_used)
+
+    def test_fallback_respects_priorities_for_delivery_and_social_spending(self) -> None:
+        request = advice_request()
+        request = PlanAdviceRequest(
+            **{
+                **request.__dict__,
+                "priorities": ["친구와 식사 유지하기", "배달 줄이기"],
+            }
+        )
+
+        result = deterministic_plan_narrative(request)
+
+        self.assertIn("약속", result.next_action)
+        self.assertIn("배달", result.next_action)
+
+    def test_fallback_does_not_infer_delivery_from_food_regrets_without_delivery_rule(self) -> None:
+        request = advice_request()
+        request = PlanAdviceRequest(
+            **{
+                **request.__dict__,
+                "priorities": ["친구와 식사 유지하기"],
+                "spending_rules": [],
+            }
+        )
+
+        result = deterministic_plan_narrative(request)
+
+        self.assertIn("후회한 식비", result.next_action)
+        self.assertNotIn("배달", result.next_action)
+
+    def test_fallback_has_upcoming_period_message(self) -> None:
+        request = advice_request()
+        request = PlanAdviceRequest(
+            **{
+                **request.__dict__,
+                "deterministic_progress": {
+                    **request.deterministic_progress,
+                    "period_status": "upcoming",
+                    "current_segment_id": None,
+                },
+            }
+        )
+
+        result = deterministic_plan_narrative(request)
+
+        self.assertIn("다가오는", result.headline)
+        self.assertIn("예정 지출", result.next_action)
+
+    def test_fallback_warns_when_current_segment_is_negative_even_if_total_plan_is_positive(self) -> None:
+        request = advice_request()
+        request = PlanAdviceRequest(
+            **{
+                **request.__dict__,
+                "allocations": [
+                    {
+                        **request.allocations[0],
+                        "flexible_remaining_krw": -10_000,
+                    }
+                ],
+                "aggregate_patterns": {
+                    **request.aggregate_patterns,
+                    "category_reflection_counts": {
+                        "food": {"well_spent": 1, "unsure": 0, "regretted": 1}
+                    },
+                },
+                "priorities": ["건강"],
+                "spending_rules": [],
+            }
+        )
+
+        result = deterministic_plan_narrative(request)
+
+        self.assertIn("소비 속도", result.headline)
+        self.assertIn("예정 지출", result.next_action)
+        self.assertNotIn("계획 안", result.headline)
 
     def test_timeout_falls_back_without_live_call(self) -> None:
         fake_responses = FakeResponses([TimeoutError("timeout"), TimeoutError("timeout")])

@@ -99,6 +99,7 @@ export interface Correction {
 }
 
 export interface Judgment {
+  language_repaired?: boolean;
   judgment_id: string;
   transaction_id: string;
   mode: "normal" | "roast";
@@ -206,6 +207,8 @@ export interface PlanSegmentProgress extends PlanAllocation {
 }
 
 export interface PlanProgress {
+  as_of?: string;
+  period_status?: "upcoming" | "active" | "completed";
   period_start: string;
   period_end: string;
   confirmed_budget_krw: number;
@@ -227,6 +230,7 @@ export interface PlanNarrative {
   assumptions: string[];
   confidence: "low" | "medium" | "high";
   fallback_used: boolean;
+  display_reason?: "current" | "data_changed" | "language_repaired" | "unavailable";
 }
 
 export interface SpendingPlanState {
@@ -236,6 +240,7 @@ export interface SpendingPlanState {
   next_action: string;
   narrative: PlanNarrative;
   preview?: boolean;
+  preview_token?: string;
 }
 
 export interface PlanDraft {
@@ -262,6 +267,7 @@ export interface PlanRevisionPreview {
   budget_change_krw: number;
   flexible_remaining_change_krw: number;
   narrative: PlanNarrative;
+  preview_token?: string;
 }
 
 export interface WeeklyConcern {

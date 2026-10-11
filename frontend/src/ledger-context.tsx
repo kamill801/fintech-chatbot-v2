@@ -69,9 +69,9 @@ interface LedgerContextValue {
   recordShareSuccess(id: string): Promise<void>;
   deleteData(): Promise<void>;
   previewPlan(draft: PlanDraft): Promise<SpendingPlanState>;
-  activatePlan(draft: PlanDraft): Promise<SpendingPlanState>;
+  activatePlan(draft: PlanDraft, previewToken?: string): Promise<SpendingPlanState>;
   previewPlanRevision(draft: PlanDraft, reason: string): Promise<PlanRevisionPreview>;
-  applyPlanRevision(draft: PlanDraft, reason: string): Promise<SpendingPlanState>;
+  applyPlanRevision(draft: PlanDraft, reason: string, previewToken?: string): Promise<SpendingPlanState>;
   checkInPlan(decision: "maintain" | "adjust", note?: string): Promise<SpendingPlanState>;
   matchPlannedExpense(plannedExpenseId: string, transactionId: string): Promise<SpendingPlanState>;
 }
@@ -370,14 +370,17 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       async previewPlan(draft) {
         return demo ? previewDemoPlan(draft) : ledgerApi.previewPlan(draft);
       },
-      async activatePlan(draft) {
-        const next = demo ? { ...previewDemoPlan(draft), preview: false } : await ledgerApi.activatePlan(draft);
+      async activatePlan(draft, previewToken) {
+        const next = demo ? { ...previewDemoPlan(draft), preview: false } : await ledgerApi.activatePlan(draft, previewToken);
         setPlan(next);
         return next;
       },
       async previewPlanRevision(draft, reason) {
         if (!plan) throw new Error("plan required");
-        if (!demo) return (await ledgerApi.previewPlanRevision(draft, plan.plan.version, reason)).revision_preview;
+        if (!demo) {
+          const response = await ledgerApi.previewPlanRevision(draft, plan.plan.version, reason);
+          return { ...response.revision_preview, preview_token: response.preview_token };
+        }
         const preview = previewDemoPlan(draft);
         return {
           from_version: plan.plan.version,
@@ -389,13 +392,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           budget_change_krw: draft.confirmed_budget_krw - plan.plan.confirmed_budget_krw,
           flexible_remaining_change_krw: preview.progress.flexible_remaining_krw - plan.progress.flexible_remaining_krw,
           narrative: preview.narrative,
+          preview_token: preview.preview_token,
         };
       },
-      async applyPlanRevision(draft, reason) {
+      async applyPlanRevision(draft, reason, previewToken) {
         if (!plan) throw new Error("plan required");
         const next = demo
           ? { ...previewDemoPlan(draft), preview: false, plan: { ...previewDemoPlan(draft).plan, version: plan.plan.version + 1 } }
-          : await ledgerApi.applyPlanRevision(draft, plan.plan.version, reason);
+          : await ledgerApi.applyPlanRevision(draft, plan.plan.version, reason, previewToken);
         setPlan(next);
         return next;
       },

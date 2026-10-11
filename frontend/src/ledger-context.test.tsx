@@ -3,7 +3,7 @@ import { type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ledgerApi, ApiError } from "./api";
 import { LedgerProvider, useLedger } from "./ledger-context";
-import { demoProfile, demoSettings, demoSummary, demoTransactions } from "./demo";
+import { demoPlanState, demoProfile, demoSettings, demoSummary, demoTransactions } from "./demo";
 
 vi.mock("./auth-context", () => ({ useAuth: () => ({ userKey: "test-user" }) }));
 
@@ -52,5 +52,53 @@ describe("ledger mutation success boundary", () => {
     expect(result.current.profile).toEqual(demoProfile);
     expect(result.current.profileLoadError).toBeNull();
     expect(result.current.error).toMatch(/일부/);
+  });
+
+  it("passes reviewed plan preview tokens through activation and revision apply", async () => {
+    vi.mocked(ledgerApi.plan).mockResolvedValueOnce(demoPlanState);
+    const previewPlan = vi.spyOn(ledgerApi, "previewPlan").mockResolvedValue({ ...demoPlanState, preview_token: "setup-token" });
+    const activatePlan = vi.spyOn(ledgerApi, "activatePlan").mockResolvedValue(demoPlanState);
+    const previewPlanRevision = vi.spyOn(ledgerApi, "previewPlanRevision").mockResolvedValue({
+      revision_preview: {
+        from_version: demoPlanState.plan.version,
+        to_version: demoPlanState.plan.version + 1,
+        before: demoPlanState.original_plan,
+        after: { ...demoPlanState.plan, version: demoPlanState.plan.version + 1 },
+        before_progress: demoPlanState.progress,
+        after_progress: demoPlanState.progress,
+        budget_change_krw: 0,
+        flexible_remaining_change_krw: 0,
+        narrative: demoPlanState.narrative,
+      },
+      plan: demoPlanState.plan,
+      progress: demoPlanState.progress,
+      preview_token: "revision-token",
+    });
+    const applyPlanRevision = vi.spyOn(ledgerApi, "applyPlanRevision").mockResolvedValue(demoPlanState);
+    const draft = {
+      period_start: demoPlanState.plan.period_start,
+      period_end: demoPlanState.plan.period_end,
+      confirmed_budget_krw: demoPlanState.plan.confirmed_budget_krw,
+      priorities: demoPlanState.plan.priorities,
+      planned_expenses: [],
+    };
+
+    const { result } = renderHook(useLedger, { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.previewPlan(draft);
+      await result.current.activatePlan(draft, "setup-token");
+    });
+    expect(previewPlan).toHaveBeenCalledWith(draft);
+    expect(activatePlan).toHaveBeenCalledWith(draft, "setup-token");
+
+    await act(async () => {
+      const preview = await result.current.previewPlanRevision(draft, "변경 확인");
+      expect(preview.preview_token).toBe("revision-token");
+      await result.current.applyPlanRevision(draft, "변경 확인", preview.preview_token);
+    });
+    expect(previewPlanRevision).toHaveBeenCalledWith(draft, demoPlanState.plan.version, "변경 확인");
+    expect(applyPlanRevision).toHaveBeenCalledWith(draft, demoPlanState.plan.version, "변경 확인", "revision-token");
   });
 });

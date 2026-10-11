@@ -344,8 +344,9 @@ def compute_plan_progress(
         if period_start <= local_date <= period_end:
             eligible.append((transaction, local_date))
     actual_spent = sum(item.amount_krw for item, _ in eligible)
+    eligible_ids = {item.transaction_id for item, _ in eligible}
     reserved_remaining = sum(
-        item.amount_krw for item in plan.planned_expenses if item.matched_transaction_id is None
+        item.amount_krw for item in plan.planned_expenses if item.matched_transaction_id not in eligible_ids
     )
     total_remaining = plan.confirmed_budget_krw - actual_spent
     flexible_remaining = total_remaining - reserved_remaining
@@ -358,7 +359,7 @@ def compute_plan_progress(
         reserved = sum(
             item.amount_krw
             for item in plan.planned_expenses
-            if item.matched_transaction_id is None and segment_start <= parse_date(item.due_date, "due_date") <= segment_end
+            if item.matched_transaction_id not in eligible_ids and segment_start <= parse_date(item.due_date, "due_date") <= segment_end
         )
         if segment_start <= as_of <= segment_end:
             current_segment_id = allocation.allocation_id
@@ -384,4 +385,6 @@ def compute_plan_progress(
         "segments": segments,
         "current_segment_id": current_segment_id,
         "latest_input_at": latest_input_at,
+        "as_of": as_of.isoformat(),
+        "period_status": "upcoming" if as_of < period_start else "completed" if as_of > period_end else "active",
     }

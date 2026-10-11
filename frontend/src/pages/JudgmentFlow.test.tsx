@@ -99,7 +99,7 @@ describe("judgment voice", () => {
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "지금 생각하면 이 소비 어땠나요?" })).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /후회함/ }));
-    await user.type(screen.getByPlaceholderText(/왜 그렇게 느꼈는지/), "충동적으로 샀어요");
+    await user.type(screen.getByRole("textbox", { name: /한 줄 메모/ }), "충동적으로 샀어요");
     await user.click(screen.getByRole("button", { name: "내 소비 기준에 반영" }));
 
     await waitFor(() => expect(mocks.reflectTransaction).toHaveBeenCalledWith("tx-shopping", "regretted", "충동적으로 샀어요"));

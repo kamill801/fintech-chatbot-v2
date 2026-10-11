@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoPlanState, demoProfile, demoSettings, demoSummary, demoTransactions } from "../demo";
+import { ApiError } from "../api";
 import { BrowserRouter } from "../router";
 import type { SpendingPlanState } from "../types";
 import { PlanPage } from "./PlanPage";
@@ -29,7 +30,7 @@ describe("spending plan flow", () => {
     applyPlanRevision.mockResolvedValue(demoPlanState);
     checkInPlan.mockResolvedValue(demoPlanState);
     matchPlannedExpense.mockResolvedValue(demoPlanState);
-    previewPlan.mockResolvedValue(demoPlanState);
+    previewPlan.mockResolvedValue({ ...demoPlanState, preview_token: "setup-token" });
     previewPlanRevision.mockResolvedValue({
       from_version: 1,
       to_version: 2,
@@ -40,6 +41,7 @@ describe("spending plan flow", () => {
       budget_change_krw: 50_000,
       flexible_remaining_change_krw: 50_000,
       narrative: demoPlanState.narrative,
+      preview_token: "revision-token",
     });
   });
 
@@ -69,12 +71,13 @@ describe("spending plan flow", () => {
 
     expect(screen.getByText("계획상 남은 생활비")).toBeInTheDocument();
     expect(screen.getByText("현재 구간은 계획 안에서 움직이고 있어요.")).toBeInTheDocument();
-    expect(screen.getByText(/숫자는 장부 코드가 계산했어요/)).toBeInTheDocument();
+    expect(screen.getByText(/금액은 최신 장부 기준이에요/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "이번 주 AI 브리핑" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /기준 관리|기준 만들기/ })).toHaveAttribute("href", "/settings?demo=1");
 
     await user.click(screen.getByRole("button", { name: "이대로 유지" }));
     expect(checkInPlan).toHaveBeenCalledWith("maintain");
+    expect(await screen.findByRole("status")).toHaveTextContent("유지한다고 기록");
 
     matchPlannedExpense.mockRejectedValueOnce(new Error("ineligible"));
     await user.selectOptions(screen.getByRole("combobox", { name: "생일 선물과 연결할 거래" }), "tx-cafe");
@@ -95,7 +98,7 @@ describe("spending plan flow", () => {
     await waitFor(() => expect(previewPlan).toHaveBeenCalled());
     expect(screen.getByRole("heading", { name: "이 계획으로 시작할까요?" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "확인하고 계획 시작" }));
-    expect(activatePlan).toHaveBeenCalled();
+    expect(activatePlan).toHaveBeenCalledWith(expect.objectContaining({ confirmed_budget_krw: expect.any(Number) }), "setup-token");
   });
 
   it("rejects a plan period longer than the server's 366-day limit", async () => {
@@ -167,10 +170,11 @@ describe("spending plan flow", () => {
     await user.type(screen.getByRole("textbox", { name: "이름" }), "병원비");
     await user.type(screen.getByRole("textbox", { name: "새 예정 지출 금액" }), "80000");
     await user.click(screen.getByRole("button", { name: "예정 지출 추가" }));
-    await user.type(screen.getByRole("textbox", { name: "조정 이유" }), "모임 반영");
+    await user.type(screen.getByRole("textbox", { name: "조정 이유" }), "  모임 반영  ");
     await user.click(screen.getByRole("button", { name: "검토하기" }));
 
     await waitFor(() => expect(previewPlanRevision).toHaveBeenCalled());
+    expect(previewPlanRevision).toHaveBeenCalledWith(expect.anything(), "모임 반영");
     expect(previewPlanRevision.mock.calls[0][0].planned_expenses).toEqual([
       expect.objectContaining({ name: "병원비", amount_krw: 80_000 }),
     ]);
@@ -179,6 +183,30 @@ describe("spending plan flow", () => {
     expect(screen.getByText("변경 후 남은 생활비")).toBeInTheDocument();
     expect(screen.getByText("계획 코치 미리보기")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "변경 내용 적용" }));
-    expect(applyPlanRevision).toHaveBeenCalled();
+    expect(applyPlanRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ planned_expenses: [expect.objectContaining({ name: "병원비" })] }),
+      "모임 반영",
+      "revision-token",
+    );
+  });
+
+  it("keeps the draft and offers a new review when a preview token is no longer valid", async () => {
+    const user = userEvent.setup();
+    activatePlan.mockRejectedValueOnce(new ApiError("plan_preview_conflict", "changed", 409));
+    mocks.useLedger.mockReturnValue(value(null));
+    render(<BrowserRouter><PlanPage /></BrowserRouter>);
+
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    await user.type(screen.getByRole("textbox", { name: /우선순위/ }), "배달 줄이기");
+    await user.click(screen.getByRole("button", { name: "검토하기" }));
+    await waitFor(() => expect(previewPlan).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: "확인하고 계획 시작" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("다시 만들어야");
+    expect(screen.getByText(/우선순위: 배달 줄이기/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "확인하고 계획 시작" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "다시 검토하기" }));
+    await waitFor(() => expect(previewPlan).toHaveBeenCalledTimes(2));
   });
 });

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 from calendar import monthrange
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -14,7 +16,9 @@ from ledger.adapters.openai_judge import JudgmentRequest
 from ledger.adapters.openai_planner import (
     PlanAdviceRequest,
     PlanNarrative,
+    NARRATIVE_FIELDS,
     deterministic_plan_narrative,
+    parse_plan_narrative,
 )
 from ledger.adapters.synthetic import ProviderUnavailableError
 from ledger.application.signals import POLICY_VERSION, SignalInputs, clamp, compute_signal_set
@@ -44,8 +48,10 @@ from ledger.domain.plans import (
     default_allocations,
 )
 from ledger.privacy import sanitize_free_text, sanitize_share_payload
+from ledger.plan_preview import InvalidPlanPreview, PlanPreviewTokens
+from ledger.language import is_korean_user_text
 from ledger.quota import JudgmentQuotaLimiter, QuotaExceededError, QuotaUnavailableError
-from ledger.rendering import render_judgment
+from ledger.rendering import grandma_mode_fallback, render_judgment
 from ledger.telemetry import TelemetryEvent, confidence_band
 
 logger = logging.getLogger(__name__)
@@ -103,6 +109,7 @@ class LedgerService:
         telemetry_sink: Callable[[dict[str, Any]], Any] | None = None,
         judgment_quota: JudgmentQuotaLimiter | None = None,
         plan_advisor: PlanAdvisor | None = None,
+        preview_tokens: PlanPreviewTokens | None = None,
     ) -> None:
         self.repository = repository
         self.judge = judge
@@ -111,6 +118,7 @@ class LedgerService:
         self.telemetry_sink = telemetry_sink
         self.judgment_quota = judgment_quota
         self.plan_advisor = plan_advisor or DeterministicPlanAdvisor()
+        self.preview_tokens = preview_tokens or PlanPreviewTokens()
 
     def get_profile(self, user_ref: str) -> ServiceResult:
         profile = self.repository.get_profile(user_ref)
@@ -214,7 +222,9 @@ class LedgerService:
         plan = self._with_plan_narrative(
             user_ref, self._build_spending_plan(user_ref, payload, status="draft")
         )
-        return ServiceResult(200, self._spending_plan_payload(user_ref, plan, preview=True))
+        data = self._spending_plan_payload(user_ref, plan, preview=True)
+        data["preview_token"] = self._issue_plan_preview(user_ref, "activate", payload, plan, None)
+        return ServiceResult(200, data)
 
     def activate_spending_plan(
         self,
@@ -233,9 +243,14 @@ class LedgerService:
             raise ServiceError("confirmation_required", "계획 내용을 확인해 주세요.", 400)
         if self.repository.get_spending_plan(user_ref) is not None:
             raise ServiceError("active_plan_exists", "이미 활성 계획이 있어요.", 409)
-        plan = self._with_plan_narrative(
-            user_ref, self._build_spending_plan(user_ref, payload, status="active")
-        )
+        if payload.get("preview_token") is not None:
+            reviewed = self._read_plan_preview(user_ref, "activate", payload, None)
+            now = utc_now_iso()
+            plan = replace(reviewed, status="active", confirmed_at=now, updated_at=now)
+        else:
+            plan = self._with_plan_narrative(
+                user_ref, self._build_spending_plan(user_ref, payload, status="active")
+            )
         stored = self.repository.activate_spending_plan(
             plan,
             idempotency_key=_key("plan-activate", idempotency_key),
@@ -262,6 +277,7 @@ class LedgerService:
                 "revision_preview": self._revision_diff(user_ref, current, candidate),
                 "plan": candidate.to_dict(),
                 "progress": self._plan_progress(user_ref, candidate),
+                "preview_token": self._issue_plan_preview(user_ref, "revise", payload, candidate, current),
             },
         )
 
@@ -281,9 +297,12 @@ class LedgerService:
         if payload.get("apply") is not True:
             raise ServiceError("confirmation_required", "변경 내용을 적용해 주세요.", 400)
         current = self._require_spending_plan(user_ref)
-        candidate = self._with_plan_narrative(
-            user_ref, self._build_revision_candidate(current, payload)
-        )
+        if payload.get("preview_token") is not None:
+            candidate = self._read_plan_preview(user_ref, "revise", payload, current)
+        else:
+            candidate = self._with_plan_narrative(
+                user_ref, self._build_revision_candidate(current, payload)
+            )
         applied_at = utc_now_iso()
         revision = PlanRevision(
             revision_id=str(uuid4()),
@@ -908,7 +927,7 @@ class LedgerService:
         correlation_id: str,
         source: str = "api",
     ) -> ServiceResult:
-        judgment = self._require_roast_judgment(user_ref, judgment_id)
+        judgment = self._display_judgment(self._require_roast_judgment(user_ref, judgment_id))
         transaction = self._require_transaction(user_ref, judgment.transaction_id)
         correction = self.repository.get_judgment_correction(user_ref, judgment_id)
         effective_label = correction.corrected_label if correction else judgment.label
@@ -1261,11 +1280,17 @@ class LedgerService:
         if regret_pattern:
             goal_name = profile.goal.name if profile else "목표"
             improvement = (
-                f"이번 주 {_category_name(regret_category)} 지출을 1회 줄이고, "
-                f"절약한 금액을 {goal_name}에 남겨둬요."
+                f"잘 썼다고 평가한 소비는 유지하고, 후회한 {_category_name(regret_category)} 소비를 한 번 줄여요. "
+                f"남긴 금액은 {goal_name} 목표에 보태 보세요."
             )
+            plan = self.repository.get_spending_plan(user_ref)
+            explicit_choices = [item.name for item in plan.priorities] if plan else []
+            explicit_choices.extend(self.repository.get_settings(user_ref).spending_rules)
+            if regret_category in {"food", "food_delivery"} and any("배달" in choice and any(word in choice for word in ("줄", "미루", "제한")) for choice in explicit_choices):
+                improvement = "만족했던 식사는 유지하고, 다음 배달 주문은 한 번 미뤄 보세요. 줄이기로 정한 소비부터 바꿔요."
         elif concern is not None and concern[2] != "justified":
             transaction, judgment, effective_label = concern
+            judgment = self._display_judgment(judgment)
             concern_payload = {
                 "transaction_id": transaction.transaction_id,
                 "label": effective_label,
@@ -1517,7 +1542,7 @@ class LedgerService:
                 priorities.append(
                     PlanPriority(
                         priority_id=str(item.get("priority_id") or f"priority-{index + 1}"),
-                        name=str(item.get("name", "")).strip(),
+                        name=sanitize_free_text(str(item.get("name", "")), max_length=60) or "",
                         rank=int(item.get("rank", index + 1)),
                     )
                 )
@@ -1532,14 +1557,15 @@ class LedgerService:
             item.planned_expense_id: item for item in (existing.planned_expenses if existing else [])
         }
         planned_expenses: list[PlannedExpense] = []
-        for index, item in enumerate(raw_expenses):
+        for item in raw_expenses:
             if isinstance(item, PlannedExpense):
-                planned_expenses.append(item)
-                continue
+                item = item.to_dict()
             if not isinstance(item, dict):
                 raise ServiceError("invalid_request", "planned_expenses must contain objects", 400)
-            expense_id = str(item.get("planned_expense_id") or f"planned-{index + 1}")
+            expense_id = str(item.get("planned_expense_id") or uuid4())
             previous = previous_expenses.get(expense_id)
+            if previous is None and (item.get("matched_transaction_id") or item.get("matched_at")):
+                raise ServiceError("invalid_planned_expense_match", "새 예정 지출은 저장 후 실제 거래와 연결해 주세요.", 400)
             planned_expenses.append(
                 PlannedExpense(
                     planned_expense_id=expense_id,
@@ -1548,9 +1574,9 @@ class LedgerService:
                     due_date=str(item.get("due_date", "")),
                     category=_normalized_category(item.get("category", "other")),
                     matched_transaction_id=(
-                        previous.matched_transaction_id if previous else item.get("matched_transaction_id")
+                        previous.matched_transaction_id if previous else None
                     ),
-                    matched_at=previous.matched_at if previous else item.get("matched_at"),
+                    matched_at=previous.matched_at if previous else None,
                 )
             )
         raw_allocations = payload.get("allocations")
@@ -1566,7 +1592,7 @@ class LedgerService:
                 for item in raw_allocations
             ]
         now = utc_now_iso()
-        return SpendingPlan(
+        plan = SpendingPlan(
             plan_id=existing.plan_id if existing else str(payload.get("plan_id") or uuid4()),
             user_ref=user_ref,
             period_start=period_start,
@@ -1584,6 +1610,24 @@ class LedgerService:
             revisions=list(existing.revisions) if existing else [],
             check_ins=list(existing.check_ins) if existing else [],
         )
+        return self._valid_plan_matches(user_ref, plan)
+
+    def _valid_plan_matches(self, user_ref: str, plan: SpendingPlan) -> SpendingPlan:
+        timezone = _safe_timezone(self.repository.get_settings(user_ref).timezone)
+        start = parse_date(plan.period_start, "period_start")
+        end = parse_date(plan.period_end, "period_end")
+        eligible_ids = {
+            item.transaction_id
+            for item in self.repository.list_transactions(user_ref)
+            if item.transaction_type == "expense"
+            and not item.exclude_from_budget
+            and start <= parse_utc_datetime(item.occurred_at, "occurred_at").astimezone(timezone).date() <= end
+        }
+        return replace(plan, planned_expenses=[
+            item if item.matched_transaction_id in eligible_ids or item.matched_transaction_id is None
+            else replace(item, matched_transaction_id=None, matched_at=None)
+            for item in plan.planned_expenses
+        ])
 
     def _attach_plan_impact(
         self, user_ref: str, transaction: Transaction, result: ServiceResult
@@ -1660,6 +1704,7 @@ class LedgerService:
     def _spending_plan_payload(
         self, user_ref: str, plan: SpendingPlan, *, preview: bool = False
     ) -> dict[str, Any]:
+        plan = self._valid_plan_matches(user_ref, plan)
         progress = self._plan_progress(user_ref, plan)
         original = plan.revisions[0].before if plan.revisions else plan.snapshot()
         current_segment = next(
@@ -1676,13 +1721,11 @@ class LedgerService:
             next_action = "이번 구간 남은 생활비 안에서 다음 지출 한 건을 기록하세요."
         else:
             next_action = "계획 기간과 현재 날짜를 확인하세요."
-        narrative = plan.narrative
-        if narrative is None:
-            narrative = deterministic_plan_narrative(
-                self._plan_advice_request(user_ref, plan, progress)
-            ).to_dict()
+        narrative = self._current_plan_narrative(user_ref, plan, progress)
+        displayed_plan = plan.to_dict()
+        displayed_plan["narrative"] = narrative
         return {
-            "plan": plan.to_dict(),
+            "plan": displayed_plan,
             "original_plan": original,
             "progress": progress,
             "next_action": next_action,
@@ -1694,15 +1737,75 @@ class LedgerService:
         self, user_ref: str, plan: SpendingPlan
     ) -> SpendingPlan:
         progress = self._plan_progress(user_ref, plan)
-        narrative = self._plan_narrative(user_ref, plan, progress).to_dict()
+        request = self._plan_advice_request(user_ref, plan, progress)
+        narrative = self._plan_narrative(user_ref, plan, progress, request=request).to_dict()
+        narrative["evidence_fingerprint"] = _fingerprint(request.allowlisted_payload())
         return replace(plan, narrative=narrative)
 
-    def _plan_narrative(
+    def _current_plan_narrative(
         self, user_ref: str, plan: SpendingPlan, progress: dict[str, Any]
-    ) -> PlanNarrative:
+    ) -> dict[str, Any]:
         request = self._plan_advice_request(user_ref, plan, progress)
+        stored = plan.narrative
+        reason = "unavailable"
+        if stored:
+            try:
+                parse_plan_narrative(
+                    {key: stored.get(key) for key in NARRATIVE_FIELDS},
+                    {item.allocation_id for item in plan.allocations},
+                )
+            except (ValueError, TypeError):
+                reason = "language_repaired"
+            else:
+                if stored.get("evidence_fingerprint") == _fingerprint(request.allowlisted_payload()):
+                    return {**stored, "display_reason": "unavailable" if stored.get("fallback_used") else "current"}
+                reason = "data_changed"
+        return {**deterministic_plan_narrative(request).to_dict(), "display_reason": reason}
+
+    def _issue_plan_preview(
+        self, user_ref: str, operation: str, payload: dict[str, Any],
+        candidate: SpendingPlan, current: SpendingPlan | None,
+    ) -> str:
+        return self.preview_tokens.issue({
+            "user_ref": user_ref,
+            "operation": operation,
+            "input_fingerprint": _plan_input_fingerprint(payload),
+            "base_fingerprint": _fingerprint(current.to_dict() if current else None),
+            "evidence_fingerprint": candidate.narrative["evidence_fingerprint"],
+            "plan": candidate.snapshot(),
+        })
+
+    def _read_plan_preview(
+        self, user_ref: str, operation: str, payload: dict[str, Any],
+        current: SpendingPlan | None,
+    ) -> SpendingPlan:
         try:
-            return self.plan_advisor.advise(request)
+            claims = self.preview_tokens.read(payload["preview_token"], user_ref=user_ref, operation=operation)
+            candidate = SpendingPlan.from_dict(claims["plan"])
+            if candidate.user_ref != user_ref:
+                raise InvalidPlanPreview("wrong plan owner")
+        except (InvalidPlanPreview, KeyError, ValueError, TypeError) as exc:
+            raise ServiceError("invalid_plan_preview", "검토 내용이 만료되었거나 유효하지 않아요. 입력 내용으로 다시 검토해 주세요.", 409) from exc
+        current_request = self._plan_advice_request(user_ref, candidate, self._plan_progress(user_ref, candidate))
+        if (
+            claims.get("input_fingerprint") != _plan_input_fingerprint(payload)
+            or claims.get("base_fingerprint") != _fingerprint(current.to_dict() if current else None)
+            or claims.get("evidence_fingerprint") != _fingerprint(current_request.allowlisted_payload())
+        ):
+            raise ServiceError("plan_preview_conflict", "검토 후 거래나 계획이 바뀌었어요. 입력 내용으로 다시 검토해 주세요.", 409)
+        return candidate
+
+    def _plan_narrative(
+        self, user_ref: str, plan: SpendingPlan, progress: dict[str, Any], *, request: PlanAdviceRequest | None = None,
+    ) -> PlanNarrative:
+        request = request or self._plan_advice_request(user_ref, plan, progress)
+        try:
+            advice = self.plan_advisor.advise(request)
+            parse_plan_narrative(
+                {key: advice.to_dict()[key] for key in NARRATIVE_FIELDS},
+                {item.allocation_id for item in plan.allocations},
+            )
+            return advice
         except Exception:
             return deterministic_plan_narrative(request)
 
@@ -1710,13 +1813,18 @@ class LedgerService:
         self, user_ref: str, plan: SpendingPlan, progress: dict[str, Any]
     ) -> PlanAdviceRequest:
         settings = self.repository.get_settings(user_ref)
+        timezone = _safe_timezone(settings.timezone)
+        start = parse_date(plan.period_start, "period_start")
+        end = parse_date(plan.period_end, "period_end")
         transactions = [
             item
             for item in self.repository.list_transactions(user_ref)
             if item.transaction_type == "expense" and not item.exclude_from_budget
+            and start <= parse_utc_datetime(item.occurred_at, "occurred_at").astimezone(timezone).date() <= end
         ]
         category_spend: dict[str, int] = {}
         reflection_counts = {"well_spent": 0, "unsure": 0, "regretted": 0}
+        category_reflection_counts: dict[str, dict[str, int]] = {}
         judgment_counts = {
             "justified": 0,
             "caution": 0,
@@ -1727,6 +1835,8 @@ class LedgerService:
             category_spend[item.category] = category_spend.get(item.category, 0) + item.amount_krw
             if item.reflection in reflection_counts:
                 reflection_counts[item.reflection] += 1
+                counts = category_reflection_counts.setdefault(item.category, {"well_spent": 0, "unsure": 0, "regretted": 0})
+                counts[item.reflection] += 1
             judgment = self.repository.get_judgment_for_transaction(user_ref, item.transaction_id)
             if judgment and judgment.label in judgment_counts:
                 judgment_counts[judgment.label] += 1
@@ -1743,6 +1853,8 @@ class LedgerService:
                     "flexible_remaining_krw",
                     "shortfall_krw",
                     "current_segment_id",
+                    "as_of",
+                    "period_status",
                 )
             },
             allocations=[
@@ -1774,6 +1886,7 @@ class LedgerService:
             aggregate_patterns={
                 "category_spend_krw": category_spend,
                 "reflection_counts": reflection_counts,
+                "category_reflection_counts": category_reflection_counts,
                 "judgment_counts": judgment_counts,
             },
         )
@@ -1795,10 +1908,7 @@ class LedgerService:
                 after_progress["flexible_remaining_krw"]
                 - before_progress["flexible_remaining_krw"]
             ),
-            "narrative": candidate.narrative
-            or deterministic_plan_narrative(
-                self._plan_advice_request(user_ref, candidate, after_progress)
-            ).to_dict(),
+            "narrative": self._current_plan_narrative(user_ref, candidate, after_progress),
         }
 
     def _compute_signals(
@@ -1853,9 +1963,37 @@ class LedgerService:
 
     def _render(self, user_ref: str, judgment: JudgmentResult) -> dict[str, Any]:
         settings = self.repository.get_settings(user_ref)
-        return render_judgment(
-            judgment, roast_enabled=settings.roast_enabled
-        ).to_dict()
+        displayed = self._display_judgment(judgment)
+        data = render_judgment(displayed, roast_enabled=settings.roast_enabled).to_dict()
+        if displayed != judgment:
+            data["language_repaired"] = True
+        return data
+
+    @staticmethod
+    def _display_judgment(judgment: JudgmentResult) -> JudgmentResult:
+        if all(is_korean_user_text(getattr(judgment, key)) for key in ("rationale", "recommended_action", "normal_message", "roast_message")):
+            return judgment
+        explanations = {
+            "justified": "기록 당시 예산과 목표 신호를 기준으로 부담이 적은 소비로 판단했어요.",
+            "caution": "기록 당시 예산과 목표 신호를 기준으로 주의가 필요한 소비로 판단했어요.",
+            "overspending": "기록 당시 예산과 목표 신호를 기준으로 부담이 큰 소비로 판단했어요.",
+            "insufficient_context": "기록 당시에는 소비를 판단할 정보가 충분하지 않았어요.",
+        }
+        actions = {
+            "justified": "같은 분류의 소비를 계속 기록하고 현재 예산을 확인해 주세요.",
+            "caution": "다음 비슷한 소비 전에는 현재 예산과 대안을 확인해 주세요.",
+            "overspending": "다음 비슷한 소비를 미룰 수 있는지 현재 예산과 함께 확인해 주세요.",
+            "insufficient_context": "이 소비에 대한 내 평가를 남기고 현재 예산을 확인해 주세요.",
+        }
+        rationale = judgment.rationale if is_korean_user_text(judgment.rationale) else explanations[judgment.label]
+        action = judgment.recommended_action if is_korean_user_text(judgment.recommended_action) else actions[judgment.label]
+        return replace(
+            judgment,
+            rationale=rationale,
+            recommended_action=action,
+            normal_message=judgment.normal_message if is_korean_user_text(judgment.normal_message) else f"{rationale} {action}",
+            roast_message=judgment.roast_message if is_korean_user_text(judgment.roast_message) else grandma_mode_fallback(label=judgment.label, rationale=rationale, recommended_action=action),
+        )
 
     def _require_transaction(
         self, user_ref: str, transaction_id: str
@@ -2151,6 +2289,15 @@ def _goal_delay_days(
         return 0
     required_daily_savings = savings_gap / days_remaining
     return ceil(regretted_spent_krw / max(required_daily_savings, 1))
+
+
+def _fingerprint(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def _plan_input_fingerprint(payload: dict[str, Any]) -> str:
+    fields = ("period_start", "period_end", "confirmed_budget_krw", "priorities", "planned_expenses", "allocations", "base_version", "reason", "plan_id")
+    return _fingerprint({key: payload[key] for key in fields if key in payload})
 
 
 def _key(scope: str, client_key: str) -> str:

@@ -128,17 +128,17 @@ export const ledgerApi = {
       body: JSON.stringify(draft),
     });
   },
-  async activatePlan(draft: PlanDraft): Promise<SpendingPlanState> {
+  async activatePlan(draft: PlanDraft, previewToken?: string): Promise<SpendingPlanState> {
     return request<SpendingPlanState>("/api/v1/me/plan", {
       method: "PUT",
-      body: JSON.stringify({ ...draft, confirmed: true }),
+      body: JSON.stringify({ ...draft, confirmed: true, preview_token: previewToken }),
     });
   },
   async previewPlanRevision(
     draft: PlanDraft,
     baseVersion: number,
     reason: string,
-  ): Promise<{ revision_preview: PlanRevisionPreview; plan: SpendingPlanState["plan"]; progress: SpendingPlanState["progress"] }> {
+  ): Promise<{ revision_preview: PlanRevisionPreview; plan: SpendingPlanState["plan"]; progress: SpendingPlanState["progress"]; preview_token?: string }> {
     return request("/api/v1/me/plan/revision-preview", {
       method: "POST",
       body: JSON.stringify({ ...draft, base_version: baseVersion, reason }),
@@ -148,10 +148,11 @@ export const ledgerApi = {
     draft: PlanDraft,
     baseVersion: number,
     reason: string,
+    previewToken?: string,
   ): Promise<SpendingPlanState> {
     return request<SpendingPlanState>("/api/v1/me/plan/revisions", {
       method: "POST",
-      body: JSON.stringify({ ...draft, base_version: baseVersion, reason, apply: true }),
+      body: JSON.stringify({ ...draft, base_version: baseVersion, reason, apply: true, preview_token: previewToken }),
     });
   },
   async checkInPlan(decision: "maintain" | "adjust", note: string): Promise<SpendingPlanState> {

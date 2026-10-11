@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
 from ledger.adapters.openai_judge import _extract_response_text
+from ledger.language import validate_korean_user_text, validate_no_financial_numbers
 
 
 NARRATIVE_FIELDS = {
@@ -88,15 +88,59 @@ class PlanAdviceRequest:
 def deterministic_plan_narrative(request: PlanAdviceRequest) -> PlanNarrative:
     shortfall = int(request.deterministic_progress.get("shortfall_krw", 0))
     current_segment = request.deterministic_progress.get("current_segment_id")
+    period_status = str(request.deterministic_progress.get("period_status") or "")
+    current_allocation = next(
+        (
+            item
+            for item in request.allocations
+            if item.get("allocation_id") == current_segment
+        ),
+        None,
+    )
+    current_segment_shortfall = (
+        isinstance(current_allocation, dict)
+        and int(current_allocation.get("flexible_remaining_krw", 0)) < 0
+    )
+    priority_text = " ".join(request.priorities)
+    rules_text = " ".join(request.spending_rules)
+    delivery_priority = "배달" in priority_text or "배달" in rules_text
+    social_priority = any(keyword in priority_text for keyword in ("친구", "식사", "약속", "만남"))
+    category_reflections = request.aggregate_patterns.get("category_reflection_counts", {})
+    food_reflections = category_reflections.get("food", {}) if isinstance(category_reflections, dict) else {}
+    regretted_food = int(food_reflections.get("regretted", 0)) if isinstance(food_reflections, dict) else 0
+    well_spent_food = int(food_reflections.get("well_spent", 0)) if isinstance(food_reflections, dict) else 0
     if shortfall > 0:
         headline = "지금 계획을 한 번 조정할 때예요."
         explanation = "입력된 지출과 남은 예약을 함께 보면 자유롭게 쓸 생활비가 부족해요."
         next_action = "예정 지출 하나의 시기나 우선순위를 다시 확인하세요."
         confidence = "high"
+    elif period_status == "completed":
+        headline = "이번 계획은 정리해도 좋아요."
+        explanation = "마무리된 기간의 입력 내역을 기준으로 생활비 흐름을 정리했어요."
+        next_action = "다음 계획에는 지키고 싶은 소비와 줄일 소비를 나눠 적어 두세요."
+        confidence = "medium"
+    elif period_status == "upcoming":
+        headline = "다가오는 계획을 준비할 때예요."
+        explanation = "아직 시작 전이라 예정된 지출과 우선순위를 먼저 맞춰 봤어요."
+        next_action = "시작 전에 꼭 남겨야 할 예정 지출부터 생활비 안에 확보하세요."
+        confidence = "medium"
     elif current_segment:
-        headline = "현재 구간은 계획 안에서 움직이고 있어요."
-        explanation = "입력된 거래와 아직 남은 예약을 분리해 생활비 흐름을 확인했어요."
-        next_action = "다음 지출 전에 현재 구간의 남은 생활비를 확인하세요."
+        if current_segment_shortfall:
+            headline = "이번 구간의 소비 속도를 조정해요."
+            explanation = "전체 계획과 별도로 현재 구간의 사용 흐름을 다시 확인했어요."
+        else:
+            headline = "현재 구간은 계획 안에서 움직이고 있어요."
+            explanation = "입력된 거래와 아직 남은 예약을 분리해 생활비 흐름을 확인했어요."
+        if delivery_priority and social_priority:
+            next_action = "약속처럼 남기고 싶은 소비는 지키고, 배달처럼 줄이기로 한 소비부터 한 번 미루세요."
+        elif delivery_priority:
+            next_action = "다음 식비 지출 전에 배달 대신 이미 정한 대안을 먼저 확인하세요."
+        elif regretted_food > well_spent_food:
+            next_action = "좋았던 식비는 남기고, 후회한 식비부터 한 번 줄여 보세요."
+        elif current_segment_shortfall:
+            next_action = "다음 구간으로 넘어가기 전 예정 지출과 우선순위를 먼저 다시 확인하세요."
+        else:
+            next_action = "다음 지출 전에 현재 구간의 남은 생활비를 확인하세요."
         confidence = "medium"
     else:
         headline = "계획 기간과 입력 시점을 확인해 주세요."
@@ -123,10 +167,17 @@ def parse_plan_narrative(payload: dict[str, Any], allocation_ids: set[str]) -> P
     strings = [payload.get("headline"), payload.get("explanation"), payload.get("next_action")]
     assumptions = payload.get("assumptions")
     focuses = payload.get("segment_focuses")
-    if not all(isinstance(item, str) and item.strip() for item in strings):
-        raise ValueError("invalid narrative text")
+    cleaned_strings = [
+        validate_korean_user_text(item, field_name=field_name)
+        for item, field_name in zip(strings, ("headline", "explanation", "next_action"), strict=True)
+    ]
     if not isinstance(assumptions, list) or not all(isinstance(item, str) for item in assumptions):
         raise ValueError("invalid assumptions")
+    cleaned_assumptions = [
+        validate_korean_user_text(item, field_name="assumption")
+        for item in assumptions
+        if item.strip()
+    ]
     if not isinstance(focuses, list):
         raise ValueError("invalid segment focuses")
     cleaned_focuses: list[dict[str, str]] = []
@@ -135,19 +186,24 @@ def parse_plan_narrative(payload: dict[str, Any], allocation_ids: set[str]) -> P
             raise ValueError("invalid segment focus")
         if item["allocation_id"] not in allocation_ids or not isinstance(item["focus"], str):
             raise ValueError("unknown allocation focus")
-        cleaned_focuses.append({"allocation_id": item["allocation_id"], "focus": item["focus"].strip()})
-    all_text = [*strings, *assumptions, *(item["focus"] for item in cleaned_focuses)]
-    if any(re.search(r"\d|[₩원]", item or "") for item in all_text):
-        raise ValueError("narrative must not calculate or restate numeric values")
+        cleaned_focuses.append(
+            {
+                "allocation_id": item["allocation_id"],
+                "focus": validate_korean_user_text(item["focus"], field_name="segment_focus"),
+            }
+        )
+    all_text = [*cleaned_strings, *cleaned_assumptions, *(item["focus"] for item in cleaned_focuses)]
+    for item in all_text:
+        validate_no_financial_numbers(item, field_name="narrative")
     confidence = payload.get("confidence")
     if confidence not in {"low", "medium", "high"}:
         raise ValueError("invalid confidence")
     return PlanNarrative(
-        headline=str(strings[0]).strip(),
-        explanation=str(strings[1]).strip(),
+        headline=cleaned_strings[0],
+        explanation=cleaned_strings[1],
         segment_focuses=cleaned_focuses,
-        next_action=str(strings[2]).strip(),
-        assumptions=[item.strip() for item in assumptions if item.strip()],
+        next_action=cleaned_strings[2],
+        assumptions=cleaned_assumptions,
         confidence=confidence,
         fallback_used=False,
     )
@@ -194,7 +250,9 @@ class OpenAIResponsesPlanAdvisor:
                             "role": "system",
                             "content": (
                                 "You are a Korean spending-plan coach. Use only the supplied aggregate facts. "
-                                "Return qualitative guidance in strict JSON. Never calculate, restate, infer, "
+                                "Return qualitative guidance in strict JSON. Every user-visible prose field "
+                                "must be Korean only; short technical terms such as AI are allowed only when "
+                                "necessary. Never calculate, restate, infer, "
                                 "round, or compare numeric values. Do not ask for or invent merchants, memos, "
                                 "reasons, notes, accounts, identities, or transactions."
                             ),
