@@ -86,7 +86,7 @@ function SessionGate() {
   const { loading, session } = useAuth();
   const query = new URLSearchParams(window.location.search);
   const demo = query.get("demo") === "1" || import.meta.env.VITE_DEMO_DEFAULT === "1";
-  if (demo) return <LedgerProvider><AppRoutes /></LedgerProvider>;
+  if (demo) return <LedgerProvider><aside className="demo-notice" aria-label="데모 안내">데모 · 예시 데이터와 AI 답변입니다. 변경 내용은 실제 장부에 저장되지 않아요.</aside><AppRoutes /></LedgerProvider>;
   if (loading) return <LoadingScreen />;
   if (!session) return <LoginPage />;
   return <LedgerProvider><AppRoutes /></LedgerProvider>;

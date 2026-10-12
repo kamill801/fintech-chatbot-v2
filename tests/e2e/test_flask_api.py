@@ -277,6 +277,130 @@ class FlaskLedgerE2ETests(unittest.TestCase):
             matched.get_json()["data"]["progress"]["reserved_remaining_krw"], 0
         )
 
+    def test_archived_transaction_accounts_can_only_be_preserved_on_update(self) -> None:
+        self.put_profile()
+        active_accounts = [
+            {
+                "account_id": "cash",
+                "name": "현금",
+                "account_type": "cash",
+                "opening_balance_krw": 0,
+            },
+            {
+                "account_id": "bank",
+                "name": "생활비 통장",
+                "account_type": "bank",
+                "opening_balance_krw": 1000000,
+            },
+        ]
+        settings = self.client.put(
+            "/api/v1/me/settings",
+            json={"accounts": active_accounts},
+            headers=self.mutate_headers("settings-archived-active"),
+        )
+        self.assertEqual(settings.status_code, 200)
+
+        expense = self.client.post(
+            "/api/v1/me/transactions",
+            json={
+                "transaction_type": "expense",
+                "amount_krw": 18000,
+                "category": "food",
+                "account_id": "cash",
+                "reason": "점심",
+            },
+            headers=self.mutate_headers("archived-expense-source"),
+        )
+        self.assertEqual(expense.status_code, 201)
+        expense_id = expense.get_json()["data"]["transaction"]["transaction_id"]
+
+        transfer = self.client.post(
+            "/api/v1/me/transactions",
+            json={
+                "transaction_type": "transfer",
+                "amount_krw": 50000,
+                "category": "transfer",
+                "account_id": "bank",
+                "destination_account_id": "cash",
+            },
+            headers=self.mutate_headers("archived-transfer-destination"),
+        )
+        self.assertEqual(transfer.status_code, 201)
+        transfer_id = transfer.get_json()["data"]["transaction"]["transaction_id"]
+
+        archived_accounts = [
+            {**active_accounts[0], "archived": True},
+            active_accounts[1],
+        ]
+        archived = self.client.put(
+            "/api/v1/me/settings",
+            json={"accounts": archived_accounts},
+            headers=self.mutate_headers("settings-archived-cash"),
+        )
+        self.assertEqual(archived.status_code, 200)
+
+        source_preserved = self.client.put(
+            f"/api/v1/me/transactions/{expense_id}",
+            json={"amount_krw": 19000},
+            headers=self.mutate_headers("archived-source-preserved"),
+        )
+        self.assertEqual(source_preserved.status_code, 200)
+        self.assertEqual(
+            source_preserved.get_json()["data"]["transaction"]["account_id"], "cash"
+        )
+
+        destination_preserved = self.client.put(
+            f"/api/v1/me/transactions/{transfer_id}",
+            json={"amount_krw": 60000},
+            headers=self.mutate_headers("archived-destination-preserved"),
+        )
+        self.assertEqual(destination_preserved.status_code, 200)
+        self.assertEqual(
+            destination_preserved.get_json()["data"]["transaction"][
+                "destination_account_id"
+            ],
+            "cash",
+        )
+
+        new_hidden = self.client.post(
+            "/api/v1/me/transactions",
+            json={
+                "transaction_type": "expense",
+                "amount_krw": 7000,
+                "category": "food",
+                "account_id": "cash",
+                "reason": "간식",
+            },
+            headers=self.mutate_headers("archived-new-hidden"),
+        )
+        self.assertEqual(new_hidden.status_code, 400)
+        self.assertEqual(new_hidden.get_json()["error"]["code"], "invalid_account")
+
+        bank_expense = self.client.post(
+            "/api/v1/me/transactions",
+            json={
+                "transaction_type": "expense",
+                "amount_krw": 12000,
+                "category": "food",
+                "account_id": "bank",
+                "reason": "저녁",
+            },
+            headers=self.mutate_headers("archived-bank-expense"),
+        )
+        self.assertEqual(bank_expense.status_code, 201)
+        bank_expense_id = bank_expense.get_json()["data"]["transaction"][
+            "transaction_id"
+        ]
+        switched_to_hidden = self.client.put(
+            f"/api/v1/me/transactions/{bank_expense_id}",
+            json={"account_id": "cash"},
+            headers=self.mutate_headers("archived-switch-to-hidden"),
+        )
+        self.assertEqual(switched_to_hidden.status_code, 400)
+        self.assertEqual(
+            switched_to_hidden.get_json()["error"]["code"], "invalid_account"
+        )
+
     def test_income_update_and_delete_routes(self) -> None:
         self.put_profile()
         created = self.client.post(

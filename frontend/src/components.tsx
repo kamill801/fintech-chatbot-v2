@@ -1,4 +1,4 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 import {
   ArrowLeft,
   Basket,
@@ -31,6 +31,50 @@ export function Highlight({ children }: { children: ReactNode }) {
 
 export function Surface({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <section className={`surface ${className}`}>{children}</section>;
+}
+
+export function Dialog({ onClose, busy = false, children, ...props }: HTMLAttributes<HTMLElement> & {
+  onClose(): void;
+  busy?: boolean;
+}) {
+  const element = useRef<HTMLElement>(null);
+  const controls = useRef({ onClose, busy });
+  useEffect(() => { controls.current = { onClose, busy }; }, [onClose, busy]);
+  useEffect(() => {
+    const dialog = element.current;
+    if (!dialog) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (!controls.current.busy) controls.current.onClose();
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )].filter((item) => !item.closest("[hidden]") && getComputedStyle(item).display !== "none");
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) { event.preventDefault(); dialog.focus(); return; }
+      if (!dialog.contains(document.activeElement) || document.activeElement === dialog) {
+        event.preventDefault(); (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
+  return <section role="dialog" aria-modal="true" tabIndex={-1} {...props} ref={element}>{children}</section>;
 }
 
 export function PrimaryButton({ className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {

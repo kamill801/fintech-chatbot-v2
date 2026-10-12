@@ -673,7 +673,7 @@ class LedgerService:
             ),
             updated_at=utc_now_iso(),
         )
-        _validate_transaction_accounts(settings, updated)
+        _validate_transaction_accounts(settings, updated, previous=existing)
         requires_interactive_reason = (
             transaction_type == "expense"
             and settings.roast_enabled
@@ -2201,16 +2201,46 @@ def _account_id(value: Any, *, default: str | None) -> str | None:
 
 
 def _validate_transaction_accounts(
-    settings: UserSettings, transaction: Transaction
+    settings: UserSettings,
+    transaction: Transaction,
+    *,
+    previous: Transaction | None = None,
 ) -> None:
-    known_ids = {account.account_id for account in settings.accounts if not account.archived}
-    if transaction.account_id not in known_ids:
+    existing_ids = {account.account_id for account in settings.accounts}
+    active_ids = {
+        account.account_id for account in settings.accounts if not account.archived
+    }
+
+    if not _is_usable_transaction_account(
+        transaction.account_id,
+        active_ids,
+        existing_ids,
+        preserved_id=previous.account_id if previous is not None else None,
+    ):
         raise ServiceError("invalid_account", "source account was not found", 400)
-    if (
-        transaction.destination_account_id is not None
-        and transaction.destination_account_id not in known_ids
+    if transaction.destination_account_id is not None and not _is_usable_transaction_account(
+        transaction.destination_account_id,
+        active_ids,
+        existing_ids,
+        preserved_id=(
+            previous.destination_account_id if previous is not None else None
+        ),
     ):
         raise ServiceError("invalid_account", "destination account was not found", 400)
+
+
+def _is_usable_transaction_account(
+    account_id: str | None,
+    active_ids: set[str],
+    existing_ids: set[str],
+    *,
+    preserved_id: str | None,
+) -> bool:
+    if account_id is None:
+        return False
+    if account_id in active_ids:
+        return True
+    return account_id == preserved_id and account_id in existing_ids
 
 
 def _account_balances(

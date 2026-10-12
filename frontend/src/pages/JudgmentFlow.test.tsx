@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   recordShareView: vi.fn(),
   saveSettings: vi.fn(),
   correctJudgment: vi.fn(),
+  updateTransaction: vi.fn(),
+  deleteTransaction: vi.fn(),
   reflectTransaction: vi.fn(),
   useLedger: vi.fn(),
 }));
@@ -31,6 +33,8 @@ describe("judgment voice", () => {
     mocks.recordShareView.mockReset().mockResolvedValue(undefined);
     mocks.saveSettings.mockReset().mockResolvedValue(undefined);
     mocks.correctJudgment.mockReset().mockResolvedValue(undefined);
+    mocks.updateTransaction.mockReset().mockResolvedValue(undefined);
+    mocks.deleteTransaction.mockReset().mockResolvedValue(undefined);
     mocks.reflectTransaction.mockReset().mockResolvedValue(undefined);
     mocks.getTransaction.mockResolvedValue({
       transaction: {
@@ -71,6 +75,8 @@ describe("judgment voice", () => {
       recordShareView: mocks.recordShareView,
       saveSettings: mocks.saveSettings,
       correctJudgment: mocks.correctJudgment,
+      updateTransaction: mocks.updateTransaction,
+      deleteTransaction: mocks.deleteTransaction,
       reflectTransaction: mocks.reflectTransaction,
       settings: { roast_enabled: true, locale: "ko-KR", timezone: "Asia/Seoul" },
     });
@@ -98,12 +104,100 @@ describe("judgment voice", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "지금 생각하면 이 소비 어땠나요?" })).toBeInTheDocument());
+    const original = await mocks.getTransaction();
+    mocks.reflectTransaction.mockResolvedValue({
+      ...original.transaction,
+      reflection: "regretted",
+      reflection_note: "충동적으로 샀어요",
+      reflected_at: "2026-08-06T12:00:00Z",
+    });
     await user.click(screen.getByRole("button", { name: /후회함/ }));
     await user.type(screen.getByRole("textbox", { name: /한 줄 메모/ }), "충동적으로 샀어요");
     await user.click(screen.getByRole("button", { name: "내 소비 기준에 반영" }));
 
     await waitFor(() => expect(mocks.reflectTransaction).toHaveBeenCalledWith("tx-shopping", "regretted", "충동적으로 샀어요"));
     expect(screen.getByText("내 소비 기준에 반영했어요.")).toBeInTheDocument();
+  });
+
+  it("opens transaction editing on the Korean ledger date and saves the edited transaction", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/transactions/tx-shopping");
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockResolvedValue({
+      ...original,
+      transaction: {
+        ...original.transaction,
+        occurred_at: "2026-08-04T18:00:00Z",
+        transaction_type: "expense",
+        account_id: "cash",
+        destination_account_id: null,
+        exclude_from_budget: false,
+      },
+    });
+    mocks.updateTransaction.mockResolvedValue({
+      ...original,
+      transaction: {
+        ...original.transaction,
+        amount_krw: 98000,
+        category: "food",
+        merchant: "김밥집",
+        occurred_at: "2026-08-05T03:00:00Z",
+        transaction_type: "expense",
+        account_id: "cash",
+        destination_account_id: null,
+        exclude_from_budget: false,
+      },
+    });
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      getTransaction: mocks.getTransaction,
+      recordShareSuccess: mocks.recordShareSuccess,
+      recordShareView: mocks.recordShareView,
+      saveSettings: mocks.saveSettings,
+      correctJudgment: mocks.correctJudgment,
+      updateTransaction: mocks.updateTransaction,
+      deleteTransaction: mocks.deleteTransaction,
+      reflectTransaction: mocks.reflectTransaction,
+      settings: {
+        roast_enabled: true,
+        locale: "ko-KR",
+        timezone: "Asia/Seoul",
+        accounts: [
+          { account_id: "cash", name: "현금", account_type: "cash", opening_balance_krw: 0, archived: true },
+          { account_id: "card", name: "카드", account_type: "card", opening_balance_krw: 0, archived: false },
+        ],
+      },
+    });
+
+    render(
+      <BrowserRouter>
+        <Routes><Route path="/transactions/:transactionId" element={<TransactionDetailPage />} /></Routes>
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "지금 생각하면 이 소비 어땠나요?" })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "거래 내용 수정" }));
+    expect(screen.getByLabelText("날짜")).toHaveValue("2026-08-05");
+    expect(screen.getByLabelText("계좌")).toHaveValue("cash");
+    expect(screen.getByRole("option", { name: "현금 (숨김)" })).toBeInTheDocument();
+    await user.clear(screen.getByLabelText("금액"));
+    await user.type(screen.getByLabelText("금액"), "98000");
+    await user.selectOptions(screen.getByLabelText("분류"), "food");
+    await user.clear(screen.getByLabelText("사용처"));
+    await user.type(screen.getByLabelText("사용처"), "김밥집");
+    await user.click(screen.getByRole("button", { name: "거래 저장" }));
+
+    await waitFor(() => expect(mocks.updateTransaction).toHaveBeenCalledWith("tx-shopping", expect.objectContaining({
+      amount_krw: 98000,
+      category: "food",
+      merchant: "김밥집",
+      occurred_at: "2026-08-05T03:00:00.000Z",
+      account_id: "cash",
+    })));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "거래 저장" })).not.toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "-98,000원" })).toBeInTheDocument();
+    expect(screen.getByText("김밥집")).toBeInTheDocument();
+    expect(screen.getByText("식비")).toBeInTheDocument();
   });
 
   it("derives share preview from the loaded judgment and records success after download", async () => {

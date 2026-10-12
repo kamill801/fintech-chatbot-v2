@@ -85,6 +85,53 @@ describe("spending plan flow", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("실제 지출을 연결하지 못했어요");
   });
 
+  it("treats a completed plan as history and starts the next period draft", async () => {
+    const user = userEvent.setup();
+    const completedPlan: SpendingPlanState = {
+      ...demoPlanState,
+      progress: {
+        ...demoPlanState.progress,
+        period_status: "completed",
+        current_segment_id: null,
+      },
+    };
+    mocks.useLedger.mockReturnValue(value(completedPlan));
+    render(<BrowserRouter><PlanPage /></BrowserRouter>);
+
+    expect(screen.getByText(/완료된 계획 · v1/)).toBeInTheDocument();
+    expect(screen.getByText("종료됨")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "이 기간 계획은 마무리됐어요" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이대로 유지" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "다음 기간 계획 세우기" }));
+
+    expect(screen.getByText("생활비 계획 1/3")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "다음 기간에 쓸 돈을 정해요" })).toBeInTheDocument();
+    expect(screen.getByLabelText("시작일")).toHaveValue("2026-09-01");
+    expect(screen.getByLabelText("종료일")).toHaveValue("2026-09-07");
+    expect(screen.queryByRole("textbox", { name: "조정 이유" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    await user.click(screen.getByRole("button", { name: "검토하기" }));
+
+    await waitFor(() => expect(previewPlanRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ period_start: "2026-09-01", period_end: "2026-09-07" }),
+      "다음 기간 계획 시작",
+    ));
+    expect(previewPlan).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "다음 기간 계획을 시작할까요?" })).toBeInTheDocument();
+    expect(screen.queryByText("변경 전 남은 생활비")).not.toBeInTheDocument();
+    expect(screen.getByText("다음 기간 예상 생활비")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "다음 기간 계획 시작" }));
+    expect(applyPlanRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ period_start: "2026-09-01", period_end: "2026-09-07" }),
+      "다음 기간 계획 시작",
+      "revision-token",
+    );
+    expect(activatePlan).not.toHaveBeenCalled();
+  });
+
   it("creates a plan through period, priorities, review, and explicit confirmation", async () => {
     const user = userEvent.setup();
     mocks.useLedger.mockReturnValue(value(null));

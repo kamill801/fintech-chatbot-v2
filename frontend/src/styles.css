@@ -1,5 +1,5 @@
 :root {
-  font-family: "Paperlogy", "SUIT", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
   color: #171512;
   background: #f6f3ec;
   font-synthesis: none;
@@ -21,7 +21,7 @@
 
 * { box-sizing: border-box; }
 html { min-height: 100%; background: var(--paper); }
-body { margin: 0; min-height: 100vh; background: var(--paper); }
+body { margin: 0; min-height: 100vh; background: var(--paper); line-height: 1.5; }
 button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
@@ -30,6 +30,15 @@ h1, h2, h3, p { margin-top: 0; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible {
   outline: 2px solid var(--action);
   outline-offset: 2px;
+}
+
+.demo-notice {
+  padding: 8px 16px;
+  color: var(--muted);
+  background: var(--paper);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .sr-only {
@@ -126,23 +135,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .toggle {
   position: relative;
-  width: 45px; height: 27px;
+  width: 45px; height: 44px;
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: #c9c9c9;
+  background: transparent;
   cursor: pointer;
   transition: background .18s ease-out;
 }
+.toggle::before { content: ""; position: absolute; inset: 8.5px 0; border-radius: 999px; background: #c9c9c9; transition: background .18s ease-out; }
 .toggle span {
   position: absolute;
-  top: 3px; left: 3px;
+  top: 11.5px; left: 3px;
   width: 21px; height: 21px;
   border-radius: 50%;
   background: #fff;
   transition: transform .18s ease-out;
 }
-.toggle.is-on { background: var(--action); }
+.toggle.is-on::before { background: var(--action); }
 .toggle.is-on span { transform: translateX(18px); }
 
 .currency-input {
@@ -229,11 +239,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 /* Global app shell */
 .app-shell { min-height: 100svh; background: var(--paper); }
 .app-content { min-height: 100svh; }
-.screen { width: 100%; max-width: 680px; min-height: 100svh; margin: 0 auto; padding: 24px 20px calc(var(--nav-height) + 34px); }
+.screen { width: 100%; min-width: 0; max-width: 680px; min-height: 100svh; margin: 0 auto; padding: 24px 20px calc(var(--nav-height) + 84px + env(safe-area-inset-bottom)); }
 .standalone-screen, .onboarding-page {
   width: 100%; max-width: 430px; min-height: 100svh;
   margin: 0 auto;
-  padding: 24px 20px 34px;
+  padding: 24px 20px max(34px, env(safe-area-inset-bottom));
   background: var(--paper);
 }
 .desktop-rail { display: none; }
@@ -254,7 +264,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   position: fixed;
   z-index: 31;
   right: 20px;
-  bottom: calc(var(--nav-height) + 16px);
+  bottom: calc(var(--nav-height) + 16px + env(safe-area-inset-bottom));
   display: grid;
   place-items: center;
   width: 56px; height: 56px;
@@ -838,6 +848,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .plan-check-in > svg { color: var(--action); }
 .plan-check-in p { margin: 0; color: var(--muted); }
 .plan-check-in > div:last-child { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.plan-check-in > div.single-action { grid-template-columns: 1fr; }
 .plan-check-in button { min-height: 42px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); font-weight: 700; }
 .setup-progress { height: 5px; overflow: hidden; border-radius: 999px; background: var(--line); }
 .setup-progress span { display: block; height: 100%; background: var(--action); transition: width .2s ease; }
@@ -921,9 +932,43 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .profile-edit-balance strong { color: var(--ink); }
 
 @media (max-width: 600px) {
+  .profile-edit-form label { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 12px 0; }
+  .profile-edit-form input { text-align: left; }
+  .profile-edit-form .currency-input input { text-align: right; }
   .plan-metrics { grid-template-columns: 1fr; }
   .plan-header { display: grid; }
   .plan-header button { justify-self: start; }
   .planned-expenses > div { align-items: flex-start; flex-wrap: wrap; }
   .plan-report-comparison > div { grid-template-columns: 1fr; }
+}
+
+/* Readable, resilient controls across the supported mobile widths. */
+.plan-form input, .plan-form textarea, .plan-form select,
+.auth-card input, .correction-dialog input, .correction-dialog textarea, .correction-dialog select,
+.reflection-note textarea, .ledger-search input, .ledger-filters select { font-size: 16px; }
+.calendar-month-control > button, .month-select, .detail-edit-button,
+.plan-header button, .plan-check-in button, .add-inline-button, .roast-preview-button,
+.judgment-screen .text-button, .judgment-screen .secondary-link,
+.transaction-detail-screen .text-button { min-height: 44px; }
+.calendar-month-control > button { min-width: 44px; }
+.info-callout > svg, .recommendation > svg, .report-advice > svg,
+.plan-coach > svg, .plan-check-in > svg { flex: 0 0 auto; }
+.info-callout > span, .plan-coach > div, .plan-check-in > div,
+.plan-metrics .surface, .revision-compare > span,
+.plan-form label, .planned-expense-editor fieldset { min-width: 0; }
+.plan-coach h2, .plan-coach p, .plan-coach strong,
+.plan-metrics strong, .revision-compare strong,
+.detail-hero p, .detail-fields > div > span, .my-reason p,
+.share-card blockquote, .form-error { overflow-wrap: anywhere; }
+.correction-dialog { max-height: calc(100dvh - 40px); overflow-y: auto; }
+.dialog-backdrop { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+
+@media (max-width: 370px) {
+  .money-edit-row { grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1.2fr); }
+  .money-edit-row .currency-input { font-size: 17px; }
+  .goal-callout { grid-template-columns: auto minmax(0, 1fr); }
+  .goal-callout strong { grid-column: 2; overflow-wrap: anywhere; }
+  .reason-transaction { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+  .reason-transaction time { grid-column: 2; padding: 0; border: 0; }
+  .reason-transaction b { grid-column: 2; overflow-wrap: anywhere; }
 }

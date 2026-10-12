@@ -304,6 +304,7 @@ describe("live ledger summaries", () => {
     expect(screen.getByRole("heading", { name: "이번 주 AI 브리핑" })).toBeInTheDocument();
     expect(screen.getByText("주의가 필요한 지출 2건이 보여요.")).toBeInTheDocument();
     expect(screen.getByText("카페 온도 · 32,000원")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /이번 주 점검할 지출/ }).querySelectorAll(".category-icon")).toHaveLength(1);
     expect(screen.getByText("다음 카페 약속은 산책으로 바꿔요.")).toBeInTheDocument();
     expect(screen.queryByText(/답변 대기/)).not.toBeInTheDocument();
   });

@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import {
   EvidenceList,
+  Dialog,
   Highlight,
   JudgmentBadge,
   ModePill,
@@ -33,16 +34,26 @@ function useTransactionDetail(transactionId: string) {
   const { getTransaction, settings } = useLedger();
   const [detail, setDetail] = useState<TransactionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const revision = useRef(0);
+  const applyDetail = useCallback((nextDetail: TransactionDetail) => {
+    revision.current += 1;
+    setDetail(nextDetail);
+    setError(null);
+  }, []);
   const reload = useCallback(async () => {
+    const requestRevision = revision.current;
     try {
-      setDetail(await getTransaction(transactionId));
+      const nextDetail = await getTransaction(transactionId);
+      if (requestRevision !== revision.current) return;
+      setDetail(nextDetail);
       setError(null);
     } catch {
+      if (requestRevision !== revision.current) return;
       setError("거래를 불러오지 못했어요.");
     }
   }, [getTransaction, transactionId]);
   useEffect(() => { void reload(); }, [reload, settings.roast_enabled]);
-  return { detail, error, reload };
+  return { detail, error, reload, applyDetail };
 }
 
 function correctedJudgmentMessage(label: JudgmentLabel): string {
@@ -111,7 +122,7 @@ export function TransactionDetailPage() {
   const { transactionId = "" } = useParams();
   const { correctJudgment, deleteTransaction, demo, reflectTransaction, settings, updateTransaction } = useLedger();
   const navigate = useNavigate();
-  const { detail, error, reload } = useTransactionDetail(transactionId);
+  const { detail, error, reload, applyDetail } = useTransactionDetail(transactionId);
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState<JudgmentLabel>("justified");
   const [reason, setReason] = useState("필요한 만남이었어요.");
@@ -149,12 +160,12 @@ export function TransactionDetailPage() {
   }
 
   async function saveReflection() {
-    if (!reflection) return;
+    if (!reflection || !detail) return;
     setReflectionSaving(true);
     setReflectionStatus(null);
     try {
-      await reflectTransaction(transactionId, reflection, reflectionNote);
-      await reload();
+      const transaction = await reflectTransaction(transactionId, reflection, reflectionNote);
+      applyDetail({ ...detail, transaction });
       setReflectionStatus("내 소비 기준에 반영했어요.");
     } catch {
       setReflectionStatus("평가를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
@@ -172,7 +183,7 @@ export function TransactionDetailPage() {
       category: transaction.category,
       merchant: transaction.merchant ?? "",
       description: transaction.description ?? "",
-      occurred_at: transaction.occurred_at.slice(0, 10),
+      occurred_at: transactionDateKey(transaction.occurred_at),
       account_id: transaction.account_id,
       destination_account_id: transaction.destination_account_id,
       exclude_from_budget: transaction.exclude_from_budget,
@@ -195,9 +206,9 @@ export function TransactionDetailPage() {
       const payload = { ...transactionDraft };
       if (payload.occurred_at && /^\d{4}-\d{2}-\d{2}$/.test(payload.occurred_at)) payload.occurred_at = new Date(`${payload.occurred_at}T12:00:00+09:00`).toISOString();
       const result = await updateTransaction(transactionId, payload);
+      applyDetail(result);
       setEditingTransaction(false);
       if (result.pending_question) navigate(withDemo(`/transactions/${transactionId}/reason`, demo));
-      else await reload();
     } catch {
       setSaveError("거래를 수정하지 못했어요.");
     } finally {
@@ -224,6 +235,9 @@ export function TransactionDetailPage() {
   const transactionTypeLabel = { expense: "지출", income: "수입", transfer: "이체" }[transactionType];
   const accountNames = Object.fromEntries((settings.accounts ?? []).map((account) => [account.account_id, account.name]));
   const editType = transactionDraft.transaction_type ?? transaction.transaction_type;
+  const editableAccounts = (settings.accounts ?? []).filter(
+    (account) => !account.archived || account.account_id === transactionDraft.account_id || account.account_id === transactionDraft.destination_account_id,
+  );
   return (
     <main className="standalone-screen transaction-detail-screen">
       <PageHeader title="거래 상세" right={<button className="detail-edit-button" onClick={openTransactionEditor}>수정</button>} />
@@ -301,20 +315,20 @@ export function TransactionDetailPage() {
       {judgment && <p className="muted detail-footnote">판단을 수정해도 원래 판단 기록은 남아요</p>}
 
       {editing && (
-        <div className="dialog-backdrop" role="presentation" onMouseDown={() => setEditing(false)}>
-          <section className="correction-dialog" role="dialog" aria-modal="true" aria-labelledby="correction-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="dialog-backdrop" role="presentation" onMouseDown={() => !saving && setEditing(false)}>
+          <Dialog className="correction-dialog" aria-labelledby="correction-title" busy={saving} onClose={() => setEditing(false)} onMouseDown={(event) => event.stopPropagation()}>
             <h2 id="correction-title">판단 수정</h2>
             <p>원래 판단은 보존되고, 수정 기록이 추가돼요.</p>
             <label>내 판단<select value={label} onChange={(event) => setLabel(event.target.value as JudgmentLabel)}><option value="justified">납득 가능한 지출</option><option value="caution">주의가 필요한 지출</option><option value="overspending">과소비</option><option value="insufficient_context">정보 부족</option></select></label>
             <label>수정 이유<textarea value={reason} onChange={(event) => setReason(event.target.value)} /></label>
             {saveError && <p className="form-error" role="alert">{saveError}</p>}
             <PrimaryButton disabled={saving} onClick={() => void saveCorrection()}>{saving ? "저장 중" : "수정 기록 남기기"}</PrimaryButton>
-            <TextButton onClick={() => setEditing(false)}>취소</TextButton>
-          </section>
+            <TextButton disabled={saving} onClick={() => setEditing(false)}>취소</TextButton>
+          </Dialog>
         </div>
       )}
-      {editingTransaction && <div className="dialog-backdrop" role="presentation" onMouseDown={() => !transactionSaving && setEditingTransaction(false)}><section className="correction-dialog transaction-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="transaction-edit-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="transaction-edit-title">거래 내용 수정</h2><div className="edit-form-grid"><label>유형<select value={editType} onChange={(event) => setTransactionDraft((current) => ({ ...current, transaction_type: event.target.value as TransactionType, category: event.target.value === "income" ? "salary" : event.target.value === "transfer" ? "transfer" : "other", destination_account_id: null }))}><option value="expense">지출</option><option value="income">수입</option><option value="transfer">이체</option></select></label><label>금액<input type="number" min="1" inputMode="numeric" value={transactionDraft.amount_krw ?? 0} onChange={(event) => setTransactionDraft((current) => ({ ...current, amount_krw: Number(event.target.value) || 0 }))} /></label><label>분류<select value={transactionDraft.category ?? "other"} onChange={(event) => setTransactionDraft((current) => ({ ...current, category: event.target.value }))}>{(editType === "income" ? ["salary", "other"] : editType === "transfer" ? ["transfer"] : ["cafe", "food", "transport", "shopping", "housing", "health", "other"]).map((category) => <option key={category} value={category}>{categoryNames[category]}</option>)}</select></label><label>사용처<input value={transactionDraft.merchant ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, merchant: event.target.value }))} /></label><label>계좌<select value={transactionDraft.account_id ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, account_id: event.target.value }))}>{(settings.accounts ?? []).filter((account) => !account.archived).map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}</select></label>{editType === "transfer" && <label>받을 계좌<select value={transactionDraft.destination_account_id ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, destination_account_id: event.target.value || null }))}><option value="">선택</option>{(settings.accounts ?? []).filter((account) => !account.archived && account.account_id !== transactionDraft.account_id).map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}</select></label>}<label>날짜<input type="date" value={transactionDraft.occurred_at?.slice(0, 10) ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, occurred_at: event.target.value }))} /></label><label>메모<input value={transactionDraft.description ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, description: event.target.value }))} /></label>{editType === "expense" && <label className="edit-checkbox"><input type="checkbox" checked={transactionDraft.exclude_from_budget ?? false} onChange={(event) => setTransactionDraft((current) => ({ ...current, exclude_from_budget: event.target.checked }))} />예산에서 제외</label>}</div>{saveError && <p className="form-error" role="alert">{saveError}</p>}<PrimaryButton disabled={transactionSaving} onClick={() => void saveTransaction()}>{transactionSaving ? "저장 중" : "거래 저장"}</PrimaryButton><TextButton disabled={transactionSaving} onClick={() => setEditingTransaction(false)}>취소</TextButton></section></div>}
-      {confirmDelete && <div className="dialog-backdrop" role="presentation" onMouseDown={() => !deleting && setConfirmDelete(false)}><section className="correction-dialog delete-dialog" role="alertdialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><Trash size={32} /><h2>이 거래를 삭제할까요?</h2><p>월 합계와 예산, 계좌 잔액에서 즉시 제외돼요.</p>{saveError && <p className="form-error" role="alert">{saveError}</p>}<PrimaryButton disabled={deleting} onClick={() => void removeTransaction()}>{deleting ? "삭제 중" : "삭제하기"}</PrimaryButton><TextButton disabled={deleting} onClick={() => setConfirmDelete(false)}>취소</TextButton></section></div>}
+      {editingTransaction && <div className="dialog-backdrop" role="presentation" onMouseDown={() => !transactionSaving && setEditingTransaction(false)}><Dialog className="correction-dialog transaction-edit-dialog" aria-labelledby="transaction-edit-title" busy={transactionSaving} onClose={() => setEditingTransaction(false)} onMouseDown={(event) => event.stopPropagation()}><h2 id="transaction-edit-title">거래 내용 수정</h2><div className="edit-form-grid"><label>유형<select value={editType} onChange={(event) => setTransactionDraft((current) => ({ ...current, transaction_type: event.target.value as TransactionType, category: event.target.value === "income" ? "salary" : event.target.value === "transfer" ? "transfer" : "other", destination_account_id: null }))}><option value="expense">지출</option><option value="income">수입</option><option value="transfer">이체</option></select></label><label>금액<input type="number" min="1" inputMode="numeric" value={transactionDraft.amount_krw ?? 0} onChange={(event) => setTransactionDraft((current) => ({ ...current, amount_krw: Number(event.target.value) || 0 }))} /></label><label>분류<select value={transactionDraft.category ?? "other"} onChange={(event) => setTransactionDraft((current) => ({ ...current, category: event.target.value }))}>{(editType === "income" ? ["salary", "other"] : editType === "transfer" ? ["transfer"] : ["cafe", "food", "transport", "shopping", "housing", "health", "other"]).map((category) => <option key={category} value={category}>{categoryNames[category]}</option>)}</select></label><label>사용처<input value={transactionDraft.merchant ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, merchant: event.target.value }))} /></label><label>계좌<select value={transactionDraft.account_id ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, account_id: event.target.value }))}>{editableAccounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}{account.archived ? " (숨김)" : ""}</option>)}</select></label>{editType === "transfer" && <label>받을 계좌<select value={transactionDraft.destination_account_id ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, destination_account_id: event.target.value || null }))}><option value="">선택</option>{editableAccounts.filter((account) => account.account_id !== transactionDraft.account_id).map((account) => <option key={account.account_id} value={account.account_id}>{account.name}{account.archived ? " (숨김)" : ""}</option>)}</select></label>}<label>날짜<input type="date" value={transactionDraft.occurred_at?.slice(0, 10) ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, occurred_at: event.target.value }))} /></label><label>메모<input value={transactionDraft.description ?? ""} onChange={(event) => setTransactionDraft((current) => ({ ...current, description: event.target.value }))} /></label>{editType === "expense" && <label className="edit-checkbox"><input type="checkbox" checked={transactionDraft.exclude_from_budget ?? false} onChange={(event) => setTransactionDraft((current) => ({ ...current, exclude_from_budget: event.target.checked }))} />예산에서 제외</label>}</div>{saveError && <p className="form-error" role="alert">{saveError}</p>}<PrimaryButton disabled={transactionSaving} onClick={() => void saveTransaction()}>{transactionSaving ? "저장 중" : "거래 저장"}</PrimaryButton><TextButton disabled={transactionSaving} onClick={() => setEditingTransaction(false)}>취소</TextButton></Dialog></div>}
+      {confirmDelete && <div className="dialog-backdrop" role="presentation" onMouseDown={() => !deleting && setConfirmDelete(false)}><Dialog className="correction-dialog delete-dialog" role="alertdialog" busy={deleting} onClose={() => setConfirmDelete(false)} onMouseDown={(event) => event.stopPropagation()}><Trash size={32} /><h2>이 거래를 삭제할까요?</h2><p>월 합계와 예산, 계좌 잔액에서 즉시 제외돼요.</p>{saveError && <p className="form-error" role="alert">{saveError}</p>}<PrimaryButton disabled={deleting} onClick={() => void removeTransaction()}>{deleting ? "삭제 중" : "삭제하기"}</PrimaryButton><TextButton disabled={deleting} onClick={() => setConfirmDelete(false)}>취소</TextButton></Dialog></div>}
       <Link className="sr-only" to={withDemo("/ledger", demo)}>장부로</Link>
     </main>
   );

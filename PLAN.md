@@ -3,14 +3,38 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: Task 8.3 — Korean coaching and reviewed-plan reliability release verification (implementation reviewed; user authorized commit, push, and production deployment on 2026-10-11)
+- Active task: Task 8.4 — Full service QA, usability polish, and single verified release (user authorized iterative fixes, preservation of all features, release, and reusable skill on 2026-10-12)
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
 - Sources of truth: `TECHSPEC.md` for product/backend invariants, `DESIGN.md` for UI/UX decisions
 - Last pre-pivot commit: `64b46ae`
 
-## Task 8.3 — Korean Coaching and Reviewed-plan Reliability Repair
+## Task 8.4 — Full Service QA and Usability Polish
+
+### Goal and authorized scope
+
+Exercise the full existing ledger journey, fix demonstrated bugs and usability defects, retain all features and financial/privacy contracts, and ship one verified final source version to the existing Vercel/Render projects. Use native Codex Goal for continuation; preserve TECHSPEC. Record scenario coverage, iterations, visual evidence, and release identities in `docs/qa/2026-10-12/RESULTS.md`. Create a reusable native service QA improvement skill and save its complete bundle to all user-required destinations.
+
+### Ordered checkpoints
+
+- [x] Establish feature coverage and baseline failures for sign-in/onboarding, home, transaction entry, calendar/list/detail, judgment/reason/reflection/correction/share, plans, reports, and settings.
+- [x] Fix reproducible state, saving, recovery, and navigation issues with meaningful regressions.
+- [x] Polish existing typography, layout, controls, copy, accessibility, and mobile safe areas while retaining the approved warm-paper design and all reachable features.
+- [x] Repeat the complete flow and responsive checks after integration; resolve every discovered required defect and record explicit verification limits.
+- [x] Run full backend/frontend, isolated storage integration, lint/typecheck/build, and independent review.
+- [x] Validate and save the reusable QA skill to Codex/.agents, Mac Skills, and the Wiki using the existing saving contract.
+- [ ] Commit and push one scoped final change, deploy the same revision to existing providers, and verify authenticated production flows.
+
+### Release verification after the source commit
+
+The final checkpoint is intentionally pending at source-commit time. Its authoritative completion evidence (full SHA, provider IDs/status and authenticated smoke) is recorded after deployment in `/Users/dd/.codex/visualizations/2026/09/13/01a09a1a-720c-7b51-bce2-8bb9d40591bf/jangbu-full-qa-2026-10-12/RELEASE.md`. This avoids treating a push as deployment or making a second application-source commit solely to record its own release identity.
+
+### Completion criteria
+
+All scenarios in the QA matrix are passed or explicitly scoped as unavailable without claiming coverage; no unresolved reproducible required bug remains. Final provider deployment source identities match the released commit. Preserve existing accounts, encryption keys, production records, audit history, local-only `.agents/` and `AGENTS.md`, and all functional capabilities. A clean test run proves its tested scenarios, not universal absence of bugs.
+
+## Task 8.3 — Korean Coaching and Reviewed-plan Reliability Repair (Completed)
 
 ### Goal and authorized scope
 
@@ -24,8 +48,8 @@ Repair the defects observed during authenticated web use: English AI prose, stal
 - [x] Bind advice to current aggregate evidence; stale reads use current deterministic guidance without another model call.
 - [x] Reuse the reviewed result through an encrypted, owner-bound, expiring preview token; reject changed evidence and preserve the draft.
 - [x] Show check-in confirmation and distinguish current AI advice from updated calculation-based guidance.
-- [ ] Verify backend, frontend, storage, and real authenticated web scenarios; record evidence.
-- [ ] Perform the authorized scoped commit, push, and release to the existing Render/Vercel projects. Record release evidence in the linked QA artifact.
+- [x] Verify backend, frontend, storage, and real authenticated web scenarios; record evidence.
+- [x] Perform the authorized scoped commit, push, and release to the existing Render/Vercel projects. Record release evidence in the linked QA artifact.
 
 ### Verification and release evidence
 
@@ -34,7 +58,7 @@ Repair the defects observed during authenticated web use: English AI prose, stal
 - Release target: Vercel `upglow/jangbu-ai`, Render `jangbu-api`; no new infrastructure or credential changes.
 - Authenticated production evidence: `/Users/dd/.codex/visualizations/2026/09/13/01a09a1a-720c-7b51-bce2-8bb9d40591bf/jangbu-korean-repair-2026-10-11/RESULTS.md`.
 - Pre-release verification: 161 backend tests passed with an isolated local Redis and no skips; all 83 frontend tests, lint, TypeScript/Vite build, compile checks, and diff checks passed. Independent review approved the final scope.
-- The final two checkpoints are intentionally pending at source-commit time. The linked QA artifact records exact commit/deployment identities and authenticated release outcomes without another source-only bookkeeping commit.
+- Release completed on 2026-10-12: commit `e9dbdcd`, Vercel `dpl_2ZGobrDv5nZxKpjZJFrFKKr8pjLf`, Render `dep-db6ac4142hec73bgmgpg` Live. The linked artifact confirms Korean display, 170,000원 reservation preview, unchanged reviewed/confirmed prose, and successful check-in; baseline financial records were preserved.
 
 ## Task 2.0 - AI Ledger Backend Pivot (Completed)
 

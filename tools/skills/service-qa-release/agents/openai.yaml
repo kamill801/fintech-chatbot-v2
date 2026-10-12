@@ -1,0 +1,7 @@
+interface:
+  display_name: "Service QA Release"
+  short_description: "Repeat QA, fix bugs, and ship one verified release"
+  brand_color: "#0B71D9"
+  default_prompt: "Use $service-qa-release to test this service end to end, fix confirmed issues while preserving features, and prepare one verified release."
+policy:
+  allow_implicit_invocation: true

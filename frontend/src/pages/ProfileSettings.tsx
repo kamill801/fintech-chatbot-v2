@@ -39,7 +39,7 @@ export function ProfileSettingsPage({ section }: { section: "budget" | "goal" })
     setSaving(true);
     try {
       await saveProfile({ ...draft, goal: { ...draft.goal, name: draft.goal.name.trim() } });
-      navigate(withDemo("/settings", demo));
+      navigate(withDemo("/settings", demo), { replace: true });
     } catch {
       setError("변경 내용을 저장하지 못했어요. 입력값을 확인하고 다시 시도해 주세요.");
     } finally {

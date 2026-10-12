@@ -2,7 +2,7 @@ import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { CurrencyInput, ModePill, Toggle, TransactionRow } from "./components";
+import { CurrencyInput, Dialog, ModePill, Toggle, TransactionRow } from "./components";
 import { demoTransactions } from "./demo";
 
 function CurrencyHarness() {
@@ -67,6 +67,37 @@ describe("shared UI", () => {
     await user.click(screen.getByRole("button", { name: "기록하기" }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("contains keyboard focus, closes on Escape and restores the opener", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return <><button onClick={() => setOpen(true)}>수정 열기</button>{open &&
+        <Dialog aria-label="수정" onClose={() => setOpen(false)}>
+          <input aria-label="이름" /><button onClick={() => setOpen(false)}>취소</button>
+        </Dialog>}</>;
+    }
+    render(<Harness />);
+    const opener = screen.getByRole("button", { name: "수정 열기" });
+    await user.click(opener);
+    expect(screen.getByRole("dialog", { name: "수정" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByLabelText("이름")).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "취소" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByLabelText("이름")).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+
+  it("does not dismiss a dialog while a save is in progress", async () => {
+    const onClose = vi.fn();
+    render(<Dialog aria-label="저장" busy onClose={onClose}><button disabled>저장 중</button></Dialog>);
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
   });
 
 });

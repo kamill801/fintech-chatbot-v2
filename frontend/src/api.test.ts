@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({ getAccessToken: vi.fn() }));
 vi.mock("./auth-client", () => auth);
@@ -7,6 +7,7 @@ import { ledgerApi } from "./api";
 
 describe("production API client", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     auth.getAccessToken.mockReset();
     auth.getAccessToken.mockResolvedValue("verified-session-token");
     vi.stubGlobal(
@@ -18,6 +19,10 @@ describe("production API client", () => {
         ),
       ),
     );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("sends the Supabase bearer token without a development identity header", async () => {
@@ -63,6 +68,89 @@ describe("production API client", () => {
 
     const [, init] = vi.mocked(fetch).mock.calls[0];
     expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("manual-op-1");
+  });
+
+  it("aborts a request that never returns instead of leaving the UI busy forever", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockImplementationOnce((_url, init) => {
+      const signal = init?.signal as AbortSignal;
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    });
+
+    const request = ledgerApi.profile();
+    let rejected = false;
+    const failure = request.catch((error) => {
+      rejected = true;
+      return error;
+    });
+
+    await vi.advanceTimersByTimeAsync(89_999);
+    await Promise.resolve();
+    expect(rejected).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(failure).resolves.toMatchObject({
+      code: "request_timeout",
+      message: "요청 시간이 오래 걸려요. 잠시 후 다시 시도해 주세요.",
+      status: 0,
+    });
+  });
+
+  it("aborts a response body that never finishes loading", async () => {
+    vi.useFakeTimers();
+    const text = vi.fn(() => new Promise<string>(() => undefined));
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      text,
+    } as unknown as Response);
+
+    const request = ledgerApi.profile();
+    const failure = request.catch((error) => error);
+
+    await vi.advanceTimersByTimeAsync(90_000);
+
+    await expect(failure).resolves.toMatchObject({
+      code: "request_timeout",
+      message: "요청 시간이 오래 걸려요. 잠시 후 다시 시도해 주세요.",
+      status: 0,
+    });
+    expect(text).toHaveBeenCalledTimes(1);
+  });
+
+  it("cleans up the timeout after a successful response", async () => {
+    vi.useFakeTimers();
+    let capturedSignal: AbortSignal | undefined;
+    vi.mocked(fetch).mockImplementationOnce((_url, init) => {
+      capturedSignal = init?.signal as AbortSignal;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ data: { profile: null }, meta: { correlation_id: "test" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    });
+
+    await ledgerApi.profile();
+    expect(capturedSignal).toBeDefined();
+    const signal = capturedSignal as AbortSignal;
+    expect(signal.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(signal.aborted).toBe(false);
+  });
+
+  it("keeps ordinary network failures distinct from request timeouts", async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    await expect(ledgerApi.profile()).rejects.toMatchObject({
+      code: "offline",
+      message: "네트워크에 연결할 수 없어요.",
+      status: 0,
+    });
   });
 
   it("records a completed share through the dedicated success endpoint", async () => {

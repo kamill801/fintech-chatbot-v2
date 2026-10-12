@@ -23,6 +23,13 @@ interface RouterState extends LocationState {
   navigate(to: string | number, options?: { replace?: boolean }): void;
 }
 
+const ROUTER_STATE_KEY = "jangbu_router_index";
+
+function navigationIndex(): number {
+  const index = window.history.state?.[ROUTER_STATE_KEY];
+  return Number.isSafeInteger(index) && index >= 0 ? index : 0;
+}
+
 const RouterContext = createContext<RouterState | null>(null);
 const ParamsContext = createContext<Record<string, string>>({});
 
@@ -38,6 +45,7 @@ export function BrowserRouter({ children }: { children: ReactNode }) {
   const [location, setLocation] = useState(currentLocation);
 
   useEffect(() => {
+    window.history.replaceState({ ...window.history.state, [ROUTER_STATE_KEY]: navigationIndex() }, "");
     const syncLocation = () => setLocation(currentLocation());
     window.addEventListener("popstate", syncLocation);
     return () => window.removeEventListener("popstate", syncLocation);
@@ -47,12 +55,20 @@ export function BrowserRouter({ children }: { children: ReactNode }) {
     ...location,
     navigate(to, options) {
       if (typeof to === "number") {
+        if (to < 0 && navigationIndex() + to < 0) {
+          const fallback = new URLSearchParams(window.location.search).get("demo") === "1" ? "/?demo=1" : "/";
+          window.history.replaceState({ [ROUTER_STATE_KEY]: 0 }, "", fallback);
+          setLocation(currentLocation());
+          window.scrollTo({ top: 0, behavior: "auto" });
+          return;
+        }
         window.history.go(to);
         return;
       }
       const target = new URL(to, window.location.href);
       const next = `${target.pathname}${target.search}${target.hash}`;
-      window.history[options?.replace ? "replaceState" : "pushState"]({}, "", next);
+      const index = navigationIndex() + (options?.replace ? 0 : 1);
+      window.history[options?.replace ? "replaceState" : "pushState"]({ [ROUTER_STATE_KEY]: index }, "", next);
       setLocation(currentLocation());
       window.scrollTo({ top: 0, behavior: "auto" });
     },
@@ -142,8 +158,13 @@ function matchRoute(pattern: string, pathname: string): Record<string, string> |
   for (let index = 0; index < patternParts.length; index += 1) {
     const expected = patternParts[index];
     const actual = pathParts[index];
-    if (expected.startsWith(":")) params[expected.slice(1)] = decodeURIComponent(actual);
-    else if (expected !== actual) return null;
+    if (expected.startsWith(":")) {
+      try {
+        params[expected.slice(1)] = decodeURIComponent(actual);
+      } catch {
+        return null;
+      }
+    } else if (expected !== actual) return null;
   }
   return params;
 }

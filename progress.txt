@@ -313,3 +313,22 @@ Why: 실제 일주일치 예시 사용에서 영어 설명, 오래된 설명과 
 Next: 사용자 승인에 따라 이 변경을 한 번의 scoped commit으로 main에 push하고 기존 Vercel upglow/jangbu-ai와 Render jangbu-api에 배포한다. 배포 SHA와 인증된 운영 회귀 검증 결과는 /Users/dd/.codex/visualizations/2026/09/13/01a09a1a-720c-7b51-bce2-8bb9d40591bf/jangbu-korean-repair-2026-10-11/RESULTS.md에 기록한다. 소스 커밋 시점에는 실제 배포/E2E를 완료로 표시하지 않는다.
 Issues: 임시 로컬 Redis를 포함한 백엔드 161개 테스트(스킵 없음), 프런트엔드 83개 테스트, lint, TypeScript/Vite build, Python compile, diff check가 통과했고 독립 코드 검토가 승인됐다. Render 로그인 세션이 만료되어 기존 서비스 소유 계정을 확인하는 질문이 대기 중이다. 자동 승인 검토가 소유 계정이 확인되지 않은 Google 계정 선택을 거절해 다른 계정으로 우회하지 않았다. TECHSPEC, 환경변수, 공급자 프로젝트, .agents/와 AGENTS.md는 변경 범위에서 제외한다.
 ---
+
+[2026-10-12 19:53] [Phase 8 / Task 8.4] (full service QA and polish; verified source ready, release follows this commit)
+What: 전체 기존 흐름과 320/390/414/1440px 화면을 점검하고, 종료된 계획의 다음 기간 동선, 앱 안 뒤로가기, 설정 저장 후 이전 폼 재등장, 거래 수정 결과를 오래된 조회가 덮는 문제, 숨긴 계좌의 기존 거래 수정 실패, 응답 본문 타임아웃을 수정했다. 시스템 글꼴·읽기 크기·44px 터치 영역·모달 포커스·안전 영역·큰 금액 폼을 다듬고 데모 데이터를 명확히 표시했다. 기존 기능/기록/감사 이력/공급자/계산/TECHSPEC을 보존했다. service-qa-release 스킬을 Codex/.agents/Mac Skills/Wiki에 저장·검증하고 Wiki index/doctor를 수행했다.
+Why: 사용자가 기능을 유지하면서 반복 테스트·수정, 최종 한 번의 커밋/푸시/배포와 재사용 스킬 저장을 요청했다. Native Goal은 지속 실행을 추적하고 검증 행렬이 실제 증거를 제공한다.
+Next: 한 번의 scoped source commit/push 후 기존 Vercel upglow/jangbu-ai와 Render jangbu-api에 같은 SHA를 배포한다. 배포 상태와 인증된 운영 회귀 증거는 /Users/dd/.codex/visualizations/2026/09/13/01a09a1a-720c-7b51-bce2-8bb9d40591bf/jangbu-full-qa-2026-10-12/RELEASE.md에 기록한다. 커밋 시점에 배포를 완료로 표시하지 않는다.
+Issues: 백엔드 162개(격리 Redis, 스킵 없음), 프런트엔드 101개/16파일, lint/TypeScript/Vite/Python compile/diff 통과; 독립 검토 APPROVE(블로커 0). 8경로×4폭 수평 넘침 없음. 실기기 WKWebView는 이번 직접 확인 범위 밖이다. CSV UI 건수·성공 확인, 다운로드 이벤트 파일 획득은 도구 한계로 미확인. .agents/와 AGENTS.md는 기존 로컬 전용으로 제외. 비밀값은 기록하지 않았다.
+---
+
+[2026-10-12] [Phase 8 / Task 8.4] (USER PAUSED before push/deploy)
+What: 사용자 요청으로 즉시 중단했다. 검증 완료 소스는 cb739a2967aed9b846a05fe50e670d4f74432c4d로 로컬 커밋만 완료. origin/main은 e9dbdcd이며 Task8.4 푸시/배포는 수행하지 않았다. 모든 하위 에이전트와 테스트는 완료 상태이다.
+Next: 사용자가 재개를 요청하면 docs/qa/2026-10-12/RESUME.md와 같은 이름의 외부 proof 문서를 먼저 읽고 Git/계정 상태를 확인한 뒤, 기존 Vercel/Render에 최종 SHA를 푸시·배포하고 인증된 smoke를 수행한다. 중단 기록은 커밋 후에 작성해 미커밋 상태로 남겼다. Native Goal은 paused이며 사용자 재개 요청 전에는 작업을 계속하지 않는다.
+Issues: 새 배포나 운영 금융 변경 없음. 실기기/CSV 다운로드 파일 획득은 미확인 범위를 유지한다. 재개에 필요한 전체 대상·SHA·검증 결과·순서·런타임/브라우저 정보는 RESUME.md에 기록했다.
+---
+
+[2026-10-14] [Phase 8 / Task 8.4] (USER RESUMED; unchanged application source ready for final release)
+What: 사용자의 재개 요청으로 중단을 해제했다. 앱 코드는 검증된 cb739a2와 동일하며 원격 main은 아직 e9dbdcd이다. 중단/재개 기록만 기존 미푸시 커밋에 포함해 최종 소스 한 번의 커밋을 유지한다. 로컬 RESUME.md는 재개용 문서로 남기며 외부 업로드 범위에 포함하지 않는다.
+Next: 최종 HEAD를 일반 push하고 기존 Vercel/Render에 같은 SHA를 배포한다. 실제 운영 검증과 배포 ID는 외부 RELEASE.md에 기록하며, 실제 iPhone 검증을 완료로 추정하지 않는다.
+Issues: 재개 때 앱 변경이나 원격 분기 없음. 기존 로그인/서비스 대상을 확인했고 새 계정·인프라·유료 API·비밀값 변경은 하지 않는다.
+---

@@ -92,28 +92,113 @@ function errorMessage(error: unknown): string {
   return "잠시 후 다시 시도해 주세요.";
 }
 
-function previewDemoPlan(draft: PlanDraft): SpendingPlanState {
-  const reserved = draft.planned_expenses.reduce((sum, item) => sum + item.amount_krw, 0);
+function transactionDateKey(transaction: Transaction): string {
+  const date = new Date(transaction.occurred_at);
+  if (Number.isNaN(date.getTime())) return transaction.occurred_at.slice(0, 10);
+  const koreaTime = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return `${koreaTime.getUTCFullYear()}-${String(koreaTime.getUTCMonth() + 1).padStart(2, "0")}-${String(koreaTime.getUTCDate()).padStart(2, "0")}`;
+}
+
+function demoPlanBudgetAmount(transaction: Transaction, currentPlan: SpendingPlanState): number {
+  if (transaction.transaction_type !== "expense" || transaction.exclude_from_budget) return 0;
+  const occurred = transactionDateKey(transaction);
+  return occurred >= currentPlan.plan.period_start && occurred <= currentPlan.plan.period_end ? transaction.amount_krw : 0;
+}
+
+function applyDemoPlanDelta(currentPlan: SpendingPlanState, delta: number): SpendingPlanState {
+  if (delta === 0) return currentPlan;
+  const actualSpent = currentPlan.progress.actual_spent_krw + delta;
+  const totalRemaining = currentPlan.progress.total_remaining_krw - delta;
+  const flexibleRemaining = currentPlan.progress.flexible_remaining_krw - delta;
   return {
-    ...demoPlanState,
+    ...currentPlan,
+    progress: {
+      ...currentPlan.progress,
+      actual_spent_krw: actualSpent,
+      total_remaining_krw: totalRemaining,
+      flexible_remaining_krw: flexibleRemaining,
+      shortfall_krw: Math.max(0, -flexibleRemaining),
+    },
+  };
+}
+
+function demoPlanImpact(transaction: Transaction, currentPlan: SpendingPlanState, delta: number): PlanImpact {
+  const next = applyDemoPlanDelta(currentPlan, delta);
+  return {
+    transaction_id: transaction.transaction_id,
+    amount_krw: Math.abs(delta),
+    total_remaining_krw: next.progress.total_remaining_krw,
+    reserved_remaining_krw: next.progress.reserved_remaining_krw,
+    flexible_remaining_krw: next.progress.flexible_remaining_krw,
+    shortfall_krw: next.progress.shortfall_krw,
+    message: next.progress.flexible_remaining_krw < 0 ? `계획상 생활비가 ${Math.abs(next.progress.flexible_remaining_krw).toLocaleString("ko-KR")}원 부족해졌어요.` : `계획상 쓸 수 있는 생활비가 ${next.progress.flexible_remaining_krw.toLocaleString("ko-KR")}원 남았어요.`,
+  };
+}
+
+function demoActualSpentForPeriod(items: Transaction[], startDate: string, endDate: string): number {
+  return items
+    .filter((item) => item.transaction_type === "expense" && !item.exclude_from_budget)
+    .filter((item) => {
+      const occurred = transactionDateKey(item);
+      return occurred >= startDate && occurred <= endDate;
+    })
+    .reduce((sum, item) => sum + item.amount_krw, 0);
+}
+
+function previewDemoPlan(
+  draft: PlanDraft,
+  options: { basePlan?: SpendingPlanState | null; transactions?: Transaction[] } = {},
+): SpendingPlanState {
+  const basePlan = options.basePlan ?? null;
+  const samePeriod = Boolean(basePlan && draft.period_start === basePlan.plan.period_start && draft.period_end === basePlan.plan.period_end);
+  const basePlannedExpenses = new Map((basePlan?.plan.planned_expenses ?? []).map((item) => [item.planned_expense_id, item]));
+  const plannedExpenses = draft.planned_expenses.map((item, index) => {
+    const planned_expense_id = item.planned_expense_id ?? `planned-${index + 1}`;
+    const previous = basePlannedExpenses.get(planned_expense_id);
+    return {
+      ...item,
+      planned_expense_id,
+      matched_transaction_id: previous?.matched_transaction_id ?? null,
+      matched_at: previous?.matched_at ?? null,
+    };
+  });
+  const reserved = plannedExpenses.reduce((sum, item) => item.matched_transaction_id ? sum : sum + item.amount_krw, 0);
+  const actualSpent = samePeriod && basePlan
+    ? basePlan.progress.actual_spent_krw
+    : demoActualSpentForPeriod(options.transactions ?? demoTransactions, draft.period_start, draft.period_end);
+  const totalRemaining = draft.confirmed_budget_krw - actualSpent;
+  const flexibleRemaining = totalRemaining - reserved;
+  const base = basePlan ?? demoPlanState;
+  const allocations = samePeriod
+    ? base.plan.allocations
+    : [{ allocation_id: "segment-demo", label: "선택 기간", start_date: draft.period_start, end_date: draft.period_end, amount_krw: draft.confirmed_budget_krw }];
+  const segments = samePeriod && basePlan
+    ? basePlan.progress.segments
+    : allocations.map((allocation) => ({ ...allocation, actual_spent_krw: actualSpent, reserved_remaining_krw: reserved, total_remaining_krw: totalRemaining, flexible_remaining_krw: flexibleRemaining }));
+  return {
+    ...base,
     preview: true,
     plan: {
-      ...demoPlanState.plan,
+      ...base.plan,
       period_start: draft.period_start,
       period_end: draft.period_end,
       confirmed_budget_krw: draft.confirmed_budget_krw,
+      allocations,
       priorities: draft.priorities.map((item, index) => typeof item === "string" ? { priority_id: `priority-${index + 1}`, name: item, rank: index + 1 } : item),
-      planned_expenses: draft.planned_expenses.map((item, index) => ({ ...item, planned_expense_id: item.planned_expense_id ?? `planned-${index + 1}`, matched_transaction_id: null, matched_at: null })),
+      planned_expenses: plannedExpenses,
     },
     progress: {
-      ...demoPlanState.progress,
+      ...base.progress,
       period_start: draft.period_start,
       period_end: draft.period_end,
       confirmed_budget_krw: draft.confirmed_budget_krw,
+      actual_spent_krw: actualSpent,
       reserved_remaining_krw: reserved,
-      total_remaining_krw: draft.confirmed_budget_krw,
-      flexible_remaining_krw: draft.confirmed_budget_krw - reserved,
-      shortfall_krw: Math.max(0, reserved - draft.confirmed_budget_krw),
+      total_remaining_krw: totalRemaining,
+      flexible_remaining_krw: flexibleRemaining,
+      shortfall_krw: Math.max(0, -flexibleRemaining),
+      segments,
+      current_segment_id: samePeriod ? base.progress.current_segment_id : allocations[0]?.allocation_id ?? null,
     },
   };
 }
@@ -241,20 +326,15 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           };
           transactionRevision.current += 1;
           setTransactions((items) => [transaction, ...items]);
-          if (transactionType === "expense" && plan && !transaction.exclude_from_budget) {
-            const totalRemaining = plan.progress.total_remaining_krw - transaction.amount_krw;
-            const flexibleRemaining = plan.progress.flexible_remaining_krw - transaction.amount_krw;
-            const impact = {
-              transaction_id: transaction.transaction_id,
-              amount_krw: transaction.amount_krw,
-              total_remaining_krw: totalRemaining,
-              reserved_remaining_krw: plan.progress.reserved_remaining_krw,
-              flexible_remaining_krw: flexibleRemaining,
-              shortfall_krw: Math.max(0, -flexibleRemaining),
-              message: flexibleRemaining < 0 ? `계획상 생활비가 ${Math.abs(flexibleRemaining).toLocaleString("ko-KR")}원 부족해졌어요.` : `계획상 쓸 수 있는 생활비가 ${flexibleRemaining.toLocaleString("ko-KR")}원 남았어요.`,
-            };
-            setLatestPlanImpact(impact);
-            setPlan({ ...plan, progress: { ...plan.progress, actual_spent_krw: plan.progress.actual_spent_krw + transaction.amount_krw, total_remaining_krw: totalRemaining, flexible_remaining_krw: flexibleRemaining, shortfall_krw: impact.shortfall_krw } });
+          if (transactionType === "expense" && plan) {
+            const delta = demoPlanBudgetAmount(transaction, plan);
+            if (delta !== 0) {
+              const impact = demoPlanImpact(transaction, plan, delta);
+              setLatestPlanImpact(impact);
+              setPlan(applyDemoPlanDelta(plan, delta));
+            } else {
+              setLatestPlanImpact(null);
+            }
           }
           if (transactionType !== "expense") return { transaction };
           return needsReason
@@ -284,6 +364,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           };
           transactionRevision.current += 1;
           setTransactions((items) => items.map((item) => (item.transaction_id === id ? updated : item)));
+          if (plan) {
+            const delta = demoPlanBudgetAmount(updated, plan) - demoPlanBudgetAmount(current, plan);
+            if (delta !== 0) {
+              const impact = demoPlanImpact(updated, plan, delta);
+              setLatestPlanImpact(impact);
+              setPlan(applyDemoPlanDelta(plan, delta));
+            }
+          }
           return { transaction: updated, judgment: updated.transaction_type === "expense" ? demoJudgment(settings.roast_enabled) : undefined };
         }
         const result = await ledgerApi.updateTransaction(id, draft);
@@ -293,9 +381,17 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         return result;
       },
       async deleteTransaction(id) {
+        const current = transactions.find((item) => item.transaction_id === id);
         if (!demo) await ledgerApi.deleteTransaction(id);
         transactionRevision.current += 1;
         setTransactions((items) => items.filter((item) => item.transaction_id !== id));
+        if (demo && plan && current) {
+          const delta = -demoPlanBudgetAmount(current, plan);
+          if (delta !== 0) {
+            setLatestPlanImpact(null);
+            setPlan(applyDemoPlanDelta(plan, delta));
+          }
+        }
         if (!demo) await refreshDerived();
       },
       async answerReason(id, reason) {
@@ -368,10 +464,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         setProfileLoadError(null);
       },
       async previewPlan(draft) {
-        return demo ? previewDemoPlan(draft) : ledgerApi.previewPlan(draft);
+        return demo ? previewDemoPlan(draft, { transactions }) : ledgerApi.previewPlan(draft);
       },
       async activatePlan(draft, previewToken) {
-        const next = demo ? { ...previewDemoPlan(draft), preview: false } : await ledgerApi.activatePlan(draft, previewToken);
+        const next = demo ? { ...previewDemoPlan(draft, { transactions }), preview: false } : await ledgerApi.activatePlan(draft, previewToken);
         setPlan(next);
         return next;
       },
@@ -381,7 +477,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           const response = await ledgerApi.previewPlanRevision(draft, plan.plan.version, reason);
           return { ...response.revision_preview, preview_token: response.preview_token };
         }
-        const preview = previewDemoPlan(draft);
+        const preview = previewDemoPlan(draft, { basePlan: plan, transactions });
         return {
           from_version: plan.plan.version,
           to_version: plan.plan.version + 1,
@@ -397,8 +493,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       },
       async applyPlanRevision(draft, reason, previewToken) {
         if (!plan) throw new Error("plan required");
+        const demoRevision = demo ? previewDemoPlan(draft, { basePlan: plan, transactions }) : null;
         const next = demo
-          ? { ...previewDemoPlan(draft), preview: false, plan: { ...previewDemoPlan(draft).plan, version: plan.plan.version + 1 } }
+          ? { ...demoRevision!, preview: false, plan: { ...demoRevision!.plan, version: plan.plan.version + 1 } }
           : await ledgerApi.applyPlanRevision(draft, plan.plan.version, reason, previewToken);
         setPlan(next);
         return next;

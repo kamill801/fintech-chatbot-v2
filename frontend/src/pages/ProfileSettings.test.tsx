@@ -31,6 +31,36 @@ describe("profile settings editing", () => {
     expect(window.location.pathname).toBe("/settings");
   });
 
+  it("replaces edit history after saving budget and goal changes", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/settings");
+    window.history.pushState({}, "", "/settings/budget");
+    render(<BrowserRouter><ProfileSettingsPage section="budget" /></BrowserRouter>);
+
+    const budget = screen.getByRole("textbox", { name: "생활비 예산" });
+    await user.clear(budget);
+    await user.type(budget, "700000");
+    await user.click(screen.getByRole("button", { name: "변경사항 저장" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/settings"));
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).not.toBe("/settings/budget"));
+    expect(window.location.pathname).toBe("/settings");
+    cleanup();
+
+    window.history.replaceState({}, "", "/settings");
+    window.history.pushState({}, "", "/settings/goal");
+    render(<BrowserRouter><ProfileSettingsPage section="goal" /></BrowserRouter>);
+    await user.clear(screen.getByDisplayValue(demoProfile.goal.name));
+    await user.type(screen.getByLabelText("목표 이름"), "새 목표");
+    await user.click(screen.getByRole("button", { name: "변경사항 저장" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/settings"));
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).not.toBe("/settings/goal"));
+    expect(window.location.pathname).toBe("/settings");
+  });
+
   it("keeps the existing goal when editing the budget and shows a shortage", () => {
     mocks.useLedger.mockReturnValue({ demo: false, profile: { ...demoProfile, monthly_income_krw: 1 }, saveProfile: mocks.saveProfile });
     render(<BrowserRouter><ProfileSettingsPage section="budget" /></BrowserRouter>);

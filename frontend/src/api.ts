@@ -41,13 +41,96 @@ export class ApiError extends Error {
 }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL?.trim() ?? "").replace(/\/+$/, "");
+const REQUEST_TIMEOUT_MS = 90_000;
 
 export function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
-async function parseResponse<T>(response: Response): Promise<(Envelope<T> & ApiFailure) | null> {
-  const text = await response.text();
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("The request was aborted.", "AbortError");
+}
+
+function readTextWithAbort(response: Response, signal: AbortSignal): Promise<string> {
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      reject(abortReason(signal));
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    response.text().then(
+      (text) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        resolve(text);
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+function createRequestSignal(externalSignal?: AbortSignal): {
+  signal: AbortSignal;
+  cleanup: () => void;
+  didTimeout: () => boolean;
+  didCancel: () => boolean;
+} {
+  const controller = new AbortController();
+  let timedOut = false;
+  let cancelled = false;
+  const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new DOMException("Request timed out.", "TimeoutError"));
+  }, REQUEST_TIMEOUT_MS);
+
+  const onExternalAbort = () => {
+    if (controller.signal.aborted) return;
+    cancelled = true;
+    controller.abort(abortReason(externalSignal as AbortSignal));
+  };
+
+  if (externalSignal?.aborted) {
+    onExternalAbort();
+  } else {
+    externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      externalSignal?.removeEventListener("abort", onExternalAbort);
+    },
+    didTimeout: () => timedOut,
+    didCancel: () => cancelled,
+  };
+}
+
+function connectionError(error: unknown, requestSignal: ReturnType<typeof createRequestSignal>): ApiError {
+  if (requestSignal.didTimeout()) {
+    return new ApiError("request_timeout", "요청 시간이 오래 걸려요. 잠시 후 다시 시도해 주세요.", 0);
+  }
+  if (requestSignal.didCancel()) {
+    return new ApiError("request_cancelled", "요청이 취소됐어요.", 0);
+  }
+  if (error instanceof ApiError) return error;
+  return new ApiError("offline", "네트워크에 연결할 수 없어요.", 0);
+}
+
+async function parseResponse<T>(response: Response, signal: AbortSignal): Promise<(Envelope<T> & ApiFailure) | null> {
+  const text = await readTextWithAbort(response, signal);
   if (!text.trim()) return null;
   try {
     return JSON.parse(text) as Envelope<T> & ApiFailure;
@@ -57,7 +140,7 @@ async function parseResponse<T>(response: Response): Promise<(Envelope<T> & ApiF
 }
 
 async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
-  const { idempotencyKey, ...requestInit } = init;
+  const { idempotencyKey, signal: externalSignal, ...requestInit } = init;
   const headers = new Headers(requestInit.headers);
   headers.set("Accept", "application/json");
   const accessToken = await getAccessToken();
@@ -70,27 +153,29 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
     headers.set("Idempotency-Key", idempotencyKey ?? createClientId());
   }
 
-  let response: Response;
+  const requestSignal = createRequestSignal(externalSignal ?? undefined);
   try {
-    response = await fetch(apiUrl(path), { ...requestInit, headers });
-  } catch {
-    throw new ApiError("offline", "네트워크에 연결할 수 없어요.", 0);
-  }
-  if (response.status === 204) return undefined as T;
+    const response = await fetch(apiUrl(path), { ...requestInit, headers, signal: requestSignal.signal });
+    if (response.status === 204) return undefined as T;
 
-  const payload = await parseResponse<T>(response);
-  if (!response.ok) {
-    throw new ApiError(
-      payload?.error?.code ?? "request_failed",
-      payload?.error?.message ?? "요청을 처리하지 못했어요.",
-      response.status,
-      payload?.meta?.correlation_id ?? response.headers.get("X-Correlation-Id"),
-    );
+    const payload = await parseResponse<T>(response, requestSignal.signal);
+    if (!response.ok) {
+      throw new ApiError(
+        payload?.error?.code ?? "request_failed",
+        payload?.error?.message ?? "요청을 처리하지 못했어요.",
+        response.status,
+        payload?.meta?.correlation_id ?? response.headers.get("X-Correlation-Id"),
+      );
+    }
+    if (!payload?.data) {
+      throw new ApiError("invalid_response", "서버 응답을 읽지 못했어요.", response.status, response.headers.get("X-Correlation-Id"));
+    }
+    return payload.data;
+  } catch (error) {
+    throw connectionError(error, requestSignal);
+  } finally {
+    requestSignal.cleanup();
   }
-  if (!payload?.data) {
-    throw new ApiError("invalid_response", "서버 응답을 읽지 못했어요.", response.status, response.headers.get("X-Correlation-Id"));
-  }
-  return payload.data;
 }
 
 export const ledgerApi = {
