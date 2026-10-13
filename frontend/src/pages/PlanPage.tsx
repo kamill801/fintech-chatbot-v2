@@ -248,6 +248,7 @@ export function PlanPage() {
     (plan && initialStoredFlowMode === "next")
   );
   const [flowMode, setFlowMode] = useState<PlanFlowMode>(() => canResumeStoredDraft ? initialStoredFlowMode! : plan ? "view" : "create");
+  const [suspendedFlowMode, setSuspendedFlowMode] = useState<"revise" | "next" | null>(null);
   const editing = flowMode === "revise";
   const [step, setStep] = useState(() => canResumeStoredDraft ? Math.min(Math.max(storedPlanDraft.step, 1), 2) : 1);
   const [draft, setDraft] = useState<PlanDraft>(() => canResumeStoredDraft ? storedPlanDraft.draft : initialDraft(plan, profile?.discretionary_budget_krw ?? 0));
@@ -298,6 +299,7 @@ export function PlanPage() {
   }, [baseVersion, draft, editing, expenseDraft, flowMode, plan, priorityText, reason, step, storageKey]);
 
   function startEdit() {
+    setSuspendedFlowMode(null);
     const stored = readStoredPlanDraft(storageKey);
     const resumable = stored?.editing && stored.baseVersion === plan?.plan.version;
     setDraft(resumable ? stored.draft : initialDraft(plan, profile?.discretionary_budget_krw ?? 0));
@@ -315,6 +317,7 @@ export function PlanPage() {
 
   function startNextPeriodPlan() {
     if (!plan) return;
+    setSuspendedFlowMode(null);
     const nextStart = addDateDays(plan.plan.period_end, 1);
     const nextEnd = addDateDays(nextStart, 6);
     setDraft({
@@ -335,6 +338,24 @@ export function PlanPage() {
     setPreviewToken(null);
     setCheckInStatus(null);
     setError(null);
+  }
+
+  function showSavedPlan() {
+    if (saving || (flowMode !== "revise" && flowMode !== "next")) return;
+    setSuspendedFlowMode(flowMode);
+    setFlowMode("view");
+    setPreview(null);
+    setRevisionPreview(null);
+    setPreviewFingerprint(null);
+    setPreviewToken(null);
+    setError(null);
+  }
+
+  function resumeDraft() {
+    if (!suspendedFlowMode) return;
+    setFlowMode(suspendedFlowMode);
+    setSuspendedFlowMode(null);
+    setStep(Math.min(step, 2));
   }
 
   function validateStepOne(current: PlanDraft): string | null {
@@ -485,6 +506,7 @@ export function PlanPage() {
       setPreviewFingerprint(null);
       setPreviewToken(null);
       clearStoredPlanDraft(storageKey);
+      setSuspendedFlowMode(null);
     } catch (nextError) {
       if (isPreviewRecoveryError(nextError)) {
         setPreview(null);
@@ -512,6 +534,7 @@ export function PlanPage() {
       <AppShell active="/plan">
         <div className="screen plan-screen">
           <header className="plan-header"><div><span>{planStatusLabel(plan)} · v{plan.plan.version}</span><h1>{plan.plan.period_start} ~ {plan.plan.period_end}</h1></div><button type="button" onClick={startEdit}><PencilSimple size={20} /> 계획 수정</button></header>
+          {suspendedFlowMode && <TextButton onClick={resumeDraft}>작성 중인 계획 이어하기</TextButton>}
           {syncWarning && <p className="ledger-sync-warning" role="status">{syncWarning}</p>}
           <ProgressCards state={plan} />
           <Surface className="plan-coach"><Target size={28} /><div><span>계획 코치</span><h2>{plan.narrative.headline}</h2><p>{plan.narrative.explanation}</p><strong>{plan.narrative.next_action}</strong><small>{syncWarning ? "요약 갱신 전 금액과 조언이에요." : `${narrativeStatusText(plan.narrative.display_reason)} 금액은 최신 장부 기준이에요.`}</small></div></Surface>
@@ -529,7 +552,7 @@ export function PlanPage() {
   return (
     <AppShell active="/plan">
       <div className="screen plan-screen plan-setup">
-        <header><span>생활비 계획 {step}/3</span><h1>{setupHeading(flowMode)}</h1></header>
+        <header><span>생활비 계획 {step}/3</span><h1>{setupHeading(flowMode)}</h1>{plan && <TextButton disabled={saving} onClick={showSavedPlan}>기존 계획 보기</TextButton>}</header>
         <div className="setup-progress" aria-label={`계획 설정 ${step}단계`}><span style={{ width: `${step * 33.333}%` }} /></div>
         {step === 1 && <Surface className="plan-form"><label>시작일<input type="date" value={draft.period_start} onChange={(event) => setDraft({ ...draft, period_start: event.target.value })} /></label><label>종료일<input type="date" value={draft.period_end} onChange={(event) => setDraft({ ...draft, period_end: event.target.value })} /></label><label>직접 확인한 생활비 예산<CurrencyInput ariaLabel="확정 생활비 예산" minimum={1} value={draft.confirmed_budget_krw} onChange={(confirmed_budget_krw) => setDraft({ ...draft, confirmed_budget_krw })} /></label><InfoCallout>예정 지출을 포함해 이번 기간에 쓸 생활비를 입력해 주세요.</InfoCallout>{error && <p className="form-error" role="alert">{error}</p>}<PrimaryButton onClick={continueFromPeriod} disabled={!draft.period_start || !draft.period_end || draft.confirmed_budget_krw < 1}>다음</PrimaryButton></Surface>}
         {step === 2 && <Surface className="plan-form"><label>우선순위 최대 3개<textarea value={priorityText} onChange={(event) => setPriorityText(event.target.value)} placeholder={"친구와의 약속\n건강"} /></label><h2>예정 지출 예약</h2>{draft.planned_expenses.length > 0 && <div className="planned-expense-editor">{draft.planned_expenses.map((expense, index) => <fieldset key={expense.planned_expense_id ?? `draft-${index}`}><legend>예정 지출 {index + 1}</legend><label>이름<input value={expense.name} onChange={(event) => updatePlannedExpense(index, { name: event.target.value })} /></label><label>금액<CurrencyInput ariaLabel={`예정 지출 ${index + 1} 금액`} value={expense.amount_krw} onChange={(amount_krw) => updatePlannedExpense(index, { amount_krw })} /></label><label>예정일<input type="date" value={expense.due_date} min={draft.period_start} max={draft.period_end} onChange={(event) => updatePlannedExpense(index, { due_date: event.target.value })} /></label><label>분류<select value={expense.category} onChange={(event) => updatePlannedExpense(index, { category: event.target.value })}>{["food", "cafe", "transport", "shopping", "housing", "health", "other"].map((category) => <option key={category} value={category}>{categoryNames[category]}</option>)}</select></label><button type="button" className="remove-planned-expense" onClick={() => setDraft((current) => ({ ...current, planned_expenses: current.planned_expenses.filter((_, itemIndex) => itemIndex !== index) }))}>{expense.name || `예정 지출 ${index + 1}`} 삭제</button></fieldset>)}</div>}<div className="new-planned-expense"><h3>새 예정 지출</h3><label>이름<input value={expenseDraft.name} onChange={(event) => setExpenseDraft({ ...expenseDraft, name: event.target.value })} placeholder="예: 병원비" /></label><label>금액<CurrencyInput ariaLabel="새 예정 지출 금액" value={expenseDraft.amount_krw} onChange={(amount_krw) => setExpenseDraft({ ...expenseDraft, amount_krw })} /></label><label>예정일<input type="date" value={expenseDraft.due_date} min={draft.period_start} max={draft.period_end} onChange={(event) => setExpenseDraft({ ...expenseDraft, due_date: event.target.value })} /></label><label>분류<select value={expenseDraft.category} onChange={(event) => setExpenseDraft({ ...expenseDraft, category: event.target.value })}>{["food", "cafe", "transport", "shopping", "housing", "health", "other"].map((category) => <option key={category} value={category}>{categoryNames[category]}</option>)}</select></label><button type="button" onClick={addPlannedExpense}>예정 지출 추가</button></div>{editing && <label>조정 이유<input value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} /></label>}{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><TextButton onClick={() => setStep(1)}>이전</TextButton><PrimaryButton onClick={continueFromPriorities}>검토하기</PrimaryButton></div></Surface>}

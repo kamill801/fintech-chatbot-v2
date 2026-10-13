@@ -148,6 +148,46 @@ describe("spending plan flow", () => {
     expect(activatePlan).toHaveBeenCalledWith(expect.objectContaining({ confirmed_budget_krw: expect.any(Number) }), "setup-token");
   });
 
+  it.each(["next", "revise"] as const)("returns to the saved plan without discarding a %s draft", async (mode) => {
+    const user = userEvent.setup();
+    const completedPlan = { ...demoPlanState, progress: { ...demoPlanState.progress, period_status: "completed" as const, current_segment_id: null } };
+    mocks.useLedger.mockReturnValue(value(completedPlan));
+    render(<BrowserRouter><PlanPage /></BrowserRouter>);
+
+    await user.click(screen.getByRole("button", { name: mode === "next" ? "다음 기간 계획 세우기" : "계획 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "확정 생활비 예산" }), { target: { value: "700000" } });
+    await user.click(screen.getByRole("button", { name: /^다음$/ }));
+    await user.clear(screen.getByRole("textbox", { name: /우선순위/ }));
+    await user.type(screen.getByRole("textbox", { name: /우선순위/ }), "주말 약속 유지하기");
+    if (mode === "revise") await user.type(screen.getByRole("textbox", { name: "조정 이유" }), "지출 범위 조정");
+
+    await user.click(screen.getByRole("button", { name: "기존 계획 보기" }));
+    expect(screen.getByText(/완료된 계획 · v1/)).toBeInTheDocument();
+    expect(applyPlanRevision).not.toHaveBeenCalled();
+    expect(activatePlan).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "작성 중인 계획 이어하기" }));
+    expect(screen.getByText("생활비 계획 2/3")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /우선순위/ })).toHaveValue("주말 약속 유지하기");
+    if (mode === "revise") expect(screen.getByRole("textbox", { name: "조정 이유" })).toHaveValue("지출 범위 조정");
+    await user.click(screen.getByRole("button", { name: /^이전$/ }));
+    expect(screen.getByRole("textbox", { name: "확정 생활비 예산" })).toHaveValue("700,000");
+  });
+
+  it("blocks returning to the saved plan while confirmation is being persisted", async () => {
+    const user = userEvent.setup();
+    mocks.useLedger.mockReturnValue(value());
+    applyPlanRevision.mockReturnValueOnce(new Promise(() => {}));
+    render(<BrowserRouter><PlanPage /></BrowserRouter>);
+    await user.click(screen.getByRole("button", { name: "계획 수정" }));
+    await user.click(screen.getByRole("button", { name: /^다음$/ }));
+    await user.type(screen.getByRole("textbox", { name: "조정 이유" }), "예산 조정");
+    await user.click(screen.getByRole("button", { name: "검토하기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "변경 내용 적용" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "변경 내용 적용" }));
+    expect(screen.getByRole("button", { name: "기존 계획 보기" })).toBeDisabled();
+  });
+
   it("rejects a plan period longer than the server's 366-day limit", async () => {
     const user = userEvent.setup();
     mocks.useLedger.mockReturnValue(value(null));
