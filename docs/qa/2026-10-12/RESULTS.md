@@ -53,3 +53,11 @@ Detailed repros are in adjacent findings files. No discovered required defect re
 No Task 8.4 deployment is claimed in this source artifact. The one final source commit is followed by release verification in `/Users/dd/.codex/visualizations/2026/09/13/01a09a1a-720c-7b51-bce2-8bb9d40591bf/jangbu-full-qa-2026-10-12/RELEASE.md` (full SHA, existing provider IDs, readiness, authenticated read/write/reload/session).
 
 Physical iPhone/Safari/WKWebView keyboard, safe areas and Kakao return were not directly observed this turn; Chrome sizing is separate. Local Python is 3.14; Render retains Python 3.11.6, so hosted readiness and authenticated smoke remain required. No original record or production account was deleted for QA.
+
+## 2026-10-14 resumed production verification
+
+Commit 6684b715437eda98ff9eaf753dc0cb8dbc124511 was pushed and deployed to the existing Vercel and Render services. Hosted smoke confirmed the completed-plan UI and canonical transaction persistence. It also exposed a further defect: a saved transaction already appeared in provider state while the composer or edit dialog still awaited slow summary/AI-plan refreshes. The initial local matrix did not model unresolved derived requests.
+
+The follow-up makes transaction create/edit/delete/reflection and profile save return after their authoritative persistence response. Derived calculations refresh separately, and pending or failed summaries are visibly identified. Response generations prevent older summary refreshes and full reloads from replacing later calculations; plan write generations preserve newly confirmed plans. No mutation retry, server calculation, auth setting, original ledger record, provider or dependency was changed.
+
+Five unresolved-refresh regression cases fail against the original provider and pass after repair. Two race regressions cover out-of-order derived responses and a plan confirmed while an older refresh is pending. Fresh frontend validation: 108 tests across 16 files, lint and TypeScript/Vite build pass. Backend source is unchanged from the earlier 162-test validated source. The final deployed SHA and authenticated smoke results will be recorded in the external RELEASE.md after the follow-up deployment; the initial deployment is not the final completion claim.

@@ -221,12 +221,18 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
   const transactionRevision = useRef(0);
+  const derivedRevision = useRef(0);
+  const planRevision = useRef(0);
 
   const refreshDerived = useCallback(async () => {
     if (demo) return;
+    const revision = ++derivedRevision.current;
+    const planVersion = planRevision.current;
+    setSyncWarning("변경사항은 저장됐어요. 예산과 AI 요약을 새로 불러오는 중이에요.");
     const [nextSummary, nextPlan] = await Promise.allSettled([ledgerApi.summary(), ledgerApi.plan()]);
+    if (derivedRevision.current !== revision) return;
     if (nextSummary.status === "fulfilled") setSummary(nextSummary.value);
-    if (nextPlan.status === "fulfilled") setPlan(nextPlan.value);
+    if (nextPlan.status === "fulfilled" && planRevision.current === planVersion) setPlan(nextPlan.value);
     setSyncWarning(nextSummary.status === "rejected" || nextPlan.status === "rejected"
       ? "변경사항은 저장됐지만 일부 요약을 새로 불러오지 못했어요."
       : null);
@@ -239,6 +245,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     setSyncWarning(null);
     setProfileLoadError(null);
     const revision = transactionRevision.current;
+    const derivedVersion = ++derivedRevision.current;
+    const planVersion = planRevision.current;
     try {
       let nextProfile: Profile | null;
       try {
@@ -258,10 +266,12 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       ]);
       if (nextSettings.status === "fulfilled") setSettings(nextSettings.value);
       if (nextTransactions.status === "fulfilled" && transactionRevision.current === revision) setTransactions(nextTransactions.value);
-      if (nextSummary.status === "fulfilled") setSummary(nextSummary.value);
-      if (nextPlan.status === "fulfilled") setPlan(nextPlan.value);
-      if (nextSummary.status === "rejected" || nextPlan.status === "rejected") {
-        setSyncWarning("일부 요약을 새로 불러오지 못했어요.");
+      if (derivedRevision.current === derivedVersion) {
+        if (nextSummary.status === "fulfilled") setSummary(nextSummary.value);
+        if (nextPlan.status === "fulfilled" && planRevision.current === planVersion) setPlan(nextPlan.value);
+        if (nextSummary.status === "rejected" || nextPlan.status === "rejected") {
+          setSyncWarning("일부 요약을 새로 불러오지 못했어요.");
+        }
       }
       if ([nextSettings, nextTransactions, nextSummary, nextPlan].some((result) => result.status === "rejected")) {
         setError("장부 일부를 새로 불러오지 못했어요. 다시 시도해 주세요.");
@@ -295,7 +305,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       async saveProfile(nextProfile) {
         setProfile(demo ? nextProfile : await ledgerApi.saveProfile(nextProfile));
         setProfileLoadError(null);
-        if (!demo) await refreshDerived();
+        if (!demo) void refreshDerived();
       },
       async saveSettings(patch) {
         const next = demo
@@ -345,7 +355,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         transactionRevision.current += 1;
         setTransactions((items) => [result.transaction, ...items.filter((item) => item.transaction_id !== result.transaction.transaction_id)]);
         setLatestPlanImpact(result.plan_impact ?? null);
-        await refreshDerived();
+        void refreshDerived();
         return result;
       },
       async updateTransaction(id, draft) {
@@ -377,7 +387,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         const result = await ledgerApi.updateTransaction(id, draft);
         transactionRevision.current += 1;
         setTransactions((items) => items.map((item) => (item.transaction_id === id ? result.transaction : item)));
-        await refreshDerived();
+        void refreshDerived();
         return result;
       },
       async deleteTransaction(id) {
@@ -392,7 +402,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
             setPlan(applyDemoPlanDelta(plan, delta));
           }
         }
-        if (!demo) await refreshDerived();
+        if (!demo) void refreshDerived();
       },
       async answerReason(id, reason) {
         if (demo) {
@@ -419,8 +429,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           return updated;
         }
         const updated = await ledgerApi.reflectTransaction(id, reflection, note);
+        transactionRevision.current += 1;
         setTransactions((items) => items.map((item) => (item.transaction_id === id ? updated : item)));
-        await refreshDerived();
+        void refreshDerived();
         return updated;
       },
       async getTransaction(id) {
@@ -455,6 +466,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       async deleteData() {
         if (!demo) await ledgerApi.deleteData();
         clearFinancialDrafts(userKey);
+        transactionRevision.current += 1;
+        derivedRevision.current += 1;
+        planRevision.current += 1;
+        setSyncWarning(null);
         setProfile(null);
         setTransactions([]);
         setSummary(null);
@@ -468,6 +483,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       },
       async activatePlan(draft, previewToken) {
         const next = demo ? { ...previewDemoPlan(draft, { transactions }), preview: false } : await ledgerApi.activatePlan(draft, previewToken);
+        planRevision.current += 1;
         setPlan(next);
         return next;
       },
@@ -497,6 +513,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         const next = demo
           ? { ...demoRevision!, preview: false, plan: { ...demoRevision!.plan, version: plan.plan.version + 1 } }
           : await ledgerApi.applyPlanRevision(draft, plan.plan.version, reason, previewToken);
+        planRevision.current += 1;
         setPlan(next);
         return next;
       },
@@ -505,6 +522,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         const next = demo
           ? { ...plan, plan: { ...plan.plan, check_ins: [...plan.plan.check_ins, { check_in_id: createClientId(), decision, note: note || null, checked_in_at: new Date().toISOString(), plan_version: plan.plan.version }] } }
           : await ledgerApi.checkInPlan(decision, note);
+        planRevision.current += 1;
         setPlan(next);
         return next;
       },
@@ -521,6 +539,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
               progress: { ...plan.progress, reserved_remaining_krw: plan.progress.reserved_remaining_krw - expense.amount_krw, flexible_remaining_krw: nextFlexibleRemaining, shortfall_krw: Math.max(0, -nextFlexibleRemaining) },
             }
           : await ledgerApi.matchPlannedExpense(plannedExpenseId, transactionId);
+        planRevision.current += 1;
         setPlan(next);
         return next;
       },

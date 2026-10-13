@@ -20,8 +20,70 @@ describe("ledger mutation success boundary", () => {
     vi.spyOn(ledgerApi, "summary").mockResolvedValue(demoSummary);
     vi.spyOn(ledgerApi, "plan").mockResolvedValue(null);
     vi.spyOn(ledgerApi, "createTransaction").mockResolvedValue({ transaction });
+    vi.spyOn(ledgerApi, "updateTransaction").mockResolvedValue({ transaction });
+    vi.spyOn(ledgerApi, "deleteTransaction").mockResolvedValue(undefined);
+    vi.spyOn(ledgerApi, "reflectTransaction").mockResolvedValue({ ...transaction, reflection: "well_spent" });
+    vi.spyOn(ledgerApi, "saveProfile").mockResolvedValue(demoProfile);
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it.each(["create", "edit", "delete", "reflect", "profile"] as const)("finishes %s after persistence while derived requests are still pending", async (operation) => {
+    const { result } = renderHook(useLedger, { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let finishSummary!: (value: typeof demoSummary) => void;
+    let finishPlan!: (value: null) => void;
+    vi.mocked(ledgerApi.summary).mockReturnValueOnce(new Promise((resolve) => { finishSummary = resolve; }));
+    vi.mocked(ledgerApi.plan).mockReturnValueOnce(new Promise((resolve) => { finishPlan = resolve; }));
+    let persisted = false;
+
+    await act(async () => {
+      const request = operation === "create" ? result.current.createTransaction({ amount_krw: 9600, category: "food" })
+        : operation === "edit" ? result.current.updateTransaction(transaction.transaction_id, { amount_krw: 10_000 })
+        : operation === "delete" ? result.current.deleteTransaction(transaction.transaction_id)
+        : operation === "reflect" ? result.current.reflectTransaction(transaction.transaction_id, "well_spent", "만족했어요")
+        : result.current.saveProfile(demoProfile);
+      void request.then(() => { persisted = true; });
+    });
+
+    expect(persisted).toBe(true);
+    expect(result.current.syncWarning).toMatch(/저장됐어요.*불러오는 중/);
+    await act(async () => { finishSummary(demoSummary); finishPlan(null); });
+    expect(result.current.syncWarning).toBeNull();
+  });
+
+  it("ignores older derived responses after a newer transaction refresh finishes", async () => {
+    const { result } = renderHook(useLedger, { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let finishOlderSummary!: (value: typeof demoSummary) => void;
+    let finishOlderPlan!: (value: null) => void;
+    vi.mocked(ledgerApi.summary).mockReturnValueOnce(new Promise((resolve) => { finishOlderSummary = resolve; }));
+    vi.mocked(ledgerApi.plan).mockReturnValueOnce(new Promise((resolve) => { finishOlderPlan = resolve; }));
+    await act(async () => { await result.current.createTransaction({ amount_krw: 9600, category: "food" }); });
+    const latestSummary = { ...demoSummary, month: "2026-10" };
+    vi.mocked(ledgerApi.summary).mockResolvedValueOnce(latestSummary);
+    await act(async () => { await result.current.createTransaction({ amount_krw: 10_000, category: "food" }); });
+    await waitFor(() => expect(result.current.summary).toEqual(latestSummary));
+    await act(async () => { finishOlderSummary(demoSummary); finishOlderPlan(null); });
+    expect(result.current.summary).toEqual(latestSummary);
+    expect(result.current.syncWarning).toBeNull();
+  });
+
+  it("keeps a newly confirmed plan when an older transaction refresh returns", async () => {
+    const { result } = renderHook(useLedger, { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let finishOlderSummary!: (value: typeof demoSummary) => void;
+    let finishOlderPlan!: (value: typeof demoPlanState) => void;
+    vi.mocked(ledgerApi.summary).mockReturnValueOnce(new Promise((resolve) => { finishOlderSummary = resolve; }));
+    vi.mocked(ledgerApi.plan).mockReturnValueOnce(new Promise((resolve) => { finishOlderPlan = resolve; }));
+    await act(async () => { await result.current.createTransaction({ amount_krw: 9600, category: "food" }); });
+    const confirmedPlan = { ...demoPlanState, plan: { ...demoPlanState.plan, version: 9 } };
+    vi.spyOn(ledgerApi, "activatePlan").mockResolvedValueOnce(confirmedPlan);
+    await act(async () => {
+      await result.current.activatePlan({ period_start: "2026-10-12", period_end: "2026-10-18", confirmed_budget_krw: 800_000, priorities: [], planned_expenses: [] });
+    });
+    await act(async () => { finishOlderSummary(demoSummary); finishOlderPlan(demoPlanState); });
+    expect(result.current.plan).toEqual(confirmedPlan);
+  });
 
   it.each(["summary", "plan"] as const)("keeps a confirmed transaction when %s refresh fails", async (resource) => {
     const { result } = renderHook(useLedger, { wrapper });

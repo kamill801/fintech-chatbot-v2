@@ -234,6 +234,7 @@ export function PlanPage() {
     demo,
     settings,
     summary,
+    syncWarning,
     transactions,
   } = useLedger();
   const { userKey } = useAuth();
@@ -511,8 +512,9 @@ export function PlanPage() {
       <AppShell active="/plan">
         <div className="screen plan-screen">
           <header className="plan-header"><div><span>{planStatusLabel(plan)} · v{plan.plan.version}</span><h1>{plan.plan.period_start} ~ {plan.plan.period_end}</h1></div><button type="button" onClick={startEdit}><PencilSimple size={20} /> 계획 수정</button></header>
+          {syncWarning && <p className="ledger-sync-warning" role="status">{syncWarning}</p>}
           <ProgressCards state={plan} />
-          <Surface className="plan-coach"><Target size={28} /><div><span>계획 코치</span><h2>{plan.narrative.headline}</h2><p>{plan.narrative.explanation}</p><strong>{plan.narrative.next_action}</strong><small>{narrativeStatusText(plan.narrative.display_reason)} 금액은 최신 장부 기준이에요.</small></div></Surface>
+          <Surface className="plan-coach"><Target size={28} /><div><span>계획 코치</span><h2>{plan.narrative.headline}</h2><p>{plan.narrative.explanation}</p><strong>{plan.narrative.next_action}</strong><small>{syncWarning ? "요약 갱신 전 금액과 조언이에요." : `${narrativeStatusText(plan.narrative.display_reason)} 금액은 최신 장부 기준이에요.`}</small></div></Surface>
           {pending && <Surface className="pending-card"><div><CategoryIcon category={pending.category} /><strong>{pending.merchant || categoryNames[pending.category]}</strong><b>{formatWon(pending.amount_krw)}</b></div><p>욕쟁이 할머니 모드에서 기다리는 이유 질문이 있어요.</p><button type="button" onClick={() => navigate(withDemo(`/transactions/${pending.transaction_id}/reason`, demo))}>이유 답하기</button></Surface>}
           <Surface className="ai-briefing plan-briefing"><div className="section-heading"><h2>이번 주 AI 브리핑</h2>{briefing && <time>{briefing.period_start} ~ {briefing.period_end}</time>}</div>{briefing ? <><h3>{briefing.headline}</h3><p>{briefing.summary}</p><div className="briefing-metrics"><span><small>이번 주 지출</small><strong>{formatWon(briefing.total_spent_krw)}</strong></span><span><small>가장 큰 분류</small><strong>{briefing.top_category ? categoryNames[briefing.top_category] ?? briefing.top_category : "아직 없음"}</strong></span></div><div className="briefing-action"><Lightbulb size={24} /><span><small>다음 행동</small><strong>{briefing.improvement}</strong></span></div></> : <p className="empty-copy">지출을 기록하면 이번 주 흐름과 개선점을 정리해 드려요.</p>}</Surface>
           <Surface className="personal-rules-card"><div><span>계획 판단에 반영하는 기준</span><h2>내 소비 기준</h2></div>{spendingRules.length ? <ul>{spendingRules.slice(0, 3).map((rule) => <li key={rule}>{rule}</li>)}</ul> : <p>중요하게 생각하는 소비 기준을 추가할 수 있어요.</p>}<Link to={withDemo("/settings", demo)}>{spendingRules.length ? "기준 관리" : "기준 만들기"}</Link></Surface>
