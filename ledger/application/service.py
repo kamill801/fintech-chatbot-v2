@@ -782,6 +782,12 @@ class LedgerService:
         if cached:
             return ServiceResult(cached.status, cached.body)
         transaction = self._require_transaction(user_ref, transaction_id)
+        if transaction.transaction_type != "expense":
+            raise ServiceError(
+                "reason_not_allowed",
+                "only expense transactions can have a spending reason judgment",
+                409,
+            )
         existing = self.repository.get_judgment_for_transaction(user_ref, transaction_id)
         if existing:
             return self._cache_service_result(user_ref, response_key, ServiceResult(
@@ -789,7 +795,7 @@ class LedgerService:
                 {"transaction": transaction.to_dict(), "judgment": self._render(user_ref, existing)},
             ))
         pending = self.repository.get_pending_question(user_ref)
-        if pending is None or pending.transaction_id != transaction_id:
+        if (pending is None or pending.transaction_id != transaction_id) and not transaction.reason:
             raise ServiceError(
                 "reason_not_requested", "this transaction is not awaiting a reason", 409
             )

@@ -1,0 +1,12 @@
+[
+  {
+    "case": "1A",
+    "transactionId": "11a3fa94-0e14-4017-9c05-3fd2b63bb9d8",
+    "amount": 8500,
+    "date": "2026-11-01",
+    "reason": "점심 먹고 습관처럼 커피를 샀어요. 꼭 필요한 지출은 아니었어요.",
+    "roastAX": "Browser tab: 3, Title: \"장부 AI\", URL: \"https://jangbu-ai.vercel.app/judgments/11a3fa94-0e14-4017-9c05-3fd2b63bb9d8\".\nThere has been no change in the accessibility tree.\nThe focused UI element is 1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/judgments/11a3fa94-0e14-4017-9c05-3fd2b63bb9d8",
+    "assessment": "FAIL: unsupported daily frequency in rationale; budget unknown, actual live inputs differ from frozen fixture; caring wit present but label intensity excessive for known context; no fallback notice visible",
+    "normalAX": "Browser tab: 3, Title: \"장부 AI\", URL: \"https://jangbu-ai.vercel.app/judgments/11a3fa94-0e14-4017-9c05-3fd2b63bb9d8\".\nThere has been no change in the accessibility tree.\nThe focused UI element is 1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/judgments/11a3fa94-0e14-4017-9c05-3fd2b63bb9d8"
+  }
+]

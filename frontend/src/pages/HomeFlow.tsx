@@ -309,13 +309,31 @@ export function ReasonPage() {
   const { answerReason, demo, getTransaction, summary, transactions } = useLedger();
   const navigate = useNavigate();
   const [transaction, setTransaction] = useState<Transaction | null>(transactions.find((item) => item.transaction_id === transactionId) ?? null);
-  const [reason, setReason] = useState(demo ? "친구와 오랜만에 만나서 이야기할 곳이 필요했어." : "");
+  const [reason, setReason] = useState(transaction?.reason ?? (demo ? "친구와 오랜만에 만나서 이야기할 곳이 필요했어." : ""));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reasonDraft = useRef({ transactionId, edited: false });
 
   useEffect(() => {
-    if (!transaction) void getTransaction(transactionId).then((detail) => setTransaction(detail.transaction)).catch(() => setError("거래를 불러오지 못했어요."));
-  }, [getTransaction, transaction, transactionId]);
+    let active = true;
+    if (reasonDraft.current.transactionId !== transactionId) {
+      reasonDraft.current = { transactionId, edited: false };
+      const cached = transactions.find((item) => item.transaction_id === transactionId) ?? null;
+      setTransaction(cached);
+      setReason(cached?.reason ?? (demo ? "친구와 오랜만에 만나서 이야기할 곳이 필요했어." : ""));
+      setError(null);
+    }
+    void getTransaction(transactionId).then((detail) => {
+      if (!active) return;
+      setTransaction(detail.transaction);
+      if (!reasonDraft.current.edited) {
+        setReason(detail.transaction.reason ?? (demo ? "친구와 오랜만에 만나서 이야기할 곳이 필요했어." : ""));
+      }
+    }).catch(() => {
+      if (active) setError("거래를 불러오지 못했어요.");
+    });
+    return () => { active = false; };
+  }, [demo, getTransaction, transactionId, transactions]);
 
   async function submit() {
     if (!reason.trim()) return;
@@ -331,6 +349,7 @@ export function ReasonPage() {
     }
   }
 
+  if (!transaction && error) return <main className="standalone-screen"><PageHeader title="지출 이유" close /><p className="form-error" role="alert">{error}</p><Link to={withDemo("/ledger", demo)}>장부로 돌아가기</Link></main>;
   if (!transaction) return <div className="loading-screen">거래를 불러오는 중</div>;
   const transactionDate = transactionDateKey(transaction.occurred_at);
   const transactionMonth = transactionDate.slice(0, 7);
@@ -365,7 +384,7 @@ export function ReasonPage() {
       <div className="reason-signals"><span><i /> {budgetUsage === null ? "당시 예산 사용률은 확인할 수 없어요" : `${Number(transactionMonth.slice(5))}월 생활비 예산 ${budgetUsage}% 사용 · 현재 입력 기준`}</span><span><CalendarBlank size={19} /> 지출일 기준 최근 7일 · 같은 분류 {sameCategoryCount}건</span></div>
       <label className="reason-box">
         <span className="sr-only">지출 이유</span>
-        <textarea maxLength={120} value={reason} onChange={(event) => setReason(event.target.value)} />
+        <textarea maxLength={120} value={reason} onChange={(event) => { reasonDraft.current.edited = true; setReason(event.target.value); }} />
         <small>{reason.length} / 120</small>
       </label>
       {error && <p className="form-error" role="alert">{error}</p>}

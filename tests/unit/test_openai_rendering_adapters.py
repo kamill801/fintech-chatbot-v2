@@ -75,6 +75,41 @@ def request() -> JudgmentRequest:
 
 
 class StrictOpenAIJudgeTests(unittest.TestCase):
+    def test_future_prefix_does_not_excuse_unsupported_past_daily_habit(self) -> None:
+        req = replace(request(), user_reason="습관처럼 커피를 샀어요")
+        for field in ("rationale", "normal_message", "roast_message", "recommended_action"):
+            with self.subTest(field=field):
+                bad = {**VALID_MODEL_PAYLOAD, field: "앞으로 매일 사던 커피는 한 번 줄여 보세요."}
+                responses = FakeResponses([bad, VALID_MODEL_PAYLOAD.copy()])
+                result = OpenAIResponsesJudge(client_factory=lambda: FakeClient(responses)).judge(req)
+                self.assertEqual(len(responses.calls), 2)
+                self.assertFalse(result.fallback_used)
+
+    def test_daily_imperative_is_advice_without_a_future_prefix(self) -> None:
+        responses = FakeResponses([{**VALID_MODEL_PAYLOAD, "recommended_action": "매일 예산을 확인해 보세요."}])
+        result = OpenAIResponsesJudge(client_factory=lambda: FakeClient(responses)).judge(
+            replace(request(), user_reason="습관처럼 커피를 샀어요"))
+        self.assertFalse(result.fallback_used)
+        self.assertEqual(len(responses.calls), 1)
+
+    def test_habit_does_not_support_invented_daily_frequency(self) -> None:
+        req = replace(request(), user_reason="점심 먹고 습관처럼 커피를 샀어요")
+        for field in ("rationale", "normal_message", "roast_message", "recommended_action"):
+            with self.subTest(field=field):
+                bad = {**VALID_MODEL_PAYLOAD, field: "매일 점심 후 커피를 구매하는 습관을 언급했다."}
+                responses = FakeResponses([bad, VALID_MODEL_PAYLOAD.copy()])
+                result = OpenAIResponsesJudge(client_factory=lambda: FakeClient(responses)).judge(req)
+                self.assertEqual(len(responses.calls), 2)
+                self.assertFalse(result.fallback_used)
+
+    def test_explicit_daily_self_report_and_future_daily_advice_are_distinct(self) -> None:
+        cases = [("매일 점심 후 커피를 사요", "매일 점심 후 커피를 산다고 말했어요."),
+                 ("습관처럼 커피를 샀어요", "앞으로 매일 커피 대신 물을 마셔 보세요.")]
+        for reason, text in cases:
+            with self.subTest(text=text):
+                responses = FakeResponses([{**VALID_MODEL_PAYLOAD, "rationale": text}])
+                result = OpenAIResponsesJudge(client_factory=lambda: FakeClient(responses)).judge(replace(request(), user_reason=reason))
+                self.assertFalse(result.fallback_used)
     def test_rejects_budget_exhaustion_below_limit_in_every_prose_field(self) -> None:
         for field in ("rationale", "normal_message", "roast_message", "recommended_action"):
             with self.subTest(field=field):

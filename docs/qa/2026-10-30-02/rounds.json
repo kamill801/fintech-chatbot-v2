@@ -4,23 +4,29 @@
   "previous_run": "../2026-10-30/rounds.json",
   "authority": "2026-10-30 explicit user continue, finish unverified quality and bugs, prepare user-ready release",
   "max_passes": 7,
-  "passes_started": 3,
-  "passes_completed": 3,
+  "passes_started": 5,
+  "passes_completed": 5,
   "active_pass": null,
   "phase": "candidate_release",
   "state": "running",
   "required_matrix_ref": "CONTRACT.md",
   "provider_budget": {
     "max_calls": 36,
-    "calls_attempted": 2,
+    "calls_attempted": 4,
     "cost_known": null,
-    "cost_unknown_calls": 2,
+    "cost_unknown_calls": 4,
     "reservations": [
       {
         "case": "1A",
         "maximum_attempt_slots": 2,
         "state": "reserved_before_submit",
         "actual_attempts": "unknown until observable; maximum charged to budget"
+      },
+      {
+        "case": "1A recovery",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown until visible provenance; conservative max2 charged"
       }
     ]
   },
@@ -32,18 +38,18 @@
   },
   "release": {
     "state": "candidate_live",
-    "source_sha": "76a24ae4a3643629e6af07b8b38c4ef1bc611d55",
+    "source_sha": "f80ac72cff1ac7731ed86e1194c87abee85b0ee4",
     "vercel": {
-      "id": "dpl_8UxuLuecTqjcnsa4bcVuchxbAou2",
-      "url": "https://jangbu-5sf2fkmd1-upglow.vercel.app",
+      "id": "dpl_AXNHwYePcaLuMsX7zZrkrKcJS7t4",
+      "url": "https://jangbu-plmcy803s-upglow.vercel.app",
       "alias": "https://jangbu-ai.vercel.app",
       "state": "READY",
-      "source_proof": "CLI v13 deployment meta.releaseCommitSha exact76a24ae4a3643629e6af07b8b38c4ef1bc611d55 and readyStateREADY"
+      "source_proof": "clean git archive, exact releaseCommitSha verified through CLI v13"
     },
     "render": {
-      "id": "dep-dbi8i3vlk1mc73fjhcl0",
+      "id": "dep-dbi8vmc9v7es7391je6g",
       "state": "Live",
-      "source_sha": "76a24ae4a3643629e6af07b8b38c4ef1bc611d55"
+      "source_sha": "f80ac72cff1ac7731ed86e1194c87abee85b0ee4"
     }
   },
   "passes": [
@@ -110,6 +116,49 @@
       "changes": [
         "F24 atomically expire every written key, release mutation lock before whole-history TTL refresh, pipeline EXPIRE without per-key EXISTS, preserve committed success during maintenance outage; Redis errors503 without internal details; same-operation pending create replay recovers response failure",
         "F25 44px composer/date/select and plan/report management link targets"
+      ]
+    },
+    {
+      "number": 4,
+      "phase": "verify",
+      "status": "completed_review_findings",
+      "scope": "Hosted repaired storage, fresh Kakao callback, retained flows round1 and actual persona batch1",
+      "findings": [
+        "F26 after saved reason but failed judgment, transaction detail has no resume action and Reason route discards saved text; missing-judgment route can spin indefinitely",
+        "F27 first actual candidate response invents daily cafe frequency from habit-only reason; factual hard gate failed; correct evidence/normal-action tone before further quality calls"
+      ],
+      "evidence": [
+        "Fresh user-completed Kakao callback reached original authenticated home and original profile, no extra scopes; Render Live exactf80ac72, Vercel READY exactf80ac72",
+        "Hosted reason recovery returned real judgment; no fallback notice displayed; output and screenshot retained; 1A hard factual fail (unsupported 매일), no budget-exceeded claim; mode switch preserved label93% and recommended action",
+        "Daily-frequency regression failed4 fields then40 judge/renderer tests passed; saved-reason recovery API passed while newer pending question remains unanswered",
+        "UI35 tests initial34 pass, one selector expected exact accessible label but counter is included; adjusted selector before verification",
+        "Full frontend155/155 backend186/186 skip0 lint/tsc/Vite passed; independent review found stale-cache reason resume, nonexpense saved-reason bypass, future-prefix frequency loophole"
+      ],
+      "changes": [
+        "F26 saved-reason recovery link, reason restoration, missing-record and missing-judgment exit instead of endless loading; saved-reason retry permitted without touching another transaction pending question",
+        "F27 bounded daily-frequency factual guard with retry; prompt separates habit from daily proof, calibrates small optional purchases, and uses respectful action copy"
+      ]
+    },
+    {
+      "number": 5,
+      "phase": "verify",
+      "status": "completed_local_repair",
+      "scope": "F26/F27 review corrections before next hosted candidate; remaining passes allow multiple bounded QA batches",
+      "findings": [
+        "F26 stale cached row skips server saved reason; income/transfer reason bypass must reject",
+        "F27 future prefix accepts past daily claim and rejects imperative daily advice"
+      ],
+      "changes": [
+        "Refresh saved reason even with stale cache; preserve edits/clearing and cancel stale async response",
+        "Reject nonexpense reason judgment before saved-reason bypass",
+        "Separate unsupported past daily claim from future imperative advice in bounded guard"
+      ],
+      "evidence": [
+        "F26 stale-cache/income/transfer regressions reproduced then HomeFlow22 and Flask36 passed",
+        "F27 future-prefix and imperative regressions red5 then judge/render42 passed",
+        "Full source verification running; no repairs inside verify",
+        "Full frontend159/159 backend189/189 isolatedRedis skip0; lint/tsc/Vite/Python compile/diff pass",
+        "Read-only re-review: all3 identified defects repaired, no new blocker; bounded semantic guard still requires hosted evaluation"
       ]
     }
   ],

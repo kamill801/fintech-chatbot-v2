@@ -111,6 +111,56 @@ class FlaskLedgerE2ETests(unittest.TestCase):
         rows = self.client.get("/api/v1/me/transactions", headers=self.headers).get_json()["data"]["transactions"]
         self.assertEqual(len(rows), 1)
 
+    def test_saved_reason_can_resume_without_overwriting_newer_pending_question(self) -> None:
+        from redis.exceptions import ConnectionError
+
+        self.put_profile()
+        self.client.put("/api/v1/me/settings", json={"roast_enabled": True},
+            headers=self.mutate_headers("roast-resume"))
+        first = self.client.post("/api/v1/me/transactions",
+            json={"amount_krw": 8500, "category": "cafe"},
+            headers=self.mutate_headers("resume-first")).get_json()["data"]["transaction"]
+        repository = self.app.extensions["ledger_repository"]
+        with patch.object(repository, "save_judgment", side_effect=ConnectionError("offline")):
+            failed = self.client.post(f'/api/v1/me/transactions/{first["transaction_id"]}/reason',
+                json={"reason": "습관처럼 커피를 샀어요"}, headers=self.mutate_headers("resume-reason"))
+        self.assertEqual(failed.status_code, 503)
+        second = self.client.post("/api/v1/me/transactions",
+            json={"amount_krw": 12000, "category": "food"},
+            headers=self.mutate_headers("resume-second")).get_json()["data"]["transaction"]
+        resumed = self.client.post(f'/api/v1/me/transactions/{first["transaction_id"]}/reason',
+            json={"reason": "습관처럼 커피를 샀어요"}, headers=self.mutate_headers("resume-reason"))
+        self.assertEqual(resumed.status_code, 201)
+        newer = self.client.get(f'/api/v1/me/transactions/{second["transaction_id"]}', headers=self.headers).get_json()["data"]
+        self.assertIsNone(newer["pending_question"]["answered_at"])
+
+    def test_saved_income_and_transfer_reasons_cannot_create_spending_judgments(self) -> None:
+        self.put_profile()
+        settings = self.client.put("/api/v1/me/settings", json={"accounts": [
+            {"account_id": "cash", "name": "현금", "account_type": "cash", "opening_balance_krw": 0},
+            {"account_id": "bank", "name": "통장", "account_type": "bank", "opening_balance_krw": 100000},
+        ]}, headers=self.mutate_headers("non-expense-accounts"))
+        self.assertEqual(settings.status_code, 200)
+        for transaction_type in ("income", "transfer"):
+            with self.subTest(transaction_type=transaction_type):
+                payload = {"transaction_type": transaction_type, "amount_krw": 50000,
+                    "category": "salary" if transaction_type == "income" else "transfer",
+                    "account_id": "bank", "reason": "저장된 거래 메모"}
+                if transaction_type == "transfer":
+                    payload["destination_account_id"] = "cash"
+                created = self.client.post("/api/v1/me/transactions", json=payload,
+                    headers=self.mutate_headers(f"non-expense-{transaction_type}"))
+                self.assertEqual(created.status_code, 201)
+                transaction_id = created.get_json()["data"]["transaction"]["transaction_id"]
+                response = self.client.post(f"/api/v1/me/transactions/{transaction_id}/reason",
+                    json={"reason": "판단해 주세요"},
+                    headers=self.mutate_headers(f"non-expense-reason-{transaction_type}"))
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.get_json()["error"]["code"], "reason_not_allowed")
+                detail = self.client.get(f"/api/v1/me/transactions/{transaction_id}", headers=self.headers).get_json()["data"]
+                self.assertIsNone(detail.get("judgment"))
+                self.assertEqual(detail["transaction"]["reason"], "저장된 거래 메모")
+
     def test_get_profile_returns_null_before_onboarding(self) -> None:
         response = self.client.get("/api/v1/me/profile", headers=self.headers)
         self.assertIsNone(response.get_json()["data"]["profile"])

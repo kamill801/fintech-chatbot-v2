@@ -94,6 +94,21 @@ describe("judgment voice", () => {
     expect(screen.getByLabelText("욕쟁이 할머니 모드 켜짐")).toBeInTheDocument();
   });
 
+  it("offers a resume link when the reason persisted but judgment did not", async () => {
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockResolvedValue({ transaction: { ...original.transaction, reason: "습관처럼 샀어요", status: "recorded" } });
+    window.history.replaceState({}, "", "/transactions/tx-shopping");
+    render(<BrowserRouter><Routes><Route path="/transactions/:transactionId" element={<TransactionDetailPage />} /></Routes></BrowserRouter>);
+    expect(await screen.findByRole("link", { name: "AI 판단 이어가기" })).toHaveAttribute("href", "/transactions/tx-shopping/reason");
+  });
+
+  it("does not spin forever when a loaded transaction has no judgment", async () => {
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockResolvedValue({ transaction: original.transaction });
+    render(<BrowserRouter><Routes><Route path="/judgments/:transactionId" element={<JudgmentPage />} /></Routes></BrowserRouter>);
+    expect(await screen.findByRole("link", { name: "저장된 거래 확인하기" })).toHaveAttribute("href", "/transactions/tx-shopping");
+  });
+
   it.each([
     ["judgment", "/judgments/tx-shopping", { fallback_used: true }, "AI 응답 대신 입력된 예산 기준으로 안내해요."],
     ["detail", "/transactions/tx-shopping", { fallback_used: true }, "AI 응답 대신 입력된 예산 기준으로 안내해요."],

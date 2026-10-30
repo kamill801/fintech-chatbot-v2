@@ -1,7 +1,7 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BrowserRouter, Route, Routes } from "../router";
+import { BrowserRouter, Link, Route, Routes } from "../router";
 import { demoPlanState, demoProfile, demoSettings, demoSummary, demoTransactions } from "../demo";
 import { manualDraftKey } from "../local-drafts";
 import { HomePage, ManualTransactionPage, ReasonPage } from "./HomeFlow";
@@ -253,6 +253,79 @@ describe("demo financial consistency", () => {
 
 describe("reason evidence boundaries", () => {
   afterEach(cleanup);
+
+  it("restores a saved reason loaded after a failed judgment", async () => {
+    mocks.useLedger.mockReturnValue({
+      answerReason: vi.fn(), demo: false, transactions: [], summary: demoSummary,
+      getTransaction: vi.fn().mockResolvedValue({ transaction: { ...demoTransactions[0], reason: "습관처럼 커피를 샀어요" } }),
+    });
+    render(<BrowserRouter><ReasonPage /></BrowserRouter>);
+    expect(await screen.findByRole("textbox", { name: /지출 이유/ })).toHaveValue("습관처럼 커피를 샀어요");
+  });
+
+  it("refreshes a stale cached transaction to restore its committed reason", async () => {
+    const cached = { ...demoTransactions[0], transaction_id: "tx-stale", reason: null };
+    const getTransaction = vi.fn().mockResolvedValue({ transaction: { ...cached, reason: "이미 저장한 이유예요" } });
+    mocks.useLedger.mockReturnValue({
+      answerReason: vi.fn(), demo: false, transactions: [cached], summary: demoSummary, getTransaction,
+    });
+    window.history.replaceState({}, "", "/transactions/tx-stale/reason");
+    render(<BrowserRouter><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>);
+
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /지출 이유/ })).toHaveValue("이미 저장한 이유예요"));
+    expect(getTransaction).toHaveBeenCalledWith("tx-stale");
+  });
+
+  it.each(["직접 다시 적은 이유", ""])("preserves the user's edited draft during a detail refresh (%s)", async (draft) => {
+    const user = userEvent.setup();
+    const cached = { ...demoTransactions[0], transaction_id: "tx-draft", reason: "기존 이유" };
+    let resolveDetail!: (detail: { transaction: Transaction }) => void;
+    const getTransaction = vi.fn().mockReturnValue(new Promise((resolve) => { resolveDetail = resolve; }));
+    mocks.useLedger.mockReturnValue({
+      answerReason: vi.fn(), demo: false, transactions: [cached], summary: demoSummary, getTransaction,
+    });
+    window.history.replaceState({}, "", "/transactions/tx-draft/reason");
+    render(<BrowserRouter><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>);
+    const input = screen.getByRole("textbox", { name: /지출 이유/ });
+    await user.clear(input);
+    if (draft) await user.type(input, draft);
+
+    await act(async () => resolveDetail({ transaction: { ...cached, reason: "서버에 저장된 이유" } }));
+
+    expect(input).toHaveValue(draft);
+  });
+
+  it("ignores a previous transaction's late response after navigating to another reason", async () => {
+    const user = userEvent.setup();
+    const first = { ...demoTransactions[0], transaction_id: "tx-first", reason: null };
+    const next = { ...demoTransactions[0], transaction_id: "tx-next", reason: null };
+    let resolveFirst!: (detail: { transaction: Transaction }) => void;
+    const getTransaction = vi.fn().mockImplementation((id: string) => id === "tx-first"
+      ? new Promise((resolve) => { resolveFirst = resolve; })
+      : Promise.resolve({ transaction: { ...next, reason: "다음 거래의 저장된 이유" } }));
+    mocks.useLedger.mockReturnValue({
+      answerReason: vi.fn(), demo: false, transactions: [first, next], summary: demoSummary, getTransaction,
+    });
+    window.history.replaceState({}, "", "/transactions/tx-first/reason");
+    render(<BrowserRouter><Link to="/transactions/tx-next/reason">다음 거래</Link><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>);
+    await user.type(screen.getByRole("textbox", { name: /지출 이유/ }), "이전 거래 초안");
+    await user.click(screen.getByRole("link", { name: "다음 거래" }));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /지출 이유/ })).toHaveValue("다음 거래의 저장된 이유"));
+
+    await act(async () => resolveFirst({ transaction: { ...first, reason: "늦게 도착한 이전 이유" } }));
+
+    expect(screen.getByRole("textbox", { name: /지출 이유/ })).toHaveValue("다음 거래의 저장된 이유");
+  });
+
+  it("shows an exit instead of an endless spinner when reason loading fails", async () => {
+    mocks.useLedger.mockReturnValue({
+      answerReason: vi.fn(), demo: false, transactions: [],
+      getTransaction: vi.fn().mockRejectedValue(new Error("offline")),
+    });
+    render(<BrowserRouter><ReasonPage /></BrowserRouter>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("거래를 불러오지 못했어요");
+    expect(screen.getByRole("link", { name: "장부로 돌아가기" })).toHaveAttribute("href", "/ledger");
+  });
 
   const transaction: Transaction = {
     ...demoTransactions[0],

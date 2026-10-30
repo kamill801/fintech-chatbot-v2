@@ -99,7 +99,8 @@ export function JudgmentPage() {
   }
 
   if (error) return <main className="standalone-screen"><PageHeader title="지출 판단" close /><p className="form-error">{error}</p></main>;
-  if (!detail?.judgment) return <div className="loading-screen">판단 근거를 정리하는 중</div>;
+  if (!detail) return <div className="loading-screen">판단 근거를 정리하는 중</div>;
+  if (!detail.judgment) return <main className="standalone-screen"><PageHeader title="지출 판단" close /><p>거래는 저장됐어요. 아직 완료된 AI 판단이 없어요.</p><Link className="secondary-link" to={withDemo(`/transactions/${transactionId}`, demo)}>저장된 거래 확인하기</Link></main>;
   const { transaction, judgment } = detail;
 
   return (
@@ -271,6 +272,7 @@ export function TransactionDetailPage() {
         </Surface>
       )}
       {transaction.reason && <div className="my-reason"><strong>내가 답한 이유</strong><p>{transaction.reason}</p></div>}
+      {!judgment && transactionType === "expense" && (transaction.reason || detail.pending_question) && <Surface className="detail-judgment"><p>{transaction.reason ? "이유는 저장됐어요. AI 판단을 이어갈 수 있어요." : "지출 이유를 남기면 AI 판단을 받을 수 있어요."}</p><Link className="secondary-link" to={withDemo(`/transactions/${transactionId}/reason`, demo)}>{transaction.reason ? "AI 판단 이어가기" : "이유 답하기"}</Link></Surface>}
       {transactionType === "expense" && <Surface className="spend-reflection">
         <div className="reflection-heading">
           <div><span>소비 돌아보기</span><h2>지금 생각하면 이 소비 어땠나요?</h2></div>

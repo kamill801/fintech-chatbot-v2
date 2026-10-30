@@ -151,8 +151,21 @@ def validate_judgment_evidence(payload: dict, request: JudgmentRequest) -> None:
         r"(?:후회|반성).{0,5}(?:않|안[ 해하]|없)", reason
     )
     regretted_count = request.reflection_context.get("category_regretted_count", 0)
+    frequency = r"매일|날마다|점심마다|하루도 빠짐없이|항상"
+    reported_daily = bool(re.search(frequency, reason)) and not re.search(
+        rf"(?:{frequency}).{{0,8}}(?:아니|않|없)", reason
+    )
     for field in ("rationale", "normal_message", "roast_message", "recommended_action"):
         for clause in re.split(r"[.!?。\n]", payload[field]):
+            if not reported_daily:
+                for claim in re.finditer(frequency, clause):
+                    prefix = re.split(r"[,;]|지만|했으며|했고", clause[:claim.start()])[-1]
+                    tail = re.split(r"[,;]|지만|했으며|했고", clause[claim.end():])[0]
+                    past_or_habit = re.search(r"사던|마시던|쓰던|하던|먹던|오던|왔|했|샀|마셨|썼|습관|구매하는|산다고|마신다고", tail)
+                    advice = re.search(r"(?:보세요|하세요|하자|해라|해 봐|해봐|마셔|줄여|확인해|아껴)\s*$", tail)
+                    future = re.search(r"(?:앞으로|다음부터|이제부터).{0,12}$", prefix)
+                    if past_or_habit or not (future or advice):
+                        raise EvidenceMismatch("Habit or category counts do not prove daily behavior; preserve the user's actual frequency without amplification.")
             # Inspect polarity adjacent to each claim. Advice later in the same
             # sentence cannot excuse an earlier unsupported factual assertion.
             budget_claims = list(re.finditer(
@@ -300,7 +313,13 @@ class OpenAIResponsesJudge:
                         "exact overrun or that the budget was exceeded. risk_score is a combined "
                         "risk signal, not a budget-use percentage. recurrence_30d is the supplied category count for 최근 30일, "
                         "never a count for 이번 주 or a calendar week. Do not invent a weekly "
-                        "count from it. amount_bucket is a range, never an exact amount. Do not "
+                        "or daily count. A habit is not proof of 매일, 항상, 점심마다 or 날마다. "
+                        "Paraphrase self-reported reasons without strengthening frequency, necessity "
+                        "or emotional state. A small optional purchase is not overspending just "
+                        "because it was unnecessary: use caution unless supplied budget/goal "
+                        "pressure and combined risk support strong scolding. Necessary treatment "
+                        "and a family emergency deserve acknowledgement and a practical, caring action. "
+                        "amount_bucket is a range, never an exact amount. Do not "
                         "turn bucket bounds, ratios, examples or free text into an exact bill, "
                         "balance, income or saving estimate. Only supplied deterministic evidence "
                         "may support a numeric claim; never invent amounts, counts, prices, "
@@ -309,6 +328,9 @@ class OpenAIResponsesJudge:
                         "financial recommendation, including what to keep, reduce or defer. "
                         "The mode changes voice only; do not add a second action or make the "
                         "roast financially stricter. normal_message is direct, respectful Korean. "
+                        "recommended_action is one concrete, feasible action in respectful Korean "
+                        "ending 보세요 or 해요, never 줄여라 or report-style 한다. The roast may "
+                        "phrase that same action naturally without adding a new limit, quota or task. "
                         "roast_message is the user-facing '욕쟁이 할머니 모드': a sharp but caring "
                         "Korean market grandmother in her seventies checking a ledger, not a "
                         "formal financial report. Use 1-3 colloquial Korean sentences, with "
