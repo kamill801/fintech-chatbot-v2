@@ -1,0 +1,105 @@
+[
+  {
+    "case": "1A",
+    "expected_label": "caution",
+    "raw_budget_ratio": 0.84,
+    "input": {
+      "amount_bucket": "under_10000",
+      "category": "cafe",
+      "policy_version": "overspending-v1",
+      "user_reason": "점심을 먹고 습관처럼 커피를 샀어요.",
+      "budget_usage_after": 0.84,
+      "transaction_budget_share": 0.010625,
+      "goal_pressure": 0.5,
+      "baseline_deviation": 1.4,
+      "recurrence_30d": 5,
+      "essentiality": 0.2,
+      "risk_score": 0.54,
+      "data_confidence": 0.92,
+      "requires_reason": false,
+      "factors": [
+        "budget_usage",
+        "recurrence",
+        "user_reason"
+      ]
+    },
+    "attempts": [
+      {
+        "number": 1,
+        "model": "gpt-4o",
+        "prompt_sha256": "783894c83cfb2a5ff28753164d873b21ea3ba95957a1b92cd47325b83620834a",
+        "status": "failed",
+        "error_type": "AuthenticationError",
+        "status_code": 401,
+        "code": "invalid_api_key",
+        "seconds": 1.244
+      },
+      {
+        "number": 2,
+        "model": "gpt-4o",
+        "prompt_sha256": "783894c83cfb2a5ff28753164d873b21ea3ba95957a1b92cd47325b83620834a",
+        "status": "failed",
+        "error_type": "AuthenticationError",
+        "status_code": 401,
+        "code": "invalid_api_key",
+        "seconds": 0.72
+      }
+    ],
+    "judgment": {
+      "judgment_id": "33febca0-bdb7-4f7d-b9d3-a82f0d4a7ab1",
+      "transaction_id": "synthetic-1A",
+      "label": "caution",
+      "confidence": 0.6,
+      "rationale": "예산 또는 목표에 주는 부담이 중간 수준이다.",
+      "recommended_action": "다음 유사 소비 전에 대체할 지출 하나를 정한다.",
+      "decision_factors": [
+        "budget_usage",
+        "recurrence",
+        "user_reason"
+      ],
+      "normal_message": "예산 또는 목표에 주는 부담이 중간 수준이다. 다음 유사 소비 전에 대체할 지출 하나를 정한다.",
+      "roast_message": "쯧쯧, 냄비 넘치기 전에 불부터 줄여라. 예산 또는 목표에 주는 부담이 중간 수준이다. 다음 유사 소비 전에 대체할 지출 하나를 정한다.",
+      "fallback_used": true,
+      "model": "deterministic-fallback-v1",
+      "policy_version": "overspending-v1",
+      "created_at": "2026-10-30T10:46:00.057880+00:00",
+      "schema_version": 1
+    },
+    "normal": {
+      "judgment_id": "33febca0-bdb7-4f7d-b9d3-a82f0d4a7ab1",
+      "transaction_id": "synthetic-1A",
+      "mode": "normal",
+      "label": "caution",
+      "confidence": 0.6,
+      "rationale": "예산 또는 목표에 주는 부담이 중간 수준이다.",
+      "recommended_action": "다음 유사 소비 전에 대체할 지출 하나를 정한다.",
+      "message": "예산 또는 목표에 주는 부담이 중간 수준이다. 다음 유사 소비 전에 대체할 지출 하나를 정한다.",
+      "fallback_used": true,
+      "model": "deterministic-fallback-v1",
+      "policy_version": "overspending-v1"
+    },
+    "roast": {
+      "judgment_id": "33febca0-bdb7-4f7d-b9d3-a82f0d4a7ab1",
+      "transaction_id": "synthetic-1A",
+      "mode": "roast",
+      "label": "caution",
+      "confidence": 0.6,
+      "rationale": "예산 또는 목표에 주는 부담이 중간 수준이다.",
+      "recommended_action": "다음 유사 소비 전에 대체할 지출 하나를 정한다.",
+      "message": "쯧쯧, 냄비 넘치기 전에 불부터 줄여라. 예산 또는 목표에 주는 부담이 중간 수준이다. 다음 유사 소비 전에 대체할 지출 하나를 정한다.",
+      "fallback_used": true,
+      "model": "deterministic-fallback-v1",
+      "policy_version": "overspending-v1"
+    },
+    "parity": [
+      true,
+      ""
+    ],
+    "roast_validator": [
+      true,
+      ""
+    ],
+    "label_matches": true,
+    "display_replaced": false
+  }
+]

@@ -20,6 +20,7 @@ ESSENTIALITY_BY_CATEGORY = {
     "utilities": 0.95,
     "medical": 0.95,
     "healthcare": 0.95,
+    "health": 0.95,  # Canonical UI key for the existing healthcare category.
     "groceries": 0.80,
     "transport": 0.65,
     "education": 0.60,

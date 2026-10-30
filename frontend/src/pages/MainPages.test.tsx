@@ -72,7 +72,7 @@ describe("live ledger summaries", () => {
     await user.click(screen.getByRole("button", { name: /말투 미리보기/ }));
     expect(screen.getByText("기본 말투")).toBeInTheDocument();
     expect(screen.getByText("욕쟁이 할머니 말투")).toBeInTheDocument();
-    expect(screen.getByText(/이번 주 카페가 벌써 세 번째/)).toBeInTheDocument();
+    expect(screen.getByText(/최근 30일 카페가 벌써 세 번째/)).toBeInTheDocument();
   });
 
   it("keeps a real zero balance instead of replacing it with demo spending", () => {

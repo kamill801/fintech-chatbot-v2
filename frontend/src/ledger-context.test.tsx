@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ledgerApi, ApiError } from "./api";
 import { LedgerProvider, useLedger } from "./ledger-context";
 import { demoPlanState, demoProfile, demoSettings, demoSummary, demoTransactions } from "./demo";
-import type { PlanDraft, PlanRevisionPreview } from "./types";
+import type { Judgment, PlanDraft, PlanRevisionPreview } from "./types";
 
 vi.mock("./auth-context", () => ({ useAuth: () => ({ userKey: "test-user" }) }));
 
@@ -302,5 +302,121 @@ describe("demo spending plan revision math", () => {
     expect(result.current.plan?.progress.actual_spent_krw).toBe(377_500);
     expect(preview?.after_progress.actual_spent_krw).toBe(45_000);
     expect(preview?.after_progress.flexible_remaining_krw).toBe(55_000);
+  });
+});
+
+
+describe("demo judgment transaction provenance", () => {
+  beforeEach(() => { window.history.replaceState({}, "", "/?demo=1"); });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it("does not attach the cafe example or another transaction id to a new meal", async () => {
+    const { result } = renderHook(useLedger, { wrapper });
+    let id = "";
+    await act(async () => {
+      const created = await result.current.createTransaction({ amount_krw: 12_500, category: "food", merchant: "예시 점심" });
+      id = created.transaction.transaction_id;
+      expect(created.judgment?.transaction_id).toBe(id);
+      expect(created.judgment?.rationale).not.toMatch(/카페|47%|세 번째/);
+      expect(created.judgment?.label).toBe("insufficient_context");
+    });
+    await act(async () => {
+      const detail = await result.current.getTransaction(id);
+      expect(detail.judgment?.transaction_id).toBe(id);
+      expect(detail.judgment?.message).toContain("데모");
+      const edited = await result.current.updateTransaction(id, { amount_krw: 14_000 });
+      expect(edited.judgment?.transaction_id).toBe(id);
+    });
+  });
+
+  it("does not reuse the cafe example after changing the seed expense", async () => {
+    const { result } = renderHook(useLedger, { wrapper });
+    await act(async () => {
+      const edited = await result.current.updateTransaction("tx-cafe", { category: "health", amount_krw: 160_000 });
+      expect(edited.judgment?.label).toBe("insufficient_context");
+      expect(edited.judgment?.rationale).not.toMatch(/카페|47%|세 번째/);
+    });
+    await act(async () => {
+      const detail = await result.current.getTransaction("tx-cafe");
+      expect(detail.judgment?.label).toBe("insufficient_context");
+    });
+  });
+
+  it.each(["tx-cafe", "tx-lunch"])("binds corrections to the original contents of %s", async (id) => {
+    const { result } = renderHook(useLedger, { wrapper });
+    let judgmentId = "";
+    await act(async () => {
+      const detail = await result.current.getTransaction(id);
+      judgmentId = detail.judgment!.judgment_id;
+      await result.current.correctJudgment(judgmentId, "justified", "원래 지출은 필요했어요");
+    });
+    await act(async () => { await result.current.reflectTransaction(id, "well_spent", "만족해요"); });
+    await act(async () => {
+      expect((await result.current.getTransaction(id)).judgment?.effective_label).toBe("justified");
+      await result.current.updateTransaction(id, { amount_krw: 160_000, category: "health" });
+    });
+    await act(async () => {
+      const detail = await result.current.getTransaction(id);
+      expect(detail.judgment?.correction).toBeNull();
+      expect(detail.judgment?.effective_label).toBe(detail.judgment?.label);
+      expect(detail.judgment?.judgment_id).not.toBe(judgmentId);
+    });
+  });
+
+  it.each(["seed", "new"] as const)("retains a %s judgment correction when reopened and after toggling modes", async (source) => {
+    const { result } = renderHook(useLedger, { wrapper });
+    let transactionId = "tx-cafe";
+    if (source === "new") {
+      await act(async () => {
+        const created = await result.current.createTransaction({ amount_krw: 12_500, category: "food", merchant: "예시 점심" });
+        transactionId = created.transaction.transaction_id;
+      });
+    }
+    let original!: Judgment;
+    await act(async () => {
+      const detail = await result.current.getTransaction(transactionId);
+      expect(detail.judgment).toBeDefined();
+      original = detail.judgment!;
+      const correction = await result.current.correctJudgment(original.judgment_id, "justified", "필요한 지출이었어요");
+      expect(correction).toMatchObject({
+        judgment_id: original.judgment_id,
+        original_label: original.label,
+        corrected_label: "justified",
+        correction_reason: "필요한 지출이었어요",
+      });
+    });
+
+    for (const roastEnabled of [false, true, false]) {
+      await act(async () => { await result.current.saveSettings({ roast_enabled: roastEnabled }); });
+      await act(async () => {
+        const detail = await result.current.getTransaction(transactionId);
+        expect(detail.judgment).toMatchObject({
+          judgment_id: original.judgment_id,
+          transaction_id: transactionId,
+          mode: roastEnabled ? "roast" : "normal",
+          label: original.label,
+          original_label: original.label,
+          effective_label: "justified",
+          correction: {
+            judgment_id: original.judgment_id,
+            original_label: original.label,
+            corrected_label: "justified",
+            correction_reason: "필요한 지출이었어요",
+          },
+        });
+        const unrelated = await result.current.getTransaction(source === "seed" ? "tx-grocery" : "tx-cafe");
+        expect(unrelated.judgment?.correction).toBeNull();
+        expect(unrelated.judgment?.effective_label).toBe(unrelated.judgment?.label);
+      });
+    }
+
+    await act(async () => {
+      const revised = await result.current.correctJudgment(original.judgment_id, "overspending", "다시 보니 충동구매였어요");
+      expect(revised.original_label).toBe(original.label);
+      const detail = await result.current.getTransaction(transactionId);
+      expect(detail.judgment?.label).toBe(original.label);
+      expect(detail.judgment?.effective_label).toBe("overspending");
+      expect(detail.judgment?.correction?.correction_reason).toBe("다시 보니 충동구매였어요");
+    });
   });
 });

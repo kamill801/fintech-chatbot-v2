@@ -94,6 +94,89 @@ describe("judgment voice", () => {
     expect(screen.getByLabelText("욕쟁이 할머니 모드 켜짐")).toBeInTheDocument();
   });
 
+  it.each([
+    ["judgment", "/judgments/tx-shopping", { fallback_used: true }, "AI 응답 대신 입력된 예산 기준으로 안내해요."],
+    ["detail", "/transactions/tx-shopping", { fallback_used: true }, "AI 응답 대신 입력된 예산 기준으로 안내해요."],
+    ["judgment", "/judgments/tx-shopping", { display_fallback_used: true }, "표현을 조정한 안내예요. 판단과 추천 행동은 그대로예요."],
+    ["detail", "/transactions/tx-shopping", { display_fallback_used: true }, "표현을 조정한 안내예요. 판단과 추천 행동은 그대로예요."],
+  ])("discloses substituted guidance on %s", async (page, path, provenance, message) => {
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockResolvedValue({ ...original, judgment: { ...original.judgment, ...provenance } });
+    window.history.replaceState({}, "", path);
+    render(<BrowserRouter><Routes><Route path={page === "judgment" ? "/judgments/:transactionId" : "/transactions/:transactionId"} element={page === "judgment" ? <JudgmentPage /> : <TransactionDetailPage />} /></Routes></BrowserRouter>);
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    if (page === "judgment") expect(screen.getByText("이번 주 쇼핑을 한 번 쉬어요.")).toBeInTheDocument();
+    else expect(screen.getByText("생활비 예산 사용량이 높아요.")).toBeInTheDocument();
+  });
+
+  it("does not describe unchanged model output as a substitute", async () => {
+    render(<BrowserRouter><Routes><Route path="/judgments/:transactionId" element={<JudgmentPage />} /></Routes></BrowserRouter>);
+    await screen.findByRole("heading", { name: /장부 바닥이 보이는데/ });
+    expect(screen.queryByText(/AI 응답 대신|표현을 조정한 안내/)).not.toBeInTheDocument();
+    expect(screen.queryByText("☕")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["justified", "내 평가를 ‘납득 가능한 지출’로 바꿨어요."],
+    ["caution", "내 평가를 ‘주의가 필요한 지출’로 바꿨어요."],
+    ["overspending", "내 평가를 ‘과소비’로 바꿨어요."],
+    ["insufficient_context", "내 평가를 ‘정보가 더 필요함’으로 바꿨어요."],
+  ])("keeps corrected %s judgments in the selected normal voice", async (label, message) => {
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockResolvedValue({
+      ...original,
+      judgment: {
+        ...original.judgment,
+        effective_label: label,
+        correction: {
+          judgment_id: "judgment-shopping",
+          original_label: "overspending",
+          corrected_label: label,
+          correction_reason: "내 소비 기준으로 다시 판단했어요",
+          corrected_at: "2026-08-14T03:00:00Z",
+        },
+      },
+    });
+    mocks.useLedger.mockReturnValue({
+      demo: false,
+      getTransaction: mocks.getTransaction,
+      saveSettings: mocks.saveSettings,
+      settings: { roast_enabled: false, locale: "ko-KR", timezone: "Asia/Seoul" },
+    });
+
+    render(<BrowserRouter><Routes><Route path="/judgments/:transactionId" element={<JudgmentPage />} /></Routes></BrowserRouter>);
+
+    expect(await screen.findByRole("heading", { name: message })).toBeInTheDocument();
+    expect(screen.getByText(/기록 당시 AI 판단: 과소비/)).toBeInTheDocument();
+    expect(screen.getByLabelText("욕쟁이 할머니 모드 꺼짐")).toBeInTheDocument();
+    expect(screen.queryByText(/확인해라|남겨라/)).not.toBeInTheDocument();
+    expect(screen.getByText("이번 주 쇼핑을 한 번 쉬어요.")).toBeInTheDocument();
+  });
+
+  it("keeps the grandma voice for a corrected judgment when explicitly enabled", async () => {
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockResolvedValue({
+      ...original,
+      judgment: {
+        ...original.judgment,
+        effective_label: "justified",
+        correction: {
+          judgment_id: "judgment-shopping",
+          original_label: "overspending",
+          corrected_label: "justified",
+          correction_reason: "회사 환급",
+          corrected_at: "2026-08-14T03:00:00Z",
+        },
+      },
+    });
+
+    render(<BrowserRouter><Routes><Route path="/judgments/:transactionId" element={<JudgmentPage />} /></Routes></BrowserRouter>);
+
+    expect(await screen.findByRole("heading", { name: "그래, 네 평가는 ‘납득 가능한 지출’로 남겨두마. 기록 당시 판단도 장부에 그대로 있다." })).toBeInTheDocument();
+    expect(screen.getByText("이번 주 쇼핑을 한 번 쉬어요.")).toBeInTheDocument();
+  });
+
   it("saves the user's post-purchase reflection from transaction detail", async () => {
     const user = userEvent.setup();
     window.history.replaceState({}, "", "/transactions/tx-shopping");
@@ -266,8 +349,8 @@ describe("judgment voice", () => {
       </BrowserRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText(/납득할 만한 지출/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/네 평가는 ‘납득 가능한 지출’로/)).toBeInTheDocument());
     expect(screen.queryByText(/장부 바닥이 보이는데/)).not.toBeInTheDocument();
-    expect(screen.getByText(/판단 · 납득 가능한 지출/)).toBeInTheDocument();
+    expect(screen.getByText(/내 평가 · 납득 가능한 지출/)).toBeInTheDocument();
   });
 });

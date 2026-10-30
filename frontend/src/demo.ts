@@ -343,7 +343,33 @@ function occurrenceText(count: number): string {
   return ({ 1: "첫 번째", 2: "두 번째", 3: "세 번째" } as Record<number, string>)[count] ?? `${count}번째`;
 }
 
-export function demoJudgment(roast: boolean): Judgment {
+export function demoJudgment(roast: boolean, transaction: Transaction = demoTransactions[0]): Judgment {
+  const seed = demoTransactions[0];
+  const isOriginalExample = transaction.transaction_id === seed.transaction_id
+    && !transaction.updated_at
+    && transaction.amount_krw === seed.amount_krw
+    && transaction.category === seed.category
+    && transaction.reason === seed.reason;
+  if (!isOriginalExample) {
+    return {
+      judgment_id: `demo-${transaction.transaction_id}${transaction.updated_at ? `-${transaction.updated_at}` : ""}`,
+      transaction_id: transaction.transaction_id,
+      mode: roast ? "roast" : "normal",
+      label: "insufficient_context",
+      confidence: 0,
+      rationale: "데모에서 추가한 거래에는 실제 AI 판단을 요청하지 않아요.",
+      recommended_action: "다음 지출 전에 생활비 예산을 확인해 주세요.",
+      message: roast
+        ? "아이구, 여긴 데모 장부라 이 지출을 실제로 판단한 건 아니다. 다음에 지갑 열기 전엔 생활비 예산부터 확인해라."
+        : "데모에 거래를 기록했어요. 실제 AI 판단은 로그인한 장부에서 확인할 수 있어요.",
+      fallback_used: false,
+      model: "demo-artifact",
+      policy_version: "overspending-v1",
+      original_label: "insufficient_context",
+      effective_label: "insufficient_context",
+      correction: null,
+    };
+  }
   const recurrence = occurrenceText(demoSignals.recurrence_30d);
   const budgetUsage = Math.round(demoSignals.budget_usage_after * 100);
   return {
@@ -352,11 +378,11 @@ export function demoJudgment(roast: boolean): Judgment {
     mode: roast ? "roast" : "normal",
     label: "caution",
     confidence: 0.81,
-    rationale: `생활비 예산 ${budgetUsage}%를 사용했고, 이번 주 카페 지출이 ${recurrence}예요.`,
+    rationale: `생활비 예산 ${budgetUsage}%를 사용했고, 최근 30일 카페 지출이 ${recurrence}예요.`,
     recommended_action: "이번 주 카페는 여기까지. 다음 만남은 산책으로 바꿔요.",
     message: roast
-      ? `아이고 이 화상아, 친구 만난 건 좋다만 이번 주 카페가 벌써 ${recurrence}다. 이번 주 카페는 여기까지 하고, 다음 약속은 산책으로 돌려서 지갑도 숨 좀 쉬자.`
-      : `필요한 만남이었지만, 이번 주 카페는 ${recurrence}라 여기까지가 좋아요.`,
+      ? `아이고 이 화상아, 친구 만난 건 좋다만 최근 30일 카페가 벌써 ${recurrence}다. 이번 주 카페는 여기까지 하고, 다음 약속은 산책으로 돌려서 지갑도 숨 좀 쉬자.`
+      : `필요한 만남이었지만, 최근 30일 카페는 ${recurrence}라 여기까지가 좋아요.`,
     fallback_used: false,
     model: "demo-artifact",
     policy_version: "overspending-v1",

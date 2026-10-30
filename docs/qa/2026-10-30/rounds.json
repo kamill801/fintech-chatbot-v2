@@ -1,0 +1,188 @@
+{
+  "schema_version": 2,
+  "run_id": "jangbu-qa-2026-10-30-01",
+  "max_passes": 6,
+  "service_pass_limit": 3,
+  "persona_pass_limit": 3,
+  "passes_started": 6,
+  "passes_completed": 6,
+  "active_pass": null,
+  "phase": "closed",
+  "state": "stopped",
+  "required_matrix_ref": "CONTRACT.md",
+  "provider_budget": {
+    "max_calls": 36,
+    "calls_attempted": 8,
+    "cost_known": null,
+    "cost_unknown_calls": 8,
+    "blocker": "Local existing connection401 remains; production authenticated UI is now reachable. Candidate new prompt is not deployed.",
+    "production_reservations": [
+      {
+        "case": "hosted-1A",
+        "reserved_attempts": 2,
+        "status": "UI_result_received_actual_attempts_unknown",
+        "note": "Up to two application judgment attempts; actual usage/provenance not accessible from UI."
+      },
+      {
+        "case": "hosted-1C",
+        "reserved_attempts": 2,
+        "status": "UI_result_received_actual_attempts_unknown",
+        "note": "Existing production judgment; clinical detail synthetic; profile preserved."
+      },
+      {
+        "case": "hosted-1B",
+        "reserved_attempts": 2,
+        "status": "UI_result_received_actual_attempts_unknown",
+        "note": "Existing production judgment; synthetic shopping follows medical case; current budget will differ from fixed fixture."
+      }
+    ],
+    "counter_semantics": "8 conservatively reserved attempt slots: local2 observed failed calls plus up to2 attempts for each of3 production UI operations. Actual hosted attempt count and cost are unknown; not8 confirmed provider requests."
+  },
+  "post_deploy": {
+    "max_checks": 2,
+    "checks_started": 0,
+    "checks_completed": 0,
+    "checks": []
+  },
+  "passes": [
+    {
+      "number": 1,
+      "kind": "service",
+      "phase": "closed",
+      "status": "fixed",
+      "findings": [
+        "F1: Reason screen rolling-seven-day category count includes income/transfers/future rows and claims this week; budget signal can refer to a different month.",
+        "F2: Corrected judgment message uses grandma voice even in normal mode."
+      ],
+      "evidence": [
+        "Baseline frontend 111 passed; backend 162 OK with four Redis skips pending isolated run.",
+        "Read-only source reproduction by persona_audit; local 390px expense saved and calendar row read back.",
+        "Regression before fixes: 12 failed / 14 passed; after fixes: 26 passed. Agent lint and TypeScript passed.",
+        "Isolated Redis integration: 162 passed, no skips. Demo expense→calendar→detail→reflection, plan revision/confirmation/check-in, report/settings/export inspected. Actual CSV file contains the new labeled transaction.",
+        "Whole frontend 121 passed; actual 390px reason UI shows matching-month qualifier and expense-date seven-day count."
+      ],
+      "changes": [
+        "F1 expense-only KST seven-day evidence anchored to transaction; matching-month budget provenance",
+        "F2 corrected judgment honors current voice; share remains explicitly roast"
+      ]
+    },
+    {
+      "number": 2,
+      "kind": "service",
+      "phase": "closed",
+      "status": "fixed_with_followups",
+      "findings": [
+        "F3 demo judgment is a fixed cafe example for unrelated newly recorded expenses",
+        "F4 plan match selector offers expenses outside the plan period",
+        "F5 account input accessible labels append 번째 to account names"
+      ],
+      "evidence": [
+        "Demo identity regression red 1 failed/18 passed, green targeted20 passed; Plan red3 failed/11 passed, green14 passed; full lint and TypeScript/Vite build passed.",
+        "24 browser route/width checks: 320/390/414/1440, no document overflow and visible form fonts >=16px. Reason→judgment→detail→correction dialog exercised.",
+        "Full frontend:124 pass/1 outdated copy expectation fails after corrected 30-day wording; queued for pass3."
+      ],
+      "changes": [
+        "F3 demo new expenses have their own id and explicitly no real AI judgment; seed recurrence explicitly 30-day",
+        "F4 selector mirrors backend period/timezone/unique-link eligibility",
+        "F5 readable accessible account field labels"
+      ]
+    },
+    {
+      "number": 3,
+      "kind": "service",
+      "phase": "closed",
+      "status": "fixed",
+      "findings": [
+        "F6 demo correction not reflected after successful dialog submission",
+        "F7 transaction detail always shows coffee icon for any category",
+        "F8 settings preview test still expects incorrect this-week wording"
+      ],
+      "evidence": [
+        "F6 regressions red2 failed/19 passed, green21 context tests; scoped lint/typecheck passed.",
+        "Actual414px UI: income50000 saved to selected calendar date; transfer10000 recorded with both accounts then edited11000 and read back; filtering exercised. During Vite HMR demo state resets, so no cross-reload persistence claim.",
+        "Fresh final frontend 127/127 across16 files; ESLint and TypeScript/Vite production build passed.",
+        "Fresh full backend 162/162 with isolated Redis, no skips; git diff --check passed.",
+        "Actual414px demo correction after submit reads justified81%, true original caution and user correction marker. Proof round3-correction.txt."
+      ],
+      "changes": [
+        "F6 demo correction readback and true original label retained across voice changes",
+        "F7 detail reuses category icon",
+        "F8 copy expectation uses evidenced30-day period"
+      ]
+    },
+    {
+      "number": 4,
+      "kind": "persona",
+      "phase": "closed",
+      "status": "local_repairs_verified_live_blocked",
+      "findings": [
+        "F9 judge prompt includes invented this-week example and insufficient colloquial/grounding constraints; existing fallback has report endings.",
+        "F10 renderer silently replaces invalid model voice without distinct display provenance; UI does not disclose deterministic fallback.",
+        "F11 innocuous 설거지 fails safety substring 거지; justified 잘 샀다 acknowledgement wrongly rejected.",
+        "F12 judgment result still shows coffee icon for non-cafe category."
+      ],
+      "evidence": [
+        "Actual application model path attempted twice on synthetic1A; both401 AuthenticationError invalid_api_key. No live generated output; remaining live cases blocked without retrying unchanged authorization. Original attempts recorded persona-batch-1.json.",
+        "User declined new key; directs existing deployed Vercel tests. Chrome reaches Kakao credentials screen; user sign-in requested. Local401 not a diagnosis of production provider.",
+        "Scoped backend regression red31cases with13failed subcases/8missing-field errors → green31/31; allunit76/76, compile and scoped diff pass.",
+        "Frontend provenance+category regression red5failed/10passed; green15/15.",
+        "Coordinator fresh targeted checks: backend31 passed and frontend15 passed. User directs production UI instead of key changes; production auth blocks live persona so no semantic generation pass counted."
+      ],
+      "changes": [
+        "F9 actual prompt guards30d/bucket precision/injection and colloquial purchase-specific voice, neutral fallback cadence.",
+        "F10 distinct immutable artifact vs display fallback provenance; result/detail/share UI disclose substitutes.",
+        "F11 allow innocuous 설거지 and positive acknowledgement; reject empty marker-only voice.",
+        "F12 result uses transaction category icon."
+      ]
+    },
+    {
+      "number": 5,
+      "kind": "persona",
+      "phase": "closed",
+      "status": "local_repairs_verified_production_auth_blocked",
+      "findings": [
+        "F13 edited seed tx-cafe retains fixed cafe judgment after material edit.",
+        "F14 correction overlays a materially edited demo transaction.",
+        "F15 login POST has no deadline for fetch/body; session restoration awaits metadata indefinitely. Production UI reproduced pending Kakao state then failed callback; root cause of production callback remains unconfirmed."
+      ],
+      "evidence": [
+        "Chrome1211556714 newly opened public root: session check error, Kakao click pending for >30s then callback failure message. Public Render health200 in7.4s; not proof of OAuth exchange.",
+        "Source: kakao-login.post has no AbortController/deadline; AuthProvider getSession/getUser unbounded. No credentials changed.",
+        "Production connection diagnosis: current public bundleindex-kR9Xx8Ue.js uses registeredrefkkzsyprcujrxzrsognhb; authoritative public DNS Status3NXDOMAIN; Supabase connector list/get exactprojectINACTIVE, orgmtydqzgsdegviajlzfwa. Restoration queued pass6.",
+        "Fresh pass5 verification45/45 acrosscontext/auth/callback/transport; red demo3failed21passed and auth7failed9passed. No green-driven edits."
+      ],
+      "changes": [
+        "F13 seed cafe example only for original contents; edits receive a new demo judgment identity.",
+        "F14 correction stays attached to original artifact; edited revision no longer overlays old correction, reflection/voice retain it.",
+        "F15 actual fetch+body90s abort; auth restore15s/metadata8s; revision guard and confirmed late auth recovery; no credential/provider changes."
+      ]
+    },
+    {
+      "number": 6,
+      "kind": "persona",
+      "phase": "closed",
+      "status": "auth_restored_live_semantic_gate_failed",
+      "findings": [
+        "F16 existing production auth projectINACTIVE and hostNXDOMAIN prevents login. Same-project restore required."
+      ],
+      "evidence": [
+        "Live connectorget/list registeredrefkkzsyprcujrxzrsognhb andmatchingorg; public frontendbundle exactsamehost; publicDNSNXDOMAIN.",
+        "restore_project existingref accepted success=true; completion not yet verified.",
+        "Restoration completion: connector get_project ACTIVE_HEALTHY; existing public auth JWKS HTTP200. Production Chrome new root restores the original authenticated account and reads existing records/settings. This proves session restoration, not a newly completed Kakao consent callback.",
+        "Hosted baseline1A: expense8500 saved→reason→judgment; overspending95%; unsupported budget-exceeded rationale at shown41%. New F17 recorded for a future explicitly authorized run; no repair inside verification.",
+        "Hosted1C treatment160000: justified85%, acknowledges necessity; roast mixes colloquial opening and formal advice,6/10 below frozen threshold. Raw model/display provenance not exposed.",
+        "Hosted1B shopping320000: overspending95%, shown101% budget use supports exceedance but rationale invents remorse;6/10 and factual hard gate failed.",
+        "Production authenticated reload retains3 labeled synthetic QA rows; Oct30 total488500, month811000, settings export21 rows. No original transaction/profile deletion or change. Original roast=false save confirmed; reload readback pending.",
+        "Final authenticated reload confirms original grandma modeoff, budget800000, goal30%, one account,21 records. Three hosted cases are not three candidate batches. Full readiness and release gates remain unmet."
+      ],
+      "changes": [
+        "Restore existing Free Seoul jangbu-ai projectkkzsyprcujrxzrsognhb; no replacement, keys, plan or region change."
+      ]
+    }
+  ],
+  "open_defects": [
+    "F17 hosted baseline 1A: UI budget use41%, but generated rationale claims budget exceeded and roast says ledger bottom visible. Unsupported financial assertion; candidate prompt is not deployed/live-evaluated.",
+    "F17 additional hosted1B: rationale asserts remorse without user evidence; budget exceedance itself is supported by shown101%. Hosted1C voice quality6/10 below frozen threshold. Candidate not live-evaluated."
+  ],
+  "stop_reason": "limit_reached_required_gates_unmet"
+}

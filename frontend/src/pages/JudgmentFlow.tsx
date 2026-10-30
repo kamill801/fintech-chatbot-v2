@@ -14,6 +14,7 @@ import {
   Wallet,
 } from "@phosphor-icons/react";
 import {
+  CategoryIcon,
   EvidenceList,
   Dialog,
   Highlight,
@@ -56,20 +57,24 @@ function useTransactionDetail(transactionId: string) {
   return { detail, error, reload, applyDetail };
 }
 
-function correctedJudgmentMessage(label: JudgmentLabel): string {
-  const messages: Record<JudgmentLabel, string> = {
-    justified: "다시 장부를 보니 납득할 만한 지출이구나. 다음에도 이유와 예산을 같이 확인해라.",
-    caution: "다시 장부를 보니 주의가 필요한 지출이구나. 다음 소비 전에는 예산부터 한 번 더 확인해라.",
-    overspending: "다시 장부를 보니 과소비가 맞구나. 다음 지출은 멈추고 예산부터 확인해라.",
-    insufficient_context: "다시 장부를 봐도 정보가 더 필요하구나. 판단 전에 이유를 조금 더 남겨라.",
-  };
-  return messages[label];
+function correctedJudgmentMessage(label: JudgmentLabel, roastEnabled: boolean): string {
+  const name = labelText(label);
+  return roastEnabled
+    ? `그래, 네 평가는 ‘${name}’로 남겨두마. 기록 당시 판단도 장부에 그대로 있다.`
+    : `내 평가를 ‘${name}’${label === "insufficient_context" ? "으로" : "로"} 바꿨어요.`;
 }
 
-function currentJudgmentMessage(judgment: Judgment): string {
+function currentJudgmentMessage(judgment: Judgment, roastEnabled: boolean): string {
   return judgment.correction
-    ? correctedJudgmentMessage(judgment.effective_label || judgment.correction.corrected_label)
+    ? correctedJudgmentMessage(judgment.effective_label || judgment.correction.corrected_label, roastEnabled)
     : judgment.message;
+}
+
+function JudgmentProvenance({ judgment }: { judgment: Judgment }) {
+  if (judgment.model === "demo-artifact") return null;
+  if (judgment.fallback_used) return <p className="muted">AI 응답 대신 입력된 예산 기준으로 안내해요.</p>;
+  if (judgment.display_fallback_used) return <p className="muted">표현을 조정한 안내예요. 판단과 추천 행동은 그대로예요.</p>;
+  return null;
 }
 
 export function JudgmentPage() {
@@ -101,13 +106,15 @@ export function JudgmentPage() {
     <main className={`standalone-screen judgment-screen ${settings.roast_enabled ? "roast-view" : ""}`}>
       <PageHeader title="지출 판단" close right={<button className="mode-button" disabled={modeSaving} onClick={() => void toggleMode()}><ModePill enabled={settings.roast_enabled} /></button>} />
       <Surface className="judgment-transaction">
-        <span className="warm-icon">☕</span><strong>{transaction.merchant || categoryNames[transaction.category]}</strong><b>{formatWon(transaction.amount_krw)}</b>
+        <span className="warm-icon"><CategoryIcon category={transaction.category} size={28} /></span><strong>{transaction.merchant || categoryNames[transaction.category]}</strong><b>{formatWon(transaction.amount_krw)}</b>
       </Surface>
-      <div className="judgment-meta"><JudgmentBadge label={judgment.effective_label || judgment.label} /><span>{confidenceText(judgment.confidence)} · {Math.round(judgment.confidence * 100)}%</span></div>
+      <div className="judgment-meta"><JudgmentBadge label={judgment.effective_label || judgment.label} /><span>{judgment.correction ? "내가 수정한 평가" : `${confidenceText(judgment.confidence)} · ${Math.round(judgment.confidence * 100)}%`}</span></div>
       <section className="judgment-headline">
-        <h1>{currentJudgmentMessage(judgment)}</h1>
+        <h1>{currentJudgmentMessage(judgment, settings.roast_enabled)}</h1>
       </section>
-      <h2>판단 근거</h2>
+      <JudgmentProvenance judgment={judgment} />
+      <h2>{judgment.correction ? "기록 당시 AI 판단 근거" : "판단 근거"}</h2>
+      {judgment.correction && <p className="muted">기록 당시 AI 판단: {labelText(judgment.original_label || judgment.label)} · {Math.round(judgment.confidence * 100)}%. 아래 근거와 추천 행동은 당시 기록이에요.</p>}
       <EvidenceList judgment={judgment} transaction={transaction} />
       <div className="recommendation"><span className="idea-icon"><Lightbulb size={28} /></span><p>{judgment.recommended_action}</p></div>
       {modeError && <p className="form-error" role="alert">{modeError}</p>}
@@ -243,7 +250,7 @@ export function TransactionDetailPage() {
       <PageHeader title="거래 상세" right={<button className="detail-edit-button" onClick={openTransactionEditor}>수정</button>} />
       <section className="detail-hero">
         <h1 className={transactionType === "income" ? "income-text" : ""}>{transactionType === "income" ? "+" : transactionType === "expense" ? "-" : ""}{formatWon(transaction.amount_krw)}</h1>
-        <div><span className="detail-icon">☕</span><p><strong>{transaction.merchant || categoryNames[transaction.category]}</strong><small>{categoryNames[transaction.category]}</small></p></div>
+        <div><CategoryIcon category={transaction.category} size={28} /><p><strong>{transaction.merchant || categoryNames[transaction.category]}</strong><small>{categoryNames[transaction.category]}</small></p></div>
         <span className="source-pill">{transactionTypeLabel} · 수기 입력</span>
       </section>
       <Surface className="detail-fields">
@@ -256,10 +263,11 @@ export function TransactionDetailPage() {
       {judgment && (
         <Surface className="detail-judgment">
           <h2>기록 당시 AI 판단</h2>
-          <JudgmentBadge label={judgment.effective_label || judgment.label} confidence={judgment.confidence} />
+          <JudgmentBadge label={judgment.original_label || judgment.label} confidence={judgment.confidence} />
           <p>{judgment.rationale}</p>
+          <JudgmentProvenance judgment={judgment} />
           {judgment.language_repaired && <small>이전 설명을 한국어로 표시했어요. 당시 판단 결과는 유지돼요.</small>}
-          {judgment.correction && <small>원래 판단: {labelText(judgment.original_label || judgment.label)} · 내가 수정함</small>}
+          {judgment.correction && <small>내가 수정한 평가: {labelText(judgment.effective_label || judgment.correction.corrected_label)}</small>}
         </Surface>
       )}
       {transaction.reason && <div className="my-reason"><strong>내가 답한 이유</strong><p>{transaction.reason}</p></div>}
@@ -384,7 +392,7 @@ async function shareCardImage(
   context.lineTo(930, 850);
   context.stroke();
   context.font = "500 38px sans-serif";
-  if (options.judgment) context.fillText(`판단 · ${labelText(payload.label)}`, 150, 945);
+  if (options.judgment) context.fillText(`${detail.judgment?.correction ? "내 평가" : "AI 판단"} · ${labelText(payload.label)}`, 150, 945);
   if (options.recommendation) context.fillText(payload.recommended_action.slice(0, 28), 150, 1025);
   if (options.amount) context.fillText(`금액 · ${formatWon(detail.transaction.amount_krw)}`, 150, 1105);
   if (options.merchant) context.fillText(`사용처 · ${detail.transaction.merchant || "미입력"}`, 150, 1185);
@@ -406,7 +414,7 @@ export function SharePage() {
     if (!detail?.judgment) return null;
     return {
       label: detail.judgment.effective_label || detail.judgment.label,
-      roast_message: currentJudgmentMessage(detail.judgment),
+      roast_message: currentJudgmentMessage(detail.judgment, true),
       category: detail.transaction.category,
       recommended_action: detail.judgment.recommended_action,
     };
@@ -464,11 +472,12 @@ export function SharePage() {
   return (
     <main className="standalone-screen share-screen">
       <PageHeader title="결과 공유" close />
+      {detail.judgment && <JudgmentProvenance judgment={detail.judgment} />}
       <h1>웃기더라도, <Highlight>내 돈</Highlight>은 가리고.</h1>
       <section className="share-card" aria-label="공유 이미지 미리보기">
         <div className="share-stamp"><strong>장부 AI · 소비 판단</strong></div>
         <blockquote>{copy}</blockquote>
-        <div className="share-meta"><span><CalendarBlank size={20} /> {categoryNames[payload.category] ?? "같은 분류"} 지출</span><strong>판단 · {labelText(payload.label)}</strong><span><Copy size={22} /> 내 장부</span></div>
+        <div className="share-meta"><span><CalendarBlank size={20} /> {categoryNames[payload.category] ?? "같은 분류"} 지출</span><strong>{detail.judgment?.correction ? "내 평가" : "AI 판단"} · {labelText(payload.label)}</strong><span><Copy size={22} /> 내 장부</span></div>
       </section>
       <Surface className="share-options">
         <h2>공유에 포함</h2>

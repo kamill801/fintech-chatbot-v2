@@ -346,3 +346,18 @@ Why: 새 계획을 아직 확정하지 않고 기존 계획을 확인할 수 있
 Next: 검증된 최종 SHA를 일반 push하고 기존 Vercel/Render에 동일 SHA로 배포한다. 실제 최종 운영 검증과 배포 식별자는 외부 RELEASE.md에 기록한다.
 Issues: 프런트111개/16파일과 lint 통과. 새 테스트 쿼리의 타입 오류3곳을 정확한 정규식 이름 조회로 수정한 뒤 PlanPage11개와 tsc/Vite build 재통과. 실제 로컬320px에서 초안 우선순위/사유/700000예산 복원·기존 계산 유지·문서폭320·버튼48px 확인. 백엔드·인증·계산·원본 금융 데이터·공급자 변경 없음. 실기기/CSV 파일 내용/직접 모델 성공 여부의 미확인 범위를 유지한다.
 ---
+
+[2026-10-30 20:28] [Phase 8 / Task 8.5] (bounded QA6/6 stopped; production auth recovered; semantic gate failed)
+What: 기존 Supabase 프로젝트 kkzsyprcujrxzrsognhb가 INACTIVE이고 현재 운영 번들의 인증 호스트가 NXDOMAIN인 것을 확인했다. 동일한 Free/Seoul 프로젝트만 복원해 ACTIVE_HEALTHY, 공개 auth JWKS200, 원래 계정의 인증된 홈/기록/설정 및 새로고침 세션 복원을 확인했다. 새 프로젝트·키·계정·요금제·리전은 만들거나 바꾸지 않았다. 새 카카오 동의→authorization-code 콜백은 이번에 별도로 완료하지 않았다.
+Changes: 앞선 5개 배치의 거래 근거 기간/모드, 데모 판단·수정 이력, 계획 연결 기간, 분류 아이콘, 대체 문구 출처 표시, 한국어 할머니 프롬프트/렌더러, 인증 fetch+body 및 세션 대기 제한 소스는 미커밋 작업 트리에 보존했다. source-manifest.json의23개 소스/테스트 해시는 최종 테스트 후 동일하다. TECHSPEC, app.py/worker.py/sheets_logger.py, 기존 공급자와 계산/기록을 보존했다.
+Evidence: frontend147/147, backend170/170(격리 Redis, skip0), lint/typecheck/Vite build/Python compile/diff check 통과. 실제 운영 UI에서 QA1030 카페8500, 필요한 치료160000, 충동 의류320000을 기록→이유→판단→해당 날짜 캘린더로 확인했다. 새로고침 후 Oct30합계488500/월811000, 설정21건 유지. 원래18건과 프로필/예산/목표는 삭제·변경하지 않았고 테스트3건도 삭제하지 않았다. 할머니 모드는 원래off로 복원해 새로고침 읽기 확인했다.
+Issues: 실제 운영 카페 판단은 예산41%에도 예산 초과라고 주장했다. 의료 지출은 필요성을 인정하지만 말투가 딱딱하게 섞여6/10이다. 의류 판단은 실제101%초과는 맞지만 사용자가 말하지 않은 반성 신호를 근거로 만들어냈다. F17과 낮은 말투 품질은 미해결이며, 운영3사례는 수정 후보의3개 실제 모델 배치 검증이 아니다. 로컬 기존 API401은 운영 키 오류의 증거가 아니며 사용자 지시에 따라 키 교체/추가 로컬 호출 없이 운영UI를 사용했다. 기존UI로 모델/원문/렌더 대체 출처를 검증하지 못했다.
+Next: docs/qa/2026-10-30/RESULTS.md, rounds.json(6started/6completed, stopped, limit_reached_required_gates_unmet), hosted-persona.json과 원문/스크린샷/루브릭을 먼저 읽는다. 이번6회 기록을 초기화하거나 다음 수정을 verification 안에 숨기지 않는다. 후속 명시 요청이 있으면 F17을 허용된 실제 모델 입력과 대조해 재현하고 사실성/말투를 수정한 뒤 원래9개 루브릭, 최종 후보 운영 검증, 새로운 카카오 콜백/남은 전체 행렬을 완료해야 한다. 커밋·푸시·배포 권한은 기존 그대로지만 필수 gate 미통과라 이번 변경은 전부 미커밋/미푸시/미배포이며 배포 확인0/2다. `.agents/`, AGENTS.md, 옛 RESUME.md는 제외한다. 비밀값은 기록하지 않았다.
+---
+
+[2026-10-30 21:10] [Phase 8 / Task 8.5] (explicitly authorized continuation; candidate ready for hosted evaluation)
+What: 사용자의 후속 요청으로 새 run2026-10-30-02를 시작했다. prior6/6중단 기록은 보존했다. 예산 비율과 반성 근거를 벗어난 모델 주장을 저장 전에 거절하고 최대2회 안에서 재시도/명시된 대체 결과로 처리한다. 건강 분류를 기존 healthcare 정책에 연결하고, 검증된 카카오 콜백이 캐시 세션에 덮이지 않게 하며, 사용자의 평가 수정과 기록 당시 AI근거/확신/권고를 분리했다. 이전 미커밋23개 소스 수정을 함께 보존한다.
+Evidence: 예산/후회/건강/fallback 회귀8실패→통과, 주장별 부정/미래 범위12실패→통과, 콜백4실패→16통과. 전체 frontend151/151, backend178/178(격리 Redis6389,skip0), lint/tsc/Vite/Python compile/diff 통과. source-manifest.json으로 소스를 고정했다. 원래 운영 계정21건과 프로필을 읽기 확인했다.
+Next: 기존 권한으로 한 scoped candidate commit/push 후 기존 Vercel upglow/jangbu-ai와 Render jangbu-api에 같은 SHA를 배포해 실제 후보를 평가한다. 후보 배포는 유저 준비 완료 선언이 아니다. 실제 AI3배치와 새 카카오 콜백, 전체 기능/화면, 마지막 배포 확인2회는 남아있다. docs/qa/2026-10-30-02/rounds.json에 이력/공급자예산을 유지한다.
+Issues: 로컬401 키 교체나 모델 호출 없음. 기존 금융 기록/프로필/계산식/TECHSPEC/app.py/worker.py/sheets_logger.py/공급자/요금제/비밀값 보존. .agents/, AGENTS.md, 옛 RESUME.md 제외. 최초 Redis검사는 샌드박스 소켓 제한으로 실패했고 격리 소켓 허용 후 전체 통과했다.
+---

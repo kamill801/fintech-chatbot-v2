@@ -100,6 +100,8 @@ export interface Correction {
 
 export interface Judgment {
   language_repaired?: boolean;
+  display_fallback_used?: boolean;
+  display_fallback_reason?: string | null;
   judgment_id: string;
   transaction_id: string;
   mode: "normal" | "roast";

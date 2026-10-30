@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoPlanState, demoProfile, demoSettings, demoSummary, demoTransactions } from "../demo";
 import { ApiError } from "../api";
 import { BrowserRouter } from "../router";
-import type { SpendingPlanState } from "../types";
+import type { SpendingPlanState, Transaction } from "../types";
 import { PlanPage } from "./PlanPage";
 
 
@@ -64,6 +64,10 @@ describe("spending plan flow", () => {
     };
   }
 
+  function transaction(id: string, occurred_at: string, patch: Partial<Transaction> = {}): Transaction {
+    return { ...demoTransactions[0], transaction_id: id, merchant: id, occurred_at, ...patch };
+  }
+
   it("shows active progress, bounded narrative, check-in, and manual matching", async () => {
     const user = userEvent.setup();
     mocks.useLedger.mockReturnValue(value());
@@ -83,6 +87,87 @@ describe("spending plan flow", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "생일 선물과 연결할 거래" }), "tx-cafe");
     expect(matchPlannedExpense).toHaveBeenCalledWith("planned-gift", "tx-cafe");
     expect(await screen.findByRole("alert")).toHaveTextContent("실제 지출을 연결하지 못했어요");
+  });
+
+  it("offers only budget expenses inside the inclusive Korean plan dates", () => {
+    mocks.useLedger.mockReturnValue({
+      ...value(),
+      transactions: [
+        transaction("before-start", "2026-07-31T14:59:59Z"),
+        transaction("at-start", "2026-07-31T15:00:00Z"),
+        transaction("at-end", "2026-08-31T14:59:59Z"),
+        transaction("after-end", "2026-08-31T15:00:00Z"),
+        transaction("income", "2026-08-10T00:00:00Z", { transaction_type: "income" }),
+        transaction("transfer", "2026-08-10T00:00:00Z", { transaction_type: "transfer" }),
+        transaction("excluded", "2026-08-10T00:00:00Z", { exclude_from_budget: true }),
+        transaction("other-category", "2026-08-10T00:00:00Z", { category: "food" }),
+      ],
+    });
+    render(<BrowserRouter><PlanPage /></BrowserRouter>);
+
+    const selector = screen.getByRole("combobox", { name: "생일 선물과 연결할 거래" });
+    expect(within(selector).getAllByRole("option").map((option) => (option as HTMLOptionElement).value))
+      .toEqual(["", "at-start", "at-end", "other-category"]);
+  });
+
+  it("removes transactions already linked elsewhere and refreshes after a plan update", () => {
+    const linkedExpense = {
+      ...demoPlanState.plan.planned_expenses[0],
+      planned_expense_id: "planned-linked",
+      name: "이미 연결한 식사",
+      matched_transaction_id: "linked",
+      matched_at: "2026-08-10T00:00:00Z",
+    };
+    const plan = {
+      ...demoPlanState,
+      plan: {
+        ...demoPlanState.plan,
+        planned_expenses: [
+          ...demoPlanState.plan.planned_expenses,
+          linkedExpense,
+          { ...linkedExpense, planned_expense_id: "planned-next", name: "다음 약속", matched_transaction_id: null, matched_at: null },
+        ],
+      },
+    };
+    const transactions = [
+      transaction("linked", "2026-08-10T00:00:00Z"),
+      transaction("available", "2026-08-11T00:00:00Z"),
+    ];
+    mocks.useLedger.mockReturnValue({ ...value(plan), transactions });
+    const view = render(<BrowserRouter><PlanPage /></BrowserRouter>);
+    const options = () => within(screen.getByRole("combobox", { name: "생일 선물과 연결할 거래" }))
+      .getAllByRole("option").map((option) => (option as HTMLOptionElement).value);
+    expect(options()).toEqual(["", "available"]);
+
+    const updatedPlan = {
+      ...plan,
+      plan: {
+        ...plan.plan,
+        planned_expenses: plan.plan.planned_expenses.map((expense) => expense.planned_expense_id === "planned-next"
+          ? { ...expense, matched_transaction_id: "available", matched_at: "2026-08-11T00:00:00Z" }
+          : expense),
+      },
+    };
+    mocks.useLedger.mockReturnValue({ ...value(updatedPlan), transactions });
+    view.rerender(<BrowserRouter><PlanPage /></BrowserRouter>);
+    expect(options()).toEqual([""]);
+  });
+
+  it("uses the account timezone for match eligibility just like the server", () => {
+    mocks.useLedger.mockReturnValue({
+      ...value(),
+      settings: { ...demoSettings, timezone: "UTC" },
+      transactions: [
+        transaction("before-utc-start", "2026-07-31T15:00:00Z"),
+        transaction("at-utc-end", "2026-08-31T23:59:59Z"),
+        transaction("after-utc-end", "2026-09-01T00:00:00Z"),
+      ],
+    });
+    render(<BrowserRouter><PlanPage /></BrowserRouter>);
+
+    const selector = screen.getByRole("combobox", { name: "생일 선물과 연결할 거래" });
+    expect(within(selector).getAllByRole("option").map((option) => (option as HTMLOptionElement).value))
+      .toEqual(["", "at-utc-end"]);
   });
 
   it("treats a completed plan as history and starts the next period draft", async () => {

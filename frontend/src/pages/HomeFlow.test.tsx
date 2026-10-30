@@ -1,10 +1,11 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BrowserRouter } from "../router";
+import { BrowserRouter, Route, Routes } from "../router";
 import { demoPlanState, demoProfile, demoSettings, demoSummary, demoTransactions } from "../demo";
 import { manualDraftKey } from "../local-drafts";
 import { HomePage, ManualTransactionPage, ReasonPage } from "./HomeFlow";
+import type { Transaction } from "../types";
 
 const mocks = vi.hoisted(() => ({
   createTransaction: vi.fn(),
@@ -227,15 +228,15 @@ describe("demo financial consistency", () => {
     window.history.replaceState({}, "", "/transactions/tx-cafe/reason?demo=1");
     render(<BrowserRouter><ReasonPage /></BrowserRouter>);
 
-    expect(await screen.findByText("생활비 예산 13% 사용")).toBeInTheDocument();
+    expect(await screen.findByText("8월 생활비 예산 13% 사용 · 현재 입력 기준")).toBeInTheDocument();
   });
 
-  it("shows the same weekly recurrence count used by the demo judgment", async () => {
+  it("labels the demo recurrence as seven days instead of a calendar week", async () => {
     window.history.replaceState({}, "", "/transactions/tx-cafe/reason?demo=1");
     render(<BrowserRouter><ReasonPage /></BrowserRouter>);
 
-    expect(await screen.findByText("생활비 예산 47% 사용")).toBeInTheDocument();
-    expect(screen.getByText("이번 주 같은 분류 3번째")).toBeInTheDocument();
+    expect(await screen.findByText("8월 생활비 예산 47% 사용 · 현재 입력 기준")).toBeInTheDocument();
+    expect(screen.getByText("지출일 기준 최근 7일 · 같은 분류 3건")).toBeInTheDocument();
   });
 
   it("returns from an unanswered reason to that transaction's calendar date", async () => {
@@ -243,9 +244,76 @@ describe("demo financial consistency", () => {
     window.history.replaceState({}, "", "/transactions/tx-cafe/reason?demo=1");
     render(<BrowserRouter><ReasonPage /></BrowserRouter>);
 
-    await screen.findByText("생활비 예산 47% 사용");
+    await screen.findByText("8월 생활비 예산 47% 사용 · 현재 입력 기준");
     await user.click(screen.getByRole("button", { name: "나중에 답하기 · 장부로" }));
     expect(window.location.pathname).toBe("/ledger");
     expect(window.location.search).toBe("?date=2026-08-03&view=calendar&saved=tx-cafe&demo=1");
+  });
+});
+
+describe("reason evidence boundaries", () => {
+  afterEach(cleanup);
+
+  const transaction: Transaction = {
+    ...demoTransactions[0],
+    transaction_id: "tx-reason",
+    occurred_at: "2026-08-02T15:30:00Z", // Monday, August 3 at 00:30 in Korea.
+    status: "awaiting_reason",
+  };
+
+  function renderReason(transactions: Transaction[], summary = demoSummary, demo = false) {
+    mocks.useLedger.mockReturnValue({
+      answerReason: vi.fn(),
+      demo,
+      getTransaction: vi.fn().mockResolvedValue({ transaction }),
+      profile: demoProfile,
+      summary,
+      transactions,
+    });
+    window.history.replaceState({}, "", `/transactions/tx-reason/reason${demo ? "?demo=1" : ""}`);
+    return render(<BrowserRouter><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>);
+  }
+
+  it.each([false, true])("counts only same-category expenses in seven Korean dates through this purchase (demo=%s)", async (demo) => {
+    const record = (id: string, occurredAt: string, patch: Partial<Transaction> = {}): Transaction => ({
+      ...transaction,
+      transaction_id: id,
+      occurred_at: occurredAt,
+      ...patch,
+    });
+    renderReason([
+      transaction,
+      record("first-in-range", "2026-07-27T15:00:00Z"),
+      record("before-this-purchase", "2026-08-02T15:20:00Z"),
+      record("too-old", "2026-07-27T14:59:59Z"),
+      record("later-same-day", "2026-08-02T15:31:00Z"),
+      record("future", "2030-08-03T00:00:00Z"),
+      record("income", "2026-08-02T15:10:00Z", { transaction_type: "income" }),
+      record("transfer", "2026-08-02T15:10:00Z", { transaction_type: "transfer" }),
+      record("other-category", "2026-08-02T15:10:00Z", { category: "food" }),
+    ], demoSummary, demo);
+
+    expect(await screen.findByText("지출일 기준 최근 7일 · 같은 분류 3건")).toBeInTheDocument();
+    expect(screen.queryByText(/이번 주 같은 분류/)).not.toBeInTheDocument();
+  });
+
+  it("includes the loaded purchase once when the transaction list has not caught up", async () => {
+    renderReason([]);
+
+    expect(await screen.findByText("지출일 기준 최근 7일 · 같은 분류 1건")).toBeInTheDocument();
+  });
+
+  it("does not present a different month's budget as historical evidence", async () => {
+    renderReason([transaction], { ...demoSummary, month: "2026-10" });
+
+    expect(await screen.findByText("당시 예산 사용률은 확인할 수 없어요")).toBeInTheDocument();
+    expect(screen.queryByText(/47% 사용/)).not.toBeInTheDocument();
+  });
+
+  it("matches the summary month using the transaction's Korean date", async () => {
+    const boundaryTransaction = { ...transaction, occurred_at: "2026-07-31T15:05:00Z" };
+    renderReason([boundaryTransaction]);
+
+    expect(await screen.findByText("8월 생활비 예산 47% 사용 · 현재 입력 기준")).toBeInTheDocument();
   });
 });

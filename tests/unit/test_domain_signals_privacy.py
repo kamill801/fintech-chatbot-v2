@@ -86,6 +86,11 @@ class DomainValidationTests(unittest.TestCase):
 
 
 class SignalPolicyTests(unittest.TestCase):
+    def test_ui_health_category_uses_existing_healthcare_signal(self) -> None:
+        base = SignalInputs(transaction_amount_krw=160000, discretionary_budget_krw=800000, category="healthcare")
+        from dataclasses import replace
+        self.assertEqual(compute_signal_set(base), compute_signal_set(replace(base, category="health")))
+
     def test_computes_documented_risk_formula(self) -> None:
         signals = compute_signal_set(
             SignalInputs(

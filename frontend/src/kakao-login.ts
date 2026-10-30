@@ -1,5 +1,6 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { apiUrl } from "./api";
+import { authFetch } from "./auth-request";
 
 const PENDING_KEY = "jangbu:kakao-login";
 const MAX_PENDING_AGE_MS = 10 * 60 * 1000;
@@ -27,7 +28,7 @@ async function pkceChallenge(verifier: string): Promise<string> {
 }
 
 async function post<T>(path: string, body: Record<string, string>): Promise<T> {
-  const response = await fetch(apiUrl(path), {
+  const response = await authFetch(apiUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

@@ -3,14 +3,33 @@
 ## Current State
 
 - Phase: 8 - AI spending-plan coach
-- Active task: Task 8.4 — Full service QA, usability polish, and single verified release (user authorized iterative fixes, preservation of all features, release, and reusable skill on 2026-10-12)
+- Active task: Task 8.5 — Three full-service QA rounds followed by three grandma-voice quality rounds (user requested 2026-10-30)
 - Approval: 2026-08-01 user-approved replacement of the legacy product, TECHSPEC, PLAN, and backend
 - UI/UX approval: 2026-08-03 user-approved domestic-ledger benchmarking and joint design start
 - Branch: `main`
 - Sources of truth: `TECHSPEC.md` for product/backend invariants, `DESIGN.md` for UI/UX decisions
 - Last pre-pivot commit: `64b46ae`
 
-## Task 8.4 — Full Service QA and Usability Polish
+## Task 8.5 — Full-service and Grandma-voice Quality Verification
+
+### Authorized continuation (2026-10-30)
+
+User requested a new run after the capped prior run. Continue Task8.5 using docs/qa/2026-10-30-02/CONTRACT.md and rounds.json (max7); prior6/6 evidence remains intact. Finish actual hosted quality and full retained flows, then verified commit/push/deployment to existing services. No new provider or key.
+
+### Authorized plan
+
+Preserve every existing ledger feature and the approved design. Run three forward-only inspect/fix/verify service rounds, then three separate persona-evaluation rounds. Record the contract, frozen semantic rubric, provider-attempt budget, findings, regressions, browser evidence and remaining gaps under `docs/qa/2026-10-30/`. Existing provider connections only; isolated fixtures for mutations; no production-data deletion, new infrastructure, billing changes or TECHSPEC edits.
+
+- [ ] Round 1: baseline all retained flows, reproduce defects and repair the frozen findings batch.
+- [ ] Round 2: repeat the full journey with different inputs and recovery/navigation cases.
+- [ ] Round 3: verify the final functional candidate, responsive UI and retained features.
+- [ ] Persona rounds 1–3: evaluate actual configured-model output separately from fallback, improve demonstrated voice defects, and verify financial/safety parity against the frozen rubric.
+- [x] Final source regressions: frontend151/151, backend178/178 with isolated Redis, lint/typecheck/build/compile and diff checks passed.
+- [x] Recover the existing production Supabase project and verify authenticated session/record readback.
+- [x] Record bounded-run results, actual hosted outputs and exact continuation evidence in docs/qa/2026-10-30/RESULTS.md.
+- [ ] Complete required live persona gates and release; F17 factual guards, health-category mapping, callback authority and correction provenance are locally verified. Candidate commit/push/deployment follows; hosted voice and final journeys remain unverified.
+
+## Task 8.4 — Full Service QA and Usability Polish (Completed)
 
 ### Goal and authorized scope
 

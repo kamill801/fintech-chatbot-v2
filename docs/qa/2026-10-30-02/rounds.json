@@ -1,0 +1,81 @@
+{
+  "schema_version": 2,
+  "run_id": "jangbu-qa-2026-10-30-02",
+  "previous_run": "../2026-10-30/rounds.json",
+  "authority": "2026-10-30 explicit user continue, finish unverified quality and bugs, prepare user-ready release",
+  "max_passes": 7,
+  "passes_started": 2,
+  "passes_completed": 2,
+  "active_pass": null,
+  "phase": "candidate_release",
+  "state": "running",
+  "required_matrix_ref": "CONTRACT.md",
+  "provider_budget": {
+    "max_calls": 36,
+    "calls_attempted": 0,
+    "cost_known": null,
+    "cost_unknown_calls": 0,
+    "reservations": []
+  },
+  "post_deploy": {
+    "max_checks": 2,
+    "checks_started": 0,
+    "checks_completed": 0,
+    "checks": []
+  },
+  "release": {
+    "state": "candidate_prepared",
+    "source_sha": null,
+    "vercel": null,
+    "render": null
+  },
+  "passes": [
+    {
+      "number": 1,
+      "phase": "verify",
+      "status": "completed_findings",
+      "findings": [
+        "F17 carried: hosted cafe41% claims budget exceeded; shopping invents remorse; medical voice6/10",
+        "F18 UI health category lacks existing healthcare signal mapping",
+        "F19 pending Kakao callback can be overridden by cached auth event",
+        "F20 manual correction is presented as AI reconsideration and adds a new action",
+        "F21 aggregate fallback risk is described as both budget and goal high without evidence"
+      ],
+      "changes": [
+        "F17 bounded budget/remorse factual guard plus retry feedback and colloquial prompt; immutable stored artifacts preserved",
+        "F18 canonical health maps to existing healthcare policy",
+        "F19 validated callback authority + StrictMode promise reuse",
+        "F20 separate user correction from original AI confidence/rationale/action and share provenance",
+        "F21 describe aggregate risk without claiming each component is high"
+      ],
+      "evidence": [
+        "backend targeted56 pass; new budget/remorse/health/fallback regressions initially8 failures",
+        "auth targeted red4/12 and green16/16; targeted ESLint pass",
+        "Read-only review found F22 clause-wide future exemption accepts mixed false past and future; F23 missing past conjugation and truthful negation"
+      ]
+    },
+    {
+      "number": 2,
+      "phase": "verify",
+      "status": "completed_local_candidate",
+      "findings": [
+        "F22 bound evidence polarity to individual claim, not whole clause",
+        "F23 common exceeded conjugation and direct denial handling"
+      ],
+      "changes": [
+        "Scope direct negative/conditional qualification to each individual budget claim; cover common past exceeded conjugation"
+      ],
+      "evidence": [
+        "12 new claim-scope regression failures before repair, targeted58/58 after",
+        "JudgmentFlow15/15; source baseline lint/build pass",
+        "Initial backend integration could not bind/connect isolated Redis due sandbox; rerunning with approved local socket access, not an application failure",
+        "frontend151/151, backend178/178 including isolated Redis integration skip0, lint/tsc/Vite/Python compile/diff pass",
+        "Source manifest frozen before candidate commit; original production account21 records read back"
+      ]
+    }
+  ],
+  "open_defects": [
+    "Hosted validation remains: candidate persona3batches, fresh Kakao callback, final retained-flow UI/readback and responsive/device evidence"
+  ],
+  "stop_reason": null
+}

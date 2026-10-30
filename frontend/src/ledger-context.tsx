@@ -223,6 +223,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const transactionRevision = useRef(0);
   const derivedRevision = useRef(0);
   const planRevision = useRef(0);
+  const demoCorrections = useRef(new Map<string, Correction>());
 
   const refreshDerived = useCallback(async () => {
     if (demo) return;
@@ -349,7 +350,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           if (transactionType !== "expense") return { transaction };
           return needsReason
             ? { transaction, signals: demoSignals, pending_question: { ...demoPending, transaction_id: transaction.transaction_id } }
-            : { transaction, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled) };
+            : { transaction, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled, transaction) };
         }
         const result = await ledgerApi.createTransaction(draft, operationId);
         transactionRevision.current += 1;
@@ -382,7 +383,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
               setPlan(applyDemoPlanDelta(plan, delta));
             }
           }
-          return { transaction: updated, judgment: updated.transaction_type === "expense" ? demoJudgment(settings.roast_enabled) : undefined };
+          return { transaction: updated, judgment: updated.transaction_type === "expense" ? demoJudgment(settings.roast_enabled, updated) : undefined };
         }
         const result = await ledgerApi.updateTransaction(id, draft);
         transactionRevision.current += 1;
@@ -409,7 +410,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
           const transaction = transactions.find((item) => item.transaction_id === id) ?? demoTransactions[0];
           const updated = { ...transaction, reason, status: "judged" as const };
           setTransactions((items) => items.map((item) => (item.transaction_id === id ? updated : item)));
-          return { transaction: updated, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled) };
+          return { transaction: updated, signals: demoSignals, judgment: demoJudgment(settings.roast_enabled, updated) };
         }
         const result = await ledgerApi.answerReason(id, reason);
         setTransactions((items) => items.map((item) => (item.transaction_id === id ? result.transaction : item)));
@@ -437,9 +438,11 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       async getTransaction(id) {
         if (demo) {
           const transaction = transactions.find((item) => item.transaction_id === id) ?? demoTransactions[0];
+          const judgment = transaction.status === "judged" ? demoJudgment(settings.roast_enabled, transaction) : undefined;
+          const correction = judgment ? demoCorrections.current.get(judgment.judgment_id) : undefined;
           return {
             transaction,
-            judgment: transaction.status === "judged" ? demoJudgment(settings.roast_enabled) : undefined,
+            judgment: judgment ? { ...judgment, effective_label: correction?.corrected_label ?? judgment.label, correction: correction ?? null } : undefined,
             pending_question: transaction.status === "awaiting_reason" ? { ...demoPending, transaction_id: transaction.transaction_id } : undefined,
           };
         }
@@ -447,13 +450,18 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       },
       async correctJudgment(id, label, reason) {
         if (demo) {
-          return {
+          const transaction = transactions.find((item) => item.status === "judged" && demoJudgment(settings.roast_enabled, item).judgment_id === id);
+          if (!transaction) throw new ApiError("judgment_not_found", "판단을 찾지 못했어요.", 404);
+          const original = demoJudgment(settings.roast_enabled, transaction);
+          const correction: Correction = {
             judgment_id: id,
-            original_label: "caution",
+            original_label: original.label,
             corrected_label: label,
             correction_reason: reason,
             corrected_at: new Date().toISOString(),
           };
+          demoCorrections.current.set(id, correction);
+          return correction;
         }
         return ledgerApi.correctJudgment(id, label, reason);
       },
@@ -465,6 +473,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       },
       async deleteData() {
         if (!demo) await ledgerApi.deleteData();
+        demoCorrections.current.clear();
         clearFinancialDrafts(userKey);
         transactionRevision.current += 1;
         derivedRevision.current += 1;

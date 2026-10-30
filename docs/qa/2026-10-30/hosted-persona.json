@@ -1,0 +1,82 @@
+{
+  "deployment": "baseline ed2cadd (candidate not deployed)",
+  "environment": "existing production UI; current profile unchanged; QA records retained",
+  "model_and_raw_provenance": "Not exposed by baseline UI; output differs from static fallback but exact model/attempts unverified",
+  "cases": [
+    {
+      "case": "hosted-1A",
+      "category": "cafe",
+      "amount_krw": 8500,
+      "reason": "점심을 먹고 습관처럼 커피를 샀어요.",
+      "visible_budget_usage_percent": 41,
+      "label": "overspending",
+      "confidence": 0.95,
+      "rationale": "이번 카페 지출은 예산을 넘어서는 행동입니다",
+      "roast": "이 녀석아, 장부 바닥이 보이는데 또 퍼 쓰면 어쩌자는 거냐. 커피는 자주 마셨으니 이제 물이나 산책으로 대체해라.",
+      "action": "카페 지출 횟수를 줄이고 대체 활동을 고려하세요.",
+      "score_0_to_2": {
+        "support": 0,
+        "specificity": 2,
+        "cadence": 2,
+        "caring_wit": 1,
+        "action": 2
+      },
+      "total": 7,
+      "status": "Failed hard factual gate; 7/10; context differs from fixed 1A fixture.",
+      "normal": "최근 커피 지출이 반복적이어서 예산 초과 상태입니다. 다른 활동으로 전환해 보세요.",
+      "visible_parity": "same label, confidence and action; both voices contain the same unsupported budget-exceeded assertion",
+      "persistence": "Saved row on Oct30 calendar, amount8500; monthly total331000."
+    },
+    {
+      "case": "hosted-1C",
+      "category": "health",
+      "amount_krw": 160000,
+      "reason": "갑자기 아파서 필요한 치료를 받았어요.",
+      "visible_budget_usage_percent": 61,
+      "label": "justified",
+      "confidence": 0.85,
+      "rationale": "의료 지출은 예상치 못한 상황에서 발생할 수 있는 필수 지출입니다",
+      "roast": "그래, 이건 필요한 데 제대로 썼다. 지갑 닫을 일은 아니니 건강을 유지하며 앞으로의 지출을 주기적으로 점검하세요.",
+      "action": "건강을 유지하며 앞으로의 지출을 주기적으로 점검하세요.",
+      "score_0_to_2": {
+        "support": 2,
+        "specificity": 1,
+        "cadence": 1,
+        "caring_wit": 1,
+        "action": 1
+      },
+      "total": 6,
+      "status": "Safety/necessity acknowledged, quality threshold fails6/10; display appears templated; raw model vs display substitution unverified.",
+      "persistence": "Oct30 calendar healthcare160000 and cafe8500; monthly total491000."
+    },
+    {
+      "case": "hosted-1B",
+      "category": "shopping",
+      "amount_krw": 320000,
+      "reason": "기분 전환으로 계획에 없던 옷을 샀어요.",
+      "visible_budget_usage_percent": 101,
+      "label": "overspending",
+      "confidence": 0.95,
+      "rationale": "사용자가 기분 전환으로 계획에 없던 쇼핑을 했고, 반성의 날카로운 신호가 감지되었으며 예산 초과 상태입니다",
+      "roast": "이 녀석아, 통장이 다 털리면 기분이 좋던가? 장부가 살찌기 전에 먼저 계획을 세워봐야 알 거 아니냐. 다음 달엔 쇼핑 계획 세우는데 집중해라.",
+      "action": "다음 달에는 쇼핑 계획을 세워서 소비를 통제하세요.",
+      "score_0_to_2": {
+        "support": 0,
+        "specificity": 2,
+        "cadence": 2,
+        "caring_wit": 1,
+        "action": 1
+      },
+      "total": 6,
+      "status": "Failed hard factual gate: reason states an unplanned mood purchase, not remorse. Budget exceedance itself is supported by shown101%; 6/10. Actual profile differs from fixed1B fixture.",
+      "persistence": "Oct30 calendar after reload retains all three QA rows, date total488500; monthly total811000. Settings export shows21 rows."
+    }
+  ],
+  "final_state": {
+    "production_qa_records_retained": 3,
+    "original_records_deleted": 0,
+    "original_profile_budget_goal_retained": true,
+    "mode_restoration": "off saved and confirmed after authenticated reload",
+    "candidate_model_evaluation": "not deployed; no successful live candidate batch claim"
+  }
+}

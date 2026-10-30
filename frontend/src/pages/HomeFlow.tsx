@@ -306,7 +306,7 @@ export function ManualTransactionPage() {
 
 export function ReasonPage() {
   const { transactionId = "" } = useParams();
-  const { answerReason, demo, getTransaction, profile, summary, transactions } = useLedger();
+  const { answerReason, demo, getTransaction, summary, transactions } = useLedger();
   const navigate = useNavigate();
   const [transaction, setTransaction] = useState<Transaction | null>(transactions.find((item) => item.transaction_id === transactionId) ?? null);
   const [reason, setReason] = useState(demo ? "친구와 오랜만에 만나서 이야기할 곳이 필요했어." : "");
@@ -332,10 +332,24 @@ export function ReasonPage() {
   }
 
   if (!transaction) return <div className="loading-screen">거래를 불러오는 중</div>;
-  const budget = summary?.discretionary_budget_krw ?? profile?.discretionary_budget_krw ?? 0;
-  const budgetUsage = budget > 0 ? Math.round(((summary?.budget_spent_krw ?? summary?.total_spent_krw ?? 0) / budget) * 100) : 0;
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const sameCategoryCount = Math.max(1, transactions.filter((item) => item.category === transaction.category && (demo || new Date(item.occurred_at).getTime() >= weekAgo)).length);
+  const transactionDate = transactionDateKey(transaction.occurred_at);
+  const transactionMonth = transactionDate.slice(0, 7);
+  const budget = summary?.discretionary_budget_krw ?? 0;
+  const budgetUsage = summary?.month === transactionMonth && budget > 0
+    ? Math.round(((summary.budget_spent_krw ?? summary.total_spent_krw) / budget) * 100)
+    : null;
+  const occurredAt = new Date(transaction.occurred_at).getTime();
+  const recentStart = new Date(`${transactionDate}T00:00:00+09:00`).getTime() - 6 * 24 * 60 * 60 * 1000;
+  const sameCategoryCount = [
+    ...transactions.filter((item) => item.transaction_id !== transaction.transaction_id),
+    transaction,
+  ].filter((item) => {
+    const itemTime = new Date(item.occurred_at).getTime();
+    return item.transaction_type === "expense"
+      && item.category === transaction.category
+      && itemTime >= recentStart
+      && itemTime <= occurredAt;
+  }).length;
   return (
     <main className="standalone-screen reason-screen">
       <PageHeader title="할머니에게 이유 답하기" close />
@@ -348,7 +362,7 @@ export function ReasonPage() {
       <section className="reason-hero">
         <div><h1>이 지출이<br />꼭 필요했던<br /><Highlight>이유</Highlight>가 뭐야?</h1></div>
       </section>
-      <div className="reason-signals"><span><i /> 생활비 예산 {budgetUsage}% 사용</span><span><CalendarBlank size={19} /> 이번 주 같은 분류 {sameCategoryCount}번째</span></div>
+      <div className="reason-signals"><span><i /> {budgetUsage === null ? "당시 예산 사용률은 확인할 수 없어요" : `${Number(transactionMonth.slice(5))}월 생활비 예산 ${budgetUsage}% 사용 · 현재 입력 기준`}</span><span><CalendarBlank size={19} /> 지출일 기준 최근 7일 · 같은 분류 {sameCategoryCount}건</span></div>
       <label className="reason-box">
         <span className="sr-only">지출 이유</span>
         <textarea maxLength={120} value={reason} onChange={(event) => setReason(event.target.value)} />

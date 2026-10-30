@@ -1,0 +1,17 @@
+# Authorized continuation - user-ready release
+
+User explicitly requested continuation after the prior capped run on2026-10-30. Prior run2026-10-30-01 remains immutable history (6/6 stopped, F17 open). Native Codex; Task8.5 remains active; preserve all functions, existing accounts and data, financial arithmetic, TECHSPEC and approved design.
+
+## Claim and required gates
+
+User-ready existing web service, not universal absence of bugs or measured viral performance. Retain full A-M matrix in ../2026-10-30/CONTRACT.md and exact nine-case semantic rubric in ../2026-10-30/PERSONA-RUBRIC.md. Score thresholds remain>=8/10 and all hard factual/parity/safety/provenance gates. No fallback is a successful model generation. Synthetic production UI records are authorized, labeled and retained; preserve original financial profile/records. No production deletion, new infrastructure/keys/accounts/billing.
+
+Before candidate deployment: reproduce F17 at earliest source cause; meaningful regressions; final frontend/backend storage suites, lint/typecheck/build/compile, source/diff review; candidate fingerprint and commit SHA. After these gates pass, commit/push and deploy candidate to existing Vercel upglow/jangbu-ai and Render jangbu-api under existing explicit authority. This deployment is the required hosted candidate evaluation, not a premature readiness declaration. Because no separate hosted backend exists, candidate evaluation uses the existing service with labeled authorized fixtures. Verify both providers' exact SHA and alias. No new infrastructure or release-gate downgrade.
+
+Final readiness: actual candidate output in three batches (nine cases) matching original frozen expected meanings where supplied allowlisted signals match, otherwise clearly record live context and do not pretend fixed-fixture equivalence. Trace real model/display fallback provenance. Fresh authenticated Kakao sign-in/session, save-selected-calendar-refresh, income/transfer/edit, reason/judgment/reflection/correction/share parity, plans preview/confirm/revision/check-in, reports, settings/export, ownership/privacy/error regressions. Destructive/revocation paths use isolated repository fixtures, not original user production data. Responsive320/390/414/1440 with screenshots and usable fonts/controls; physical WKWebView remains distinct and must be tested if device available. No changed source after tests without next repair pass. Preserve scope and report residual external/hardware/pilot limits.
+
+## Run limits
+
+Max7 forward-only inspect->fix->verify passes. Explicit new-run authority comes from the latest user request, not an automatic counter reset. Reserve each before inspection; never repair during verify. Two final deployment-confirmation journeys, separately counted, with multiple linked scenarios permitted. Max36 provider attempt slots shared across all evaluations; reserve conservative maximum2 for judgment before UI submission, count failures and unknown cost; no replacement API key or repeated known401 local calls. Use existing deployed provider only as requested. Stop if actual allowance exhausted; preserve unmet gates.
+
+Pass1: factual signal/prompt/renderer and dependency inspection, targeted F17 repair. Reserve remaining passes for held-out quality and newly found functional regressions. Final report distinguishes commit/push/deploy from authenticated E2E and live model quality.

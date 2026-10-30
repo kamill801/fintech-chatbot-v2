@@ -35,6 +35,8 @@ class RenderedJudgment:
     fallback_used: bool
     model: str
     policy_version: str
+    display_fallback_used: bool = False
+    display_fallback_reason: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -49,6 +51,8 @@ class RenderedJudgment:
             "fallback_used": self.fallback_used,
             "model": self.model,
             "policy_version": self.policy_version,
+            "display_fallback_used": self.display_fallback_used,
+            "display_fallback_reason": self.display_fallback_reason,
         }
 
 
@@ -73,6 +77,8 @@ def render_judgment(judgment: JudgmentLike, *, roast_enabled: bool) -> RenderedJ
         fallback_used=judgment.fallback_used,
         model=judgment.model,
         policy_version=judgment.policy_version,
+        display_fallback_used=not valid,
+        display_fallback_reason=reason if not valid else None,
     )
 
 
@@ -89,13 +95,28 @@ def _safe_fallback_message(
 
 
 def grandma_mode_fallback(*, label: str, rationale: str, recommended_action: str) -> str:
+    explanation = _spoken_rationale(rationale)
     if label == "justified":
-        return f"그래, 이건 필요한 데 제대로 썼다. 지갑 닫을 일은 아니니 {recommended_action}"
+        return f"그래, 잘 썼다. {explanation} 지갑 열 때 챙길 약속은 이거다: {recommended_action}"
     if label == "insufficient_context":
-        return f"아이구, 장부에 이유가 비었잖아. {recommended_action}"
+        return f"아이구, 장부만 보고 속단할 순 없지. {explanation} 지갑 열기 전에 이걸 챙겨라: {recommended_action}"
     if label == "overspending":
-        return f"아이고 이 화상아, 장부 바닥이 보이는데 또 퍼 쓰면 어쩌자는 거냐. {rationale} {recommended_action}"
-    return f"쯧쯧, 냄비 넘치기 전에 불부터 줄여라. {rationale} {recommended_action}"
+        return f"아이고 이 화상아, 지갑을 쌀독처럼 퍼 쓰면 어쩌냐. {explanation} 다음엔 이 약속부터 지켜라: {recommended_action}"
+    return f"쯧쯧, 냄비 넘치기 전에 불부터 줄여야지. {explanation} 지갑 열기 전엔 이걸 챙겨라: {recommended_action}"
+
+
+def _spoken_rationale(rationale: str) -> str:
+    explanation = rationale.strip()
+    for written, spoken in (
+        ("있다.", "있구나."),
+        ("없다.", "없구나."),
+        ("높다.", "높구나."),
+        ("낮다.", "낮구나."),
+        ("이다.", "이구나."),
+    ):
+        if explanation.endswith(written):
+            return explanation[:-len(written)] + spoken
+    return explanation
 
 
 def validate_normal_tone(message: str) -> tuple[bool, str]:

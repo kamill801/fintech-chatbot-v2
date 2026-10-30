@@ -91,14 +91,20 @@ def validate_roast_tone(message: str, *, label: str | None = None) -> tuple[bool
         return valid, reason
     if label == "justified":
         acknowledgement_markers = ("필요", "정당", "괜찮", "인정")
-        if not any(marker in message for marker in acknowledgement_markers):
+        acknowledges_good_purchase = re.search(r"잘\s*(?:샀|썼)(?:다|네|구나|어)", message)
+        if not any(marker in message for marker in acknowledgement_markers) and not acknowledges_good_purchase:
             return False, "justified roast must acknowledge the purchase"
-    voice_markers = ("아이고", "아이구", "에이구", "쯧", "그래", "이 녀석", "이 화상")
-    household_markers = ("장부", "지갑", "통장", "국밥", "밥솥", "냄비", "시장", "앞치마")
+    voice_markers = ("아이고", "아이구", "에이구", "쯧", "그래", "할미", "이 녀석", "이 화상")
+    household_markers = ("장부", "지갑", "통장", "국밥", "밥솥", "냄비", "시장", "앞치마", "쌀독")
     if not any(marker in message for marker in voice_markers):
         return False, "grandma mode needs a clear voice marker"
     if not any(marker in message for marker in household_markers):
         return False, "grandma mode needs a household metaphor"
+    substance = message
+    for marker in (*voice_markers, *household_markers):
+        substance = substance.replace(marker, "")
+    if len(re.findall(r"[가-힣]", substance)) < 4:
+        return False, "grandma mode needs meaningful guidance beyond voice markers"
     return True, ""
 
 
@@ -106,7 +112,9 @@ def validate_message_safety(message: str) -> tuple[bool, str]:
     if not isinstance(message, str) or not message.strip():
         return False, "empty message"
     for phrase in ROAST_FORBIDDEN_PHRASES:
-        if phrase in message:
+        # Remove only the innocuous dishwashing word, not other occurrences of the insult.
+        checked_message = message.replace("설거지", "") if phrase == "거지" else message
+        if phrase in checked_message:
             return False, f"unsafe tone phrase: {phrase}"
     for pattern in UNSAFE_TONE_PATTERNS:
         if pattern.search(message):

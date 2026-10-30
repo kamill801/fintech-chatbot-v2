@@ -263,10 +263,25 @@ export function PlanPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const previewRequestId = useRef(0);
-  const eligibleTransactions = useMemo(
-    () => transactions.filter((item) => item.transaction_type === "expense" && !item.exclude_from_budget),
-    [transactions],
-  );
+  const eligibleTransactions = useMemo(() => {
+    if (!plan) return [];
+    const linkedTransactionIds = new Set(plan.plan.planned_expenses.map((item) => item.matched_transaction_id));
+    const dateOptions: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit" };
+    let dateFormatter: Intl.DateTimeFormat;
+    try {
+      dateFormatter = new Intl.DateTimeFormat("en-US", { ...dateOptions, timeZone: settings.timezone });
+    } catch {
+      dateFormatter = new Intl.DateTimeFormat("en-US", { ...dateOptions, timeZone: "Asia/Seoul" });
+    }
+    return transactions.filter((item) => {
+      if (item.transaction_type !== "expense" || item.exclude_from_budget || linkedTransactionIds.has(item.transaction_id)) return false;
+      const occurredAt = new Date(item.occurred_at);
+      if (Number.isNaN(occurredAt.getTime())) return false;
+      const parts = Object.fromEntries(dateFormatter.formatToParts(occurredAt).map((part) => [part.type, part.value]));
+      const dateKey = `${parts.year}-${parts.month}-${parts.day}`;
+      return plan.plan.period_start <= dateKey && dateKey <= plan.plan.period_end;
+    });
+  }, [plan, settings.timezone, transactions]);
   const baseVersion = editing ? plan?.plan.version ?? null : null;
   const needsRevisionApi = Boolean(plan && (flowMode === "revise" || flowMode === "next"));
   const revisionReason = revisionReasonForMode(flowMode, reason);

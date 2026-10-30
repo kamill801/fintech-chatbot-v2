@@ -6,9 +6,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { authConfigured, supabase } from "./auth-client";
+import { awaitAuthResult } from "./auth-request";
 import { finishKakaoLogin, isKakaoCallback, startKakaoLogin } from "./kakao-login";
 import { clearFinancialDrafts } from "./local-drafts";
 
@@ -43,6 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(authConfigured);
   const [error, setError] = useState<string | null>(null);
+  const callbackPending = useRef(isKakaoCallback());
+  const callbackResult = useRef<Promise<Session> | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -51,43 +55,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const auth = supabase.auth;
     let active = true;
-    const callbackPending = isKakaoCallback();
-    if (callbackPending) {
-      void finishKakaoLogin(supabase).then((nextSession) => {
+    let authRevision = 0;
+    const initialRevision = authRevision;
+    const isInitialReadCurrent = () => active && authRevision === initialRevision;
+    const { data } = auth.onAuthStateChange((event, nextSession) => {
+      // Cached-session refreshes and SDK sign-in notifications cannot prove that
+      // the current callback passed state, nonce and token exchange validation.
+      if (!active || event === "INITIAL_SESSION" || callbackPending.current) return;
+      // A confirmed SDK event supersedes every earlier restore/metadata snapshot.
+      authRevision += 1;
+      setSession(nextSession);
+      setError(null);
+      setLoading(false);
+    });
+    if (callbackPending.current) {
+      // Each real callback request is bounded and aborted by authFetch, including
+      // the Supabase token response body. Do not race the session-writing SDK call.
+      // Effect replay must reuse this operation: it consumes the pending state
+      // and URL synchronously, before the provider response arrives.
+      callbackResult.current ??= finishKakaoLogin(supabase);
+      void callbackResult.current.then((nextSession) => {
         if (!active) return;
+        callbackPending.current = false;
         setSession(nextSession);
+        setError(null);
       }).catch(() => {
         if (!active) return;
+        callbackPending.current = false;
+        setSession(null);
         setError("카카오 로그인을 완료하지 못했어요. 다시 시도해 주세요.");
       }).finally(() => {
         if (active) setLoading(false);
       });
     } else {
-      void auth.getSession().then(async ({ data, error: sessionError }) => {
-        let nextSession = data.session;
-        if (nextSession) {
-          try {
-            const { data: userData } = await auth.getUser();
-            if (userData.user?.id === nextSession.user.id) {
-              nextSession = { ...nextSession, user: userData.user };
+      void (async () => {
+        try {
+          const { data, error: sessionError } = await awaitAuthResult(auth.getSession(), 15_000);
+          if (!isInitialReadCurrent()) return;
+          let nextSession = data.session;
+          if (nextSession) {
+            try {
+              const { data: userData } = await awaitAuthResult(auth.getUser(), 8_000);
+              if (userData.user?.id === nextSession.user.id) {
+                nextSession = { ...nextSession, user: userData.user };
+              }
+            } catch {
+              // Preserve cached introduction metadata if its refresh is unavailable.
             }
-          } catch {
-            // A cached session remains usable when the metadata refresh is unavailable.
           }
+          if (!isInitialReadCurrent()) return;
+          setSession(nextSession);
+          setError(sessionError ? "로그인 상태를 확인하지 못했어요. 다시 로그인해 주세요." : null);
+        } catch (restoreError) {
+          if (!isInitialReadCurrent()) return;
+          setError(restoreError instanceof DOMException && restoreError.name === "TimeoutError"
+            ? "로그인 상태를 확인하는 데 시간이 오래 걸려요. 카카오 또는 이메일로 다시 로그인해 주세요."
+            : "로그인 상태를 확인하지 못했어요. 다시 로그인해 주세요.");
+        } finally {
+          if (isInitialReadCurrent()) setLoading(false);
         }
-        if (!active) return;
-        setSession(nextSession);
-        setError(sessionError ? "로그인 상태를 확인하지 못했어요." : null);
-        setLoading(false);
-      }).catch(() => {
-        if (active) setLoading(false);
-      });
+      })();
     }
-    const { data } = auth.onAuthStateChange((event, nextSession) => {
-      if (!active) return;
-      if (event === "INITIAL_SESSION") return;
-      setSession(nextSession);
-    });
     return () => {
       active = false;
       data.subscription.unsubscribe();

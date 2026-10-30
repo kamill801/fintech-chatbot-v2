@@ -1,5 +1,6 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "./auth-context";
 import { manualDraftKey, onboardingDraftKey } from "./local-drafts";
@@ -74,7 +75,7 @@ describe("AuthProvider", () => {
     authApi.unsubscribe.mockReset();
   });
 
-  afterEach(cleanup);
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
 
   it("uses password authentication for login and signup", async () => {
     const user = userEvent.setup();
@@ -117,6 +118,63 @@ describe("AuthProvider", () => {
     expect(kakao.finishKakaoLogin).toHaveBeenCalledTimes(1);
     expect(authApi.getSession).not.toHaveBeenCalled();
     expect(screen.getByLabelText("auth identity")).toHaveTextContent("kakao-supabase-user");
+  });
+
+  it.each(["TOKEN_REFRESHED", "SIGNED_IN"])("does not accept a cached %s event as a pending Kakao callback result", async (event) => {
+    kakao.isKakaoCallback.mockReturnValue(true);
+    let rejectCallback!: (error: Error) => void;
+    kakao.finishKakaoLogin.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectCallback = reject; }));
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+
+    await act(async () => {
+      authApi.onAuthStateChange.mock.calls[0][0](event, { user: { id: "cached-account" } });
+    });
+    expect(screen.getByText("loading")).toBeInTheDocument();
+    expect(screen.queryByLabelText("auth identity")).not.toBeInTheDocument();
+
+    await act(async () => { rejectCallback(new Error("callback exchange failed")); });
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("카카오 로그인을 완료하지 못했어요");
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent('"userKey":null');
+  });
+
+  it("uses the completed callback session before resuming ordinary SDK auth events", async () => {
+    kakao.isKakaoCallback.mockReturnValue(true);
+    let resolveCallback!: (session: unknown) => void;
+    kakao.finishKakaoLogin.mockReturnValueOnce(new Promise((resolve) => { resolveCallback = resolve; }));
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+
+    await act(async () => {
+      authApi.onAuthStateChange.mock.calls[0][0]("TOKEN_REFRESHED", { user: { id: "cached-account" } });
+      authApi.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", { user: { id: "callback-account" } });
+    });
+    expect(screen.getByText("loading")).toBeInTheDocument();
+
+    await act(async () => { resolveCallback({ user: { id: "callback-account" } }); });
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent("callback-account");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    await act(async () => { authApi.onAuthStateChange.mock.calls[0][0]("SIGNED_OUT", null); });
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent('"userKey":null');
+  });
+
+  it("keeps one callback operation authoritative across StrictMode effect replay", async () => {
+    kakao.isKakaoCallback.mockReturnValue(true);
+    let resolveCallback!: (session: unknown) => void;
+    kakao.finishKakaoLogin.mockImplementationOnce(() => {
+      // The real callback consumes the pending state and removes the query URL.
+      kakao.isKakaoCallback.mockReturnValue(false);
+      return new Promise((resolve) => { resolveCallback = resolve; });
+    });
+    render(<StrictMode><AuthProvider><AuthActions /></AuthProvider></StrictMode>);
+
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText("loading")).toBeInTheDocument();
+    expect(authApi.getSession).not.toHaveBeenCalled();
+    expect(kakao.finishKakaoLogin).toHaveBeenCalledTimes(1);
+
+    await act(async () => { resolveCallback({ user: { id: "callback-account" } }); });
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent("callback-account");
   });
 
   it("keeps ledger ownership on the Supabase user ID while exposing Kakao metadata for display", async () => {
@@ -176,6 +234,82 @@ describe("AuthProvider", () => {
 
     render(<AuthProvider><AuthActions /></AuthProvider>);
     expect(await screen.findByLabelText("intro state")).toHaveTextContent("seen");
+  });
+
+  it("recovers from a stalled session restore and ignores its late snapshot", async () => {
+    vi.useFakeTimers();
+    let resolveSession!: (value: unknown) => void;
+    authApi.getSession.mockReturnValueOnce(new Promise((resolve) => { resolveSession = resolve; }));
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+    expect(screen.getByText("loading")).toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("로그인 상태를 확인하는 데 시간이 오래 걸려요");
+    await act(async () => {
+      resolveSession({ data: { session: { user: { id: "old-user" } } }, error: null });
+    });
+    expect(screen.getByLabelText("auth identity")).not.toHaveTextContent("old-user");
+  });
+
+  it("uses the cached session after a bounded metadata refresh", async () => {
+    vi.useFakeTimers();
+    authApi.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: "cached-user", user_metadata: { jangbu_intro_seen: true } } } }, error: null,
+    });
+    authApi.getUser.mockReturnValueOnce(new Promise(() => undefined));
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(8_000); });
+
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent("cached-user");
+    expect(screen.getByLabelText("intro state")).toHaveTextContent("seen");
+  });
+
+  it("does not let an older session read overwrite a newer signed-in event", async () => {
+    let resolveSession!: (value: unknown) => void;
+    authApi.getSession.mockReturnValueOnce(new Promise((resolve) => { resolveSession = resolve; }));
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+    await act(async () => {
+      authApi.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", { user: { id: "new-user" } });
+      resolveSession({ data: { session: { user: { id: "old-user" } } }, error: null });
+    });
+
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent("new-user");
+    expect(screen.getByLabelText("auth identity")).not.toHaveTextContent("old-user");
+  });
+
+  it("does not restore a signed-out user when an old metadata read finishes", async () => {
+    let resolveUser!: (value: unknown) => void;
+    authApi.getSession.mockResolvedValueOnce({ data: { session: { user: { id: "user-a" } } }, error: null });
+    authApi.getUser.mockReturnValueOnce(new Promise((resolve) => { resolveUser = resolve; }));
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      authApi.onAuthStateChange.mock.calls[0][0]("SIGNED_OUT", null);
+      resolveUser({ data: { user: { id: "user-a" } }, error: null });
+    });
+
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent('"userKey":null');
+  });
+
+  it("recovers visibly when a confirmed auth event arrives after a restore timeout", async () => {
+    vi.useFakeTimers();
+    authApi.getSession.mockReturnValueOnce(new Promise(() => undefined));
+    render(<AuthProvider><AuthActions /></AuthProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    await act(async () => {
+      authApi.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", { user: { id: "confirmed-user" } });
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("auth identity")).toHaveTextContent("confirmed-user");
   });
 
   it("clears user-scoped financial drafts after sign-out succeeds", async () => {
