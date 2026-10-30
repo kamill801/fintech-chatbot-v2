@@ -1,0 +1,70 @@
+Browser tab: 3, Title: "장부 AI", URL: "https://jangbu-ai.vercel.app/settings".
+1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/settings
+	2 container
+		3 button 뒤로
+			4 image
+		5 heading 설정, Value: 1
+			6 text 설정
+		7 image
+		8 text 로그인 계정
+		9 text 카카오 계정
+		10 heading 욕쟁이 할머니 모드, Value: 2
+			11 text 욕쟁이 할머니 모드
+		12 text 켜면 모든 지출의 이유를 묻고, 할머니 말투로 판단해요
+		13 button 말투 미리보기
+			14 text 말투 미리보기
+			15 image
+		16 switch Description: 욕쟁이 할머니 모드, Value: 0
+		17 text 꺼짐
+		18 button 내 자금 기준 생활비 예산 800,000원
+			19 image
+			20 text 내 자금 기준
+			21 text 생활비 예산 800,000원
+			22 image
+		23 button 목표 비상금 · 현재 30%
+			24 image
+			25 text 목표
+			26 text 비상금 · 현재 30%
+			27 image
+		28 button 계좌 1개 사용 중
+			29 image
+			30 text 계좌
+			31 text 1개 사용 중
+			32 image
+		33 button 카테고리 예산 예산 추가
+			34 image
+			35 text 카테고리 예산
+			36 text 예산 추가
+			37 image
+		38 button 내 소비 기준 기준 추가
+			39 image
+			40 text 내 소비 기준
+			41 text 기준 추가
+			42 image
+		43 image
+		44 text 데이터 방식
+		45 text 직접 입력
+		46 button 거래 내보내기 33건 · CSV
+			47 image
+			48 text 거래 내보내기
+			49 text 33건 · CSV
+			50 image
+		51 heading 개인정보와 데이터, Value: 2
+			52 text 개인정보와 데이터
+		53 button AI가 보는 정보
+			54 image
+			55 text AI가 보는 정보
+			56 image
+		57 button 모든 데이터 삭제 삭제한 데이터는 복구할 수 없어요
+			58 image
+			59 text 모든 데이터 삭제
+			60 text 삭제한 데이터는 복구할 수 없어요
+			61 image
+		62 image
+		63 text 장부 데이터는 마지막 변경 후 최대 365일 보관되며, 직접 삭제하면 즉시 삭제돼요.
+		64 button 로그아웃
+			65 image
+			66 text 로그아웃
+		67 text 버전 0.1
+
+The focused UI element is 1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/settings

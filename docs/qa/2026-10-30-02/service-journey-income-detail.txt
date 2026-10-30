@@ -1,0 +1,34 @@
+Browser tab: 3, Title: "장부 AI", URL: "https://jangbu-ai.vercel.app/transactions/0bbfa9b3-1d63-455c-9932-992184383006".
+1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/transactions/0bbfa9b3-1d63-455c-9932-992184383006
+	2 container
+		3 button 뒤로
+			4 image
+		5 heading 거래 상세, Value: 1
+			6 text 거래 상세
+		7 button 수정
+		8 heading +1,000원, Value: 1
+			9 text + 1,000원
+		10 image
+		11 text [QA1030-02] 수입 날짜 검증
+		12 text 급여
+		13 text 수입  · 수기 입력
+		14 text 날짜
+		15 text 10월 31일 (토)  ·  12:00
+		16 text 계좌
+		17 text 현금
+		18 text 메모
+		19 text QA: 선택 날짜 수입 편집·새로고침 확인
+		20 heading 기록, Value: 2
+			21 text 기록
+		22 image
+		23 text 22:21
+		24 text 수입  기록
+		25 button 거래 내용 수정
+			26 image
+			27 text 거래 내용 수정
+		28 button 거래 삭제
+			29 image
+			30 text 거래 삭제
+		31 link Description: 장부로, Value: jangbu-ai.vercel.app/ledger
+
+The focused UI element is 1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/transactions/0bbfa9b3-1d63-455c-9932-992184383006

@@ -4,17 +4,17 @@
   "previous_run": "../2026-10-30/rounds.json",
   "authority": "2026-10-30 explicit user continue, finish unverified quality and bugs, prepare user-ready release",
   "max_passes": 7,
-  "passes_started": 5,
-  "passes_completed": 5,
+  "passes_started": 7,
+  "passes_completed": 7,
   "active_pass": null,
-  "phase": "candidate_release",
-  "state": "running",
+  "phase": "stopped",
+  "state": "stopped",
   "required_matrix_ref": "CONTRACT.md",
   "provider_budget": {
     "max_calls": 36,
-    "calls_attempted": 4,
+    "calls_attempted": 22,
     "cost_known": null,
-    "cost_unknown_calls": 4,
+    "cost_unknown_calls": 22,
     "reservations": [
       {
         "case": "1A",
@@ -27,6 +27,60 @@
         "maximum_attempt_slots": 2,
         "state": "reserved_before_submit",
         "actual_attempts": "unknown until visible provenance; conservative max2 charged"
+      },
+      {
+        "case": "R1A 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative2 charged"
+      },
+      {
+        "case": "R1B 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
+      },
+      {
+        "case": "R1C 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
+      },
+      {
+        "case": "R2A 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
+      },
+      {
+        "case": "R2B 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
+      },
+      {
+        "case": "R2C 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
+      },
+      {
+        "case": "R3A 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
+      },
+      {
+        "case": "R3B 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
+      },
+      {
+        "case": "R3C 2af944f",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown; conservative max2 charged"
       }
     ]
   },
@@ -38,19 +92,20 @@
   },
   "release": {
     "state": "candidate_live",
-    "source_sha": "f80ac72cff1ac7731ed86e1194c87abee85b0ee4",
+    "source_sha": "2af944facc7b48a1bf482002e0e4c5c5c13bce17",
     "vercel": {
-      "id": "dpl_AXNHwYePcaLuMsX7zZrkrKcJS7t4",
-      "url": "https://jangbu-plmcy803s-upglow.vercel.app",
+      "id": "dpl_8dWZ8sJdQ2ALuoVeTy2EbchJWnxt",
+      "url": "https://jangbu-el3p7y4pt-upglow.vercel.app",
       "alias": "https://jangbu-ai.vercel.app",
       "state": "READY",
-      "source_proof": "clean git archive, exact releaseCommitSha verified through CLI v13"
+      "source_proof": "clean git archive exact releaseCommitSha"
     },
     "render": {
-      "id": "dep-dbi8vmc9v7es7391je6g",
+      "id": "dep-dbi99uei0phs73d7an80",
       "state": "Live",
-      "source_sha": "f80ac72cff1ac7731ed86e1194c87abee85b0ee4"
-    }
+      "source_sha": "2af944facc7b48a1bf482002e0e4c5c5c13bce17"
+    },
+    "final_worktree_state": "uncommitted_unpushed_undeployed_required_gates_unmet"
   },
   "passes": [
     {
@@ -160,10 +215,66 @@
         "Full frontend159/159 backend189/189 isolatedRedis skip0; lint/tsc/Vite/Python compile/diff pass",
         "Read-only re-review: all3 identified defects repaired, no new blocker; bounded semantic guard still requires hosted evaluation"
       ]
+    },
+    {
+      "number": 6,
+      "phase": "verify",
+      "status": "completed_inspection_no_source_changes",
+      "scope": "Three hosted service journeys and three distinct real model batches on exact candidate; bounded repairs deferred to pass7",
+      "findings": [
+        "F28 actual R1B6/10: forced unrelated domestic metaphor (냄비가 들썩이지); purchase already completed but recommends buying next month",
+        "F29 reason screen can display previous summary percentage while derived refresh pending; verify before next repair, do not substitute UI percentage for provider inputs",
+        "Date picker fill showed future value then reverted on rerender; not yet reproduced through native/manual interaction, possible tool event limitation",
+        "F30 category-food recurrence is incorrectly narrated as repeated delivery; earliest prompt/guard scope defect reproduced with pure-function check",
+        "F31 actual justified emergency rendered a disclosed display fallback; source tone validator requires a household object and model loop never checks voice",
+        "F32 R3B disclosed deterministic fallback has report-like wording; R3C shames a planned basic meal and offers vague arbitrary next-week action"
+      ],
+      "evidence": [
+        "Candidate2af944f exactSHA Vercel READY and Render Live. R1A9/10 live102% not frozen84%; R1C9/10 necessarycare recognized; R1B6/10 failed voice/action quality. Stored immutable outputs preserved, same modes label/confidence/action verified.",
+        "All nine hosted cases R1A-R3C captured with exact text, normal-mode parity and selected-date return on2af944f. Four pass9/10; five fail or are fallback; frozen ratios differ from accumulated production context.",
+        "Actual Oct31 synthetic income1000 saved and returned to selected calendar; unchanged expense total2050500. Memo edit survives reload. CSV32rows actual downloaded and parsed, QA income present; no raw financial rows printed."
+      ],
+      "changes": []
+    },
+    {
+      "number": 7,
+      "phase": "verify",
+      "status": "completed_required_gates_unmet",
+      "scope": "Final frozen batch F28-F32, regression and full retained-flow verification; no new repair cycle after verify",
+      "findings": [
+        "F28 forced unrelated metaphor/completed-purchase deferral",
+        "F29 stale derived budget percentage",
+        "F30 subtype frequency unsupported by category history",
+        "F31 style forced-object validator / no pre-save tone retry",
+        "F32 fallback report copy and basic-meal calibration"
+      ],
+      "changes": [
+        "F28/F30 prompt purchase-time and broad-category evidence scope; bounded completed-purchase/delivery-frequency guards with positive self-report/future counterexamples",
+        "F29 suppress stale summary ratio while syncWarning preserves draft and submit",
+        "F31 optional metaphor; validate generated tone within existing maximum2 attempts; preserve original artifacts and fallback disclosure",
+        "F32 respectful deterministic action copy, spoken fallback common endings, necessary basic-meal calibration without label/formula changes"
+      ],
+      "evidence": [
+        "New hosted regressions red15; source patch and existing expectation corrections then52/52 targeted pass. F29 red2 then24/24. Independent review ending red5 and future-habit red1 fixed before final source freeze.",
+        "Final backend199/199 isolated Redis6389 skip0; frontend confirmation161/161 in17files, single worker/no file parallelism/testTimeout15000, same unchanged source. Initial parallel147/161 and default serial160/161 retained as failed resource-timeout executions; PlanPage isolated14/14 passed.",
+        "Lint/tsc/Vite/Python compile/diff check passed; F28-F32 final source not committed/pushed/deployed or hosted-reverified.",
+        "Hosted QA income/edit/reload, actual32row CSV, manual synthetic100 transfer with unchanged expense2050500, reflection saved. Correction submit readback unknown after browser transport failure.",
+        "NEW F33 during verify: CorrectionModal real reason initializes unrelated needed-meeting sentence; no repair inside verification. Browser inventory fails transport closed; roast restoration/QA account archive/viewport reset unknown."
+      ]
     }
   ],
   "open_defects": [
-    "Hosted repaired storage verification, nine actual model cases in3batches, fresh Kakao callback/user handoff, retained-flow and device gates pending"
+    "F33 confirmed: CorrectionModal prefilled irrelevant actual reason; blank+placeholder and regression repair pending.",
+    "F28-F32 locally repaired only: final hosted semantic and affected UI verification pending; earlier2af 4/9 pass5/9 fail-or-fallback.",
+    "Full-service three whole journeys and final required A-M matrix remain incomplete; not replaced by nine judgments or automated suites.",
+    "Browser transport closed; correction submit persisted state, original roast off restoration, QA account archive and QA viewport reset unknown.",
+    "Physical iPhone inventory empty; no current device proof."
   ],
-  "stop_reason": null
+  "stop_reason": "limit_reached_required_gates_unmet",
+  "cleanup": {
+    "owned_redis6389": "SIGINT graceful shutdown confirmed, session87406 exit0",
+    "owned_vite4174": "SIGINT confirmed session19423 exit130",
+    "browser": "transport closed; no unrelated app/process terminated; UI setting restoration not confirmed",
+    "production_qa_data": "retained; no deletion; original profile/goal preserved"
+  }
 }

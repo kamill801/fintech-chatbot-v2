@@ -14,7 +14,11 @@
 
 ### Authorized continuation (2026-10-30)
 
+Latest explicit continuation: user requests remaining repairs/release and authorizes maximum5 verification cycles. Active run is docs/qa/2026-10-30-03/CONTRACT.md and rounds.json (1/5 reserved). Prior stopped runs remain historical; continue F33 + frozen F28–F32 through real hosted verification and existing-provider release. No new key/project/account.
+
 User requested a new run after the capped prior run. Continue Task8.5 using docs/qa/2026-10-30-02/CONTRACT.md and rounds.json (max7); prior6/6 evidence remains intact. Finish actual hosted quality and full retained flows, then verified commit/push/deployment to existing services. No new provider or key.
+
+Current checkpoint: run2026-10-30-02 stopped7/7 with required gates unmet. Fresh Kakao callback, selected-date expense/income/edit/reload, synthetic transfer, CSV32row parsing and reflection were actually verified on candidate2af944f. Three actual voice batches/nine cases yielded4pass/5fail-or-fallback. Final F28–F32 source is locally verified (backend199,frontend161,lint/typecheck/build/compile), but uncommitted/unpushed/undeployed and not hosted-reverified. New F33 correction-reason prefill remains. CUA browser transport failed, so original roastoff restoration and correction readback remain unknown. Task8.5 is not complete; see docs/qa/2026-10-30-02/RESULTS.md and RESUME.md. Do not automatically reset counters/startpass8.
 
 ### Authorized plan
 

@@ -1,0 +1,3 @@
+Browser tab: 3, Title: "장부 AI", URL: "https://jangbu-ai.vercel.app/settings".
+There has been no change in the accessibility tree.
+The focused UI element is 1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/settings

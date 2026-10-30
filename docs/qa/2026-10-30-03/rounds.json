@@ -1,0 +1,72 @@
+{
+  "schema_version": 2,
+  "run_id": "jangbu-qa-2026-10-30-03",
+  "previous_run": "../2026-10-30-02/rounds.json",
+  "authority": "User explicitly asks remaining work and authorizes maximum5 verification cycles; prior release and synthetic UI test authority retained",
+  "max_passes": 5,
+  "passes_started": 2,
+  "passes_completed": 1,
+  "active_pass": 2,
+  "phase": "verify",
+  "state": "running",
+  "required_matrix_ref": "CONTRACT.md",
+  "provider_budget": {
+    "max_calls": 36,
+    "calls_attempted": 0,
+    "previous_run_reserved": 22,
+    "cost_known": null,
+    "reservations": []
+  },
+  "post_deploy": {
+    "max_checks": 2,
+    "checks_started": 0,
+    "checks_completed": 0,
+    "checks": []
+  },
+  "passes": [
+    {
+      "number": 1,
+      "phase": "verify",
+      "status": "completed_with_build_failure",
+      "scope": "F33 correction prefill, prior F28-F32 final patch integration, browser recovery and retained-state restoration",
+      "findings": [
+        "F33 unrelated correction reason default; current correction label/saved reason not restored; failed draft must remain; another transaction retains open dialog/draft"
+      ],
+      "changes": [
+        "F33 keyed transaction detail and optional saved correction reason; failed draft retained",
+        "F28-F32 integrated; short 안 negation frequency regressions red3 then green53"
+      ],
+      "evidence": [
+        "F33 four meaningful new tests red4/21 before source fix; /tmp/jangbu03-f33-red.log",
+        "CUA recovered; previous correction effective label confirmed; original modeoff readback and QA account archive in progress",
+        "F33 targeted21 passed; lint passed; read-only review identified short-negation fix now green",
+        "Settings original modeoff and one active account readback preserved",
+        "Backend200/200 skip0; frontend165/165; build failed only new test unsupported ByRoleOptions.exact"
+      ]
+    },
+    {
+      "number": 2,
+      "phase": "verify",
+      "status": "running",
+      "scope": "Fix new test typing; verify unchanged product, candidate deploy, hosted full journeys/persona",
+      "findings": [
+        "F34 new Testing Library getByRole exact option invalid TypeScript; runtime assertions passed165"
+      ],
+      "changes": [
+        "Replace unsupported exact option with anchored accessible-name regex in tests only"
+      ],
+      "evidence": [
+        "200 backend /165 frontend pass; affected21 re-pass after test-only TS fix; lint/tsc/Vite/compile/diff pass",
+        "Existing Vercel prj_gTH83PeOngR9KgAURhLloW94X32F project inspect matches upglow/jangbu-ai"
+      ]
+    }
+  ],
+  "release": {
+    "state": "candidate_prepared_for_hosted_evaluation",
+    "last_confirmed_live_sha": "2af944facc7b48a1bf482002e0e4c5c5c13bce17"
+  },
+  "open_defects": [
+    "Hosted final source rechecks and retained A-M matrix pending"
+  ],
+  "stop_reason": null
+}

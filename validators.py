@@ -98,8 +98,8 @@ def validate_roast_tone(message: str, *, label: str | None = None) -> tuple[bool
     household_markers = ("장부", "지갑", "통장", "국밥", "밥솥", "냄비", "시장", "앞치마", "쌀독")
     if not any(marker in message for marker in voice_markers):
         return False, "grandma mode needs a clear voice marker"
-    if not any(marker in message for marker in household_markers):
-        return False, "grandma mode needs a household metaphor"
+    if re.search(r"(?:합니다|습니다|입니다|것입니다)(?:[.!?]|\s*$)", message):
+        return False, "grandma voice must stay spoken rather than a formal report"
     substance = message
     for marker in (*voice_markers, *household_markers):
         substance = substance.replace(marker, "")

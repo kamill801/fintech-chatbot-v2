@@ -1,0 +1,23 @@
+{
+  "backend": {
+    "passed": 200,
+    "skipped": 0,
+    "log": "/tmp/jangbu03-backend.log",
+    "isolated_redis": 6389
+  },
+  "frontend": {
+    "passed": 165,
+    "files": 17,
+    "log": "/tmp/jangbu03-frontend.log",
+    "source_note": "Pass1 product source; pass2 only anchored test queries changed; affected21 passed again"
+  },
+  "build": {
+    "passed": true,
+    "log": "/tmp/jangbu03-build2.log",
+    "prior_failed": "/tmp/jangbu03-build.log test-only TS options"
+  },
+  "lint": true,
+  "compile": true,
+  "diff_check": true,
+  "review": "read-only reviewer: short-negation finding fixed with3 red subcases; otherwise no blocker"
+}

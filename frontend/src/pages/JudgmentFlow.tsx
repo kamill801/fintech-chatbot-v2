@@ -128,12 +128,16 @@ export function JudgmentPage() {
 
 export function TransactionDetailPage() {
   const { transactionId = "" } = useParams();
+  return <TransactionDetailContent key={transactionId} transactionId={transactionId} />;
+}
+
+function TransactionDetailContent({ transactionId }: { transactionId: string }) {
   const { correctJudgment, deleteTransaction, demo, reflectTransaction, settings, updateTransaction } = useLedger();
   const navigate = useNavigate();
   const { detail, error, reload, applyDetail } = useTransactionDetail(transactionId);
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState<JudgmentLabel>("justified");
-  const [reason, setReason] = useState("필요한 만남이었어요.");
+  const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [reflection, setReflection] = useState<SpendingReflection | null>(null);
@@ -152,12 +156,20 @@ export function TransactionDetailPage() {
     setReflectionNote(detail.transaction.reflection_note ?? "");
   }, [detail]);
 
+  function openCorrection() {
+    if (!detail?.judgment) return;
+    setLabel(detail.judgment.effective_label || detail.judgment.label);
+    setReason(detail.judgment.correction?.correction_reason ?? "");
+    setSaveError(null);
+    setEditing(true);
+  }
+
   async function saveCorrection() {
     if (!detail?.judgment) return;
     setSaving(true);
     setSaveError(null);
     try {
-      await correctJudgment(detail.judgment.judgment_id, label, reason);
+      await correctJudgment(detail.judgment.judgment_id, label, reason.trim());
       setEditing(false);
       await reload();
     } catch {
@@ -319,7 +331,7 @@ export function TransactionDetailPage() {
         {judgment && <div><Sparkle /> <time>{formatTime(transaction.occurred_at)}</time> 판단 완료</div>}
         {transaction.reflected_at && <div><Lightbulb /> <time>{formatTime(transaction.reflected_at)}</time> 소비 평가</div>}
       </Surface>
-      {judgment && <button className="outline-button" onClick={() => setEditing(true)}><PencilSimple size={21} /> 판단 수정</button>}
+      {judgment && <button className="outline-button" onClick={openCorrection}><PencilSimple size={21} /> 판단 수정</button>}
       <button className="outline-button transaction-edit-action" onClick={openTransactionEditor}><PencilSimple size={21} /> 거래 내용 수정</button>
       <button className="delete-transaction-button" onClick={() => setConfirmDelete(true)}><Trash size={20} /> 거래 삭제</button>
       {judgment && <p className="muted detail-footnote">판단을 수정해도 원래 판단 기록은 남아요</p>}
@@ -329,8 +341,8 @@ export function TransactionDetailPage() {
           <Dialog className="correction-dialog" aria-labelledby="correction-title" busy={saving} onClose={() => setEditing(false)} onMouseDown={(event) => event.stopPropagation()}>
             <h2 id="correction-title">판단 수정</h2>
             <p>원래 판단은 보존되고, 수정 기록이 추가돼요.</p>
-            <label>내 판단<select value={label} onChange={(event) => setLabel(event.target.value as JudgmentLabel)}><option value="justified">납득 가능한 지출</option><option value="caution">주의가 필요한 지출</option><option value="overspending">과소비</option><option value="insufficient_context">정보 부족</option></select></label>
-            <label>수정 이유<textarea value={reason} onChange={(event) => setReason(event.target.value)} /></label>
+            <label>내 판단<select disabled={saving} value={label} onChange={(event) => setLabel(event.target.value as JudgmentLabel)}><option value="justified">납득 가능한 지출</option><option value="caution">주의가 필요한 지출</option><option value="overspending">과소비</option><option value="insufficient_context">정보 부족</option></select></label>
+            <label>수정 이유 <span>선택</span><textarea disabled={saving} maxLength={500} placeholder="평가를 바꾼 이유를 직접 남겨 보세요." value={reason} onChange={(event) => setReason(event.target.value)} /></label>
             {saveError && <p className="form-error" role="alert">{saveError}</p>}
             <PrimaryButton disabled={saving} onClick={() => void saveCorrection()}>{saving ? "저장 중" : "수정 기록 남기기"}</PrimaryButton>
             <TextButton disabled={saving} onClick={() => setEditing(false)}>취소</TextButton>

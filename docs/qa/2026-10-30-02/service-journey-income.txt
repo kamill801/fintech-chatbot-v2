@@ -1,0 +1,178 @@
+Browser tab: 3, Title: "장부 AI", URL: "https://jangbu-ai.vercel.app/ledger?date=2026-10-31&view=calendar&saved=0bbfa9b3-1d63-455c-9932-992184383006".
+0 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/ledger?date=2026-10-31&view=calendar&saved=0bbfa9b3-1d63-455c-9932-992184383006
+	1 container root
+		2 container
+			3 heading 장부, Value: 1
+				4 text 장부
+			5 button 이전 달
+				6 image
+			7 container 현재 장부 월
+				8 text 2026년 10월
+			9 button 다음 달
+				10 image
+			11 heading 이번 달 2,050,500원 썼어요., Value: 2
+				12 text 이번 달  2,050,500원  썼어요.
+			13 text 수입
+			14 text 1,000원
+			15 text 지출
+			16 text 2,050,500원
+			17 text 순현금
+			18 text -2,049,500원
+			19 text 거래를 기록했어요. 선택한 날짜의 내역에서 확인할 수 있어요.
+			20 container 장부 보기 방식
+				21 checkbox 달력, Value: 1
+				22 checkbox 목록, Value: 0
+			23 button (collapsed) 검색·필터, Secondary Actions: Expand
+			24 table 2026년 10월 거래 달력
+				25 row 일 월 화 수 목 금 토
+					26 cell
+						27 text 일
+					28 cell
+						29 text 월
+					30 cell
+						31 text 화
+					32 cell
+						33 text 수
+					34 cell
+						35 text 목
+					36 cell
+						37 text 금
+					38 cell
+						39 text 토
+				40 container
+					41 row 10월 1일, 수입 0원, 지출 0원 10월 2일, 수입 0원, 지출 0원 10월 3일, 수입 0원, 지출 0원
+						42 cell (selectable) 10월 1일, 수입 0원, 지출 0원
+							43 checkbox Description: 10월 1일, 수입 0원, 지출 0원, Value: 0
+						44 cell (selectable) 10월 2일, 수입 0원, 지출 0원
+							45 checkbox Description: 10월 2일, 수입 0원, 지출 0원, Value: 0
+						46 cell (selectable) 10월 3일, 수입 0원, 지출 0원
+							47 checkbox Description: 10월 3일, 수입 0원, 지출 0원, Value: 0
+					48 row 10월 4일, 수입 0원, 지출 0원 10월 5일, 수입 0원, 지출 18,500원 10월 6일, 수입 0원, 지출 36,000원 10월 7일, 수입 0원, 지출 43,500원 10월 8일, 수입 0원, 지출 14,000원 10월 9일, 수입 0원, 지출 53,500원 10월 10일, 수입 0원, 지출 84,000원
+						49 cell (selectable) 10월 4일, 수입 0원, 지출 0원
+							50 checkbox Description: 10월 4일, 수입 0원, 지출 0원, Value: 0
+						51 cell (selectable) Description: 10월 5일, 수입 0원, 지출 18,500원, Value: 5
+-
+1.9만
+							52 checkbox Description: 10월 5일, 수입 0원, 지출 18,500원, Value: 0
+								53 text 5
+								54 container
+									55 text - 1.9만
+						56 cell (selectable) Description: 10월 6일, 수입 0원, 지출 36,000원, Value: 6
+-
+3.6만
+							57 checkbox Description: 10월 6일, 수입 0원, 지출 36,000원, Value: 0
+								58 text 6
+								59 container
+									60 text - 3.6만
+						61 cell (selectable) Description: 10월 7일, 수입 0원, 지출 43,500원, Value: 7
+-
+4.4만
+							62 checkbox Description: 10월 7일, 수입 0원, 지출 43,500원, Value: 0
+								63 text 7
+								64 container
+									65 text - 4.4만
+						66 cell (selectable) Description: 10월 8일, 수입 0원, 지출 14,000원, Value: 8
+-
+1.4만
+							67 checkbox Description: 10월 8일, 수입 0원, 지출 14,000원, Value: 0
+								68 text 8
+								69 container
+									70 text - 1.4만
+						71 cell (selectable) Description: 10월 9일, 수입 0원, 지출 53,500원, Value: 9
+-
+5.4만
+							72 checkbox Description: 10월 9일, 수입 0원, 지출 53,500원, Value: 0
+								73 text 9
+								74 container
+									75 text - 5.4만
+						76 cell (selectable) Description: 10월 10일, 수입 0원, 지출 84,000원, Value: 10
+-
+8.4만
+							77 checkbox Description: 10월 10일, 수입 0원, 지출 84,000원, Value: 0
+								78 text 10
+								79 container
+									80 text - 8.4만
+					81 row 10월 11일, 수입 0원, 지출 58,000원 10월 12일, 수입 0원, 지출 0원 10월 13일, 수입 0원, 지출 0원 10월 14일, 수입 0원, 지출 15,000원 10월 15일, 수입 0원, 지출 0원 10월 16일, 수입 0원, 지출 0원 10월 17일, 수입 0원, 지출 0원
+						82 cell (selectable) Description: 10월 11일, 수입 0원, 지출 58,000원, Value: 11
+-
+5.8만
+							83 checkbox Description: 10월 11일, 수입 0원, 지출 58,000원, Value: 0
+								84 text 11
+								85 container
+									86 text - 5.8만
+						87 cell (selectable) 10월 12일, 수입 0원, 지출 0원
+							88 checkbox Description: 10월 12일, 수입 0원, 지출 0원, Value: 0
+						89 cell (selectable) 10월 13일, 수입 0원, 지출 0원
+							90 checkbox Description: 10월 13일, 수입 0원, 지출 0원, Value: 0
+						91 cell (selectable) Description: 10월 14일, 수입 0원, 지출 15,000원, Value: 14
+-
+1.5만
+							92 checkbox Description: 10월 14일, 수입 0원, 지출 15,000원, Value: 0
+								93 text 14
+								94 container
+									95 text - 1.5만
+						96 cell (selectable) 10월 15일, 수입 0원, 지출 0원
+							97 checkbox Description: 10월 15일, 수입 0원, 지출 0원, Value: 0
+						98 cell (selectable) 10월 16일, 수입 0원, 지출 0원
+							99 checkbox Description: 10월 16일, 수입 0원, 지출 0원, Value: 0
+						100 cell (selectable) 10월 17일, 수입 0원, 지출 0원
+							101 checkbox Description: 10월 17일, 수입 0원, 지출 0원, Value: 0
+					102 row 10월 18일, 수입 0원, 지출 0원 10월 19일, 수입 0원, 지출 0원 10월 20일, 수입 0원, 지출 0원 10월 21일, 수입 0원, 지출 0원 10월 22일, 수입 0원, 지출 0원 10월 23일, 수입 0원, 지출 0원 10월 24일, 수입 0원, 지출 0원
+						103 cell (selectable) 10월 18일, 수입 0원, 지출 0원
+							104 checkbox Description: 10월 18일, 수입 0원, 지출 0원, Value: 0
+						105 cell (selectable) 10월 19일, 수입 0원, 지출 0원
+							106 checkbox Description: 10월 19일, 수입 0원, 지출 0원, Value: 0
+						107 cell (selectable) 10월 20일, 수입 0원, 지출 0원
+							108 checkbox Description: 10월 20일, 수입 0원, 지출 0원, Value: 0
+						109 cell (selectable) 10월 21일, 수입 0원, 지출 0원
+							110 checkbox Description: 10월 21일, 수입 0원, 지출 0원, Value: 0
+						111 cell (selectable) 10월 22일, 수입 0원, 지출 0원
+							112 checkbox Description: 10월 22일, 수입 0원, 지출 0원, Value: 0
+						113 cell (selectable) 10월 23일, 수입 0원, 지출 0원
+							114 checkbox Description: 10월 23일, 수입 0원, 지출 0원, Value: 0
+						115 cell (selectable) 10월 24일, 수입 0원, 지출 0원
+							116 checkbox Description: 10월 24일, 수입 0원, 지출 0원, Value: 0
+					117 row 10월 25일, 수입 0원, 지출 0원 10월 26일, 수입 0원, 지출 0원 10월 27일, 수입 0원, 지출 0원 10월 28일, 수입 0원, 지출 0원 10월 29일, 수입 0원, 지출 0원 10월 30일, 수입 0원, 지출 1,728,000원 10월 31일, 수입 1,000원, 지출 0원
+						118 cell (selectable) 10월 25일, 수입 0원, 지출 0원
+							119 checkbox Description: 10월 25일, 수입 0원, 지출 0원, Value: 0
+						120 cell (selectable) 10월 26일, 수입 0원, 지출 0원
+							121 checkbox Description: 10월 26일, 수입 0원, 지출 0원, Value: 0
+						122 cell (selectable) 10월 27일, 수입 0원, 지출 0원
+							123 checkbox Description: 10월 27일, 수입 0원, 지출 0원, Value: 0
+						124 cell (selectable) 10월 28일, 수입 0원, 지출 0원
+							125 checkbox Description: 10월 28일, 수입 0원, 지출 0원, Value: 0
+						126 cell (selectable) 10월 29일, 수입 0원, 지출 0원
+							127 checkbox Description: 10월 29일, 수입 0원, 지출 0원, Value: 0
+						128 cell (selectable) Description: 10월 30일, 수입 0원, 지출 1,728,000원, Value: 30
+-
+172.8만
+							129 checkbox Description: 10월 30일, 수입 0원, 지출 1,728,000원, Value: 0
+								130 text 30
+								131 container
+									132 text - 172.8만
+						133 cell (selected) Description: 10월 31일, 수입 1,000원, 지출 0원, Value: 31
++
+1천
+							134 checkbox Description: 10월 31일, 수입 1,000원, 지출 0원, Value: 1
+								135 text 31
+								136 container
+									137 text + 1천
+			138 heading 10월 31일 내역, Value: 2
+				139 text 10월 31일 내역
+			140 link Description: 10월 31일에 거래 추가, Value: jangbu-ai.vercel.app/add?date=2026-10-31
+			141 button [QA1030-02] 수입 날짜 검증 수입 12:00 +1,000원
+				142 image
+				143 text [QA1030-02] 수입 날짜 검증
+				144 text 수입
+				145 text 12:00
+				146 container
+					147 text + 1,000원
+				148 image
+		149 link Description: 10월 31일 빠른 거래 추가, Value: jangbu-ai.vercel.app/add?date=2026-10-31
+		150 container 주요 메뉴
+			151 link Description: 홈, Value: jangbu-ai.vercel.app/
+			152 link Description: 장부, Value: jangbu-ai.vercel.app/ledger
+			153 link Description: 계획, Value: jangbu-ai.vercel.app/plan
+			154 link Description: 리포트, Value: jangbu-ai.vercel.app/report
+
+The focused UI element is 0 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/ledger?date=2026-10-31&view=calendar&saved=0bbfa9b3-1d63-455c-9932-992184383006

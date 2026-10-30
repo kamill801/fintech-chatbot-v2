@@ -1,0 +1,15 @@
+{
+  "pass": 2,
+  "phase": "verify",
+  "files": {
+    "frontend/src/pages/HomeFlow.test.tsx": "5d36e0a2e61a6c9c2a2516d8362d6424ae8c510520b977383e597b05dab4ddac",
+    "frontend/src/pages/HomeFlow.tsx": "4d281995707bbe41f40befbd13a8ce8559520d1e418e6f7d130a4c1d2f7ff73b",
+    "frontend/src/pages/JudgmentFlow.test.tsx": "d5e3468dfc816037129aaed1c88d00ed10afc857914dc7a668d9b837af9493bf",
+    "frontend/src/pages/JudgmentFlow.tsx": "f5252a0fa385920e99d73c3bd0126523050bc50d0d4b81c664078e8f2da8477b",
+    "ledger/adapters/openai_judge.py": "d976e34f9ac6ea1b764091f0250abd9d43617e68abec08ff77b9c75de4bd17d0",
+    "ledger/rendering.py": "856b679b8481421f0bdf2e61a8239833f00da153cd6a01e399a1675a64decef3",
+    "tests/unit/test_openai_rendering_adapters.py": "e818debd4ddd46c45a42a27c0eb204642c4ee3df99caa9f39f97738bf94dada8",
+    "validators.py": "1d95418aacba6faa6dca26c898b5a5b6106507654891011bd521f4fc66f388e5",
+    "tests/unit/test_hosted_voice_regressions.py": "30f6665f3dbd4b78509aefa9a575c69e5becc944bec24bdd5805605b85cccc2d"
+  }
+}

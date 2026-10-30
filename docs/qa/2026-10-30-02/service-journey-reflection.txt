@@ -1,0 +1,72 @@
+Browser tab: 3, Title: "장부 AI", URL: "https://jangbu-ai.vercel.app/transactions/6fa829bf-b1c5-46c5-a52f-5b855a226713".
+1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/transactions/6fa829bf-b1c5-46c5-a52f-5b855a226713
+	2 container
+		3 button 뒤로
+			4 image
+		5 heading 거래 상세, Value: 1
+			6 text 거래 상세
+		7 button 수정
+		8 heading -12,000원, Value: 1
+			9 text - 12,000원
+		10 image
+		11 text [QA1030-02 R3C] 계획한 점심
+		12 text 식비
+		13 text 지출  · 수기 입력
+		14 text 날짜
+		15 text 10월 30일 (금)  ·  12:00
+		16 text 계좌
+		17 text 현금
+		18 text 메모
+		19 text 선택 입력 없음
+		20 heading 기록 당시 AI 판단, Value: 2
+			21 text 기록 당시 AI 판단
+		22 container
+			23 text 과소비  · 90%
+		24 text 점심 식사는 필요하지만, 예산 한도에 도달한 상황에서 반복적인 음식 소비가 있어 신중함이 필요합니다.
+		25 text 내가 답한 이유 원래 계획한 점심 식사였어요. 필요한 한 끼를 먹었어요. 소비 돌아보기
+		26 heading 지금 생각하면 이 소비 어땠나요?, Value: 2
+			27 text 지금 생각하면 이 소비 어땠나요?
+		65 text 저장됨
+		28 text 내 평가는 다음 소비 조언에 반영돼요. 기록 당시 AI 판단은 그대로 남아요.
+		29 container 소비 평가
+			30 checkbox 잘 쓴 돈 만족했어요, Value: 1
+				31 text 잘 쓴 돈
+				32 text 만족했어요
+			33 checkbox 애매함 조금 더 볼래요, Value: 0
+				34 text 애매함
+				35 text 조금 더 볼래요
+			36 checkbox 후회함 다음엔 줄일래요, Value: 0
+				37 text 후회함
+				38 text 다음엔 줄일래요
+		62 container
+			63 text 한 줄 메모 선택
+			64 text entry area (settable) 한 줄 메모 선택
+		66 text 내 소비 기준에 반영했어요.
+		39 button 평가 수정
+		40 heading 기록, Value: 2
+			41 text 기록
+		42 image
+		43 text 22:18
+		44 text 지출  기록
+		45 image
+		46 text 12:00
+		47 text 이유 답변
+		48 image
+		49 text 12:00
+		50 text 판단 완료
+		67 image
+		68 text 22:48
+		69 text 소비 평가
+		51 button 판단 수정
+			52 image
+			53 text 판단 수정
+		54 button 거래 내용 수정
+			55 image
+			56 text 거래 내용 수정
+		57 button 거래 삭제
+			58 image
+			59 text 거래 삭제
+		60 text 판단을 수정해도 원래 판단 기록은 남아요
+		61 link Description: 장부로, Value: jangbu-ai.vercel.app/ledger
+
+The focused UI element is 1 AXWebArea 장부 AI, URL: jangbu-ai.vercel.app/transactions/6fa829bf-b1c5-46c5-a52f-5b855a226713

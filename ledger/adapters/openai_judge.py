@@ -15,6 +15,7 @@ from ledger.domain.models import DeterministicSignalSet, JudgmentResult
 from ledger.language import validate_korean_user_text
 from ledger.privacy import build_prompt_payload
 from ledger.rendering import grandma_mode_fallback
+from validators import validate_roast_tone
 
 
 ALLOWED_LABELS = {"justified", "caution", "overspending", "insufficient_context"}
@@ -152,11 +153,26 @@ def validate_judgment_evidence(payload: dict, request: JudgmentRequest) -> None:
     )
     regretted_count = request.reflection_context.get("category_regretted_count", 0)
     frequency = r"매일|날마다|점심마다|하루도 빠짐없이|항상"
+    frequency_negation = r"아니|않|없|안(?=\s|마[시셔]|시[키켜]|먹|하)"
     reported_daily = bool(re.search(frequency, reason)) and not re.search(
-        rf"(?:{frequency}).{{0,8}}(?:아니|않|없)", reason
+        rf"(?:{frequency}).{{0,12}}(?:{frequency_negation})", reason
+    )
+    delivery_frequency = r"자주|반복|잦|빈번"
+    delivery_report_markers = rf"{delivery_frequency}|{frequency}"
+    reported_delivery = bool(re.search(rf"배달.{{0,20}}(?:{delivery_report_markers})|(?:{delivery_report_markers}).{{0,20}}배달", reason)) and not re.search(
+        rf"(?:{delivery_report_markers}).{{0,12}}(?:{frequency_negation})", reason
     )
     for field in ("rationale", "normal_message", "roast_message", "recommended_action"):
         for clause in re.split(r"[.!?。\n]", payload[field]):
+            # History is intentionally category-only; it contains no delivery history.
+            delivery_claim = re.search(rf"배달.{{0,80}}(?:{delivery_frequency})|(?:{delivery_frequency}).{{0,30}}배달", clause)
+            delivery_advice = re.search(r"^(?:\s*앞으로|\s*다음부터).*(?:보세요|하자꾸나|해라)\s*$", clause) and not re.search(r"했|시켰|왔|기록|사던|시키던|주문하던|습관", clause)
+            if delivery_claim and not reported_delivery and not delivery_advice:
+                raise EvidenceMismatch("Category history does not prove delivery frequency; name the broad category or use only explicit self-reported delivery frequency.")
+            # The transaction is already recorded. Deferral must refer to a NEXT purchase.
+            if (re.search(r"이번.{0,15}(?:구매|구입|소비).{0,20}(?:미뤄|미루)", clause)
+                    or re.search(r"다음\s*달.{0,12}(?:구매해|구매하|구입해|사세요|사자)", clause)):
+                raise EvidenceMismatch("This purchase is already recorded; recommend a concrete next-purchase action, not postponing this completed purchase or an arbitrary purchase date.")
             if not reported_daily:
                 for claim in re.finditer(frequency, clause):
                     prefix = re.split(r"[,;]|지만|했으며|했고", clause[:claim.start()])[-1]
@@ -197,17 +213,17 @@ def deterministic_fallback_judgment(request: JudgmentRequest) -> JudgmentResult:
         label = "overspending"
         confidence = min(confidence_cap, max(0.76, risk))
         rationale = "예산·목표·소비 패턴을 종합한 소비 부담 신호가 높다."
-        recommended_action = "이번 주 같은 카테고리의 다음 소비를 한 번 건너뛴다."
+        recommended_action = "이번 주 같은 카테고리의 다음 소비를 한 번 건너뛰어 보세요."
     elif risk >= 0.35:
         label = "caution"
         confidence = min(confidence_cap, max(0.60, risk))
         rationale = "예산·목표·소비 패턴을 종합한 소비 부담 신호가 중간 수준이다."
-        recommended_action = "다음 유사 소비 전에 대체할 지출 하나를 정한다."
+        recommended_action = "다음 유사 소비 전에 대체할 지출 하나를 정해 보세요."
     else:
         label = "justified"
         confidence = min(confidence_cap, max(0.70, 1.0 - risk))
         rationale = "예산·목표·소비 패턴을 종합한 소비 부담 신호가 낮다."
-        recommended_action = "이 소비는 유지하되 같은 카테고리를 계속 기록한다."
+        recommended_action = "이 소비는 유지하되 같은 카테고리를 계속 기록해 보세요."
 
     factors = list(request.signals.factors or ["risk_score"])
     if request.user_reason and "user_reason" not in factors:
@@ -271,6 +287,9 @@ class OpenAIResponsesJudge:
                 payload = self._call_model(request, retry_hint=str(last_error) if isinstance(last_error, EvidenceMismatch) else None)
                 parsed = parse_judgment_payload(payload)
                 validate_judgment_evidence(parsed, request)
+                valid_voice, voice_error = validate_roast_tone(parsed["roast_message"], label=parsed["label"])
+                if not valid_voice:
+                    raise EvidenceMismatch(f"Grandma voice validation: {voice_error}. Use natural spoken Korean and preserve the same action.")
                 return JudgmentResult(
                     judgment_id=str(uuid4()),
                     transaction_id=request.transaction_id,
@@ -312,6 +331,10 @@ class OpenAIResponsesJudge:
                         "the budget is not exhausted; at 1.0 say 한도에 도달, never assert an "
                         "exact overrun or that the budget was exceeded. risk_score is a combined "
                         "risk signal, not a budget-use percentage. recurrence_30d is the supplied category count for 최근 30일, "
+                        "excluding the current transaction. It covers the entire broad category: food means all 식비, "
+                        "not delivery orders. Never narrow category recurrence into delivery, clothing, electronics, "
+                        "a specific shop or item frequency unless the user explicitly reports that frequency. "
+                        "When using recurrence, name the broad scope (식비 분류 전체 or 같은 분류). "
                         "never a count for 이번 주 or a calendar week. Do not invent a weekly "
                         "or daily count. A habit is not proof of 매일, 항상, 점심마다 or 날마다. "
                         "Paraphrase self-reported reasons without strengthening frequency, necessity "
@@ -319,6 +342,9 @@ class OpenAIResponsesJudge:
                         "because it was unnecessary: use caution unless supplied budget/goal "
                         "pressure and combined risk support strong scolding. Necessary treatment "
                         "and a family emergency deserve acknowledgement and a practical, caring action. "
+                        "A planned basic meal is not an extravagant habit simply because eating recurs. "
+                        "Acknowledge necessary eating even under budget pressure; do not shame the user for eating "
+                        "or invent that the meal was lavish. Distinguish budget pressure from the worth of this meal. "
                         "amount_bucket is a range, never an exact amount. Do not "
                         "turn bucket bounds, ratios, examples or free text into an exact bill, "
                         "balance, income or saving estimate. Only supplied deterministic evidence "
@@ -331,12 +357,17 @@ class OpenAIResponsesJudge:
                         "recommended_action is one concrete, feasible action in respectful Korean "
                         "ending 보세요 or 해요, never 줄여라 or report-style 한다. The roast may "
                         "phrase that same action naturally without adding a new limit, quota or task. "
+                        "This transaction is already purchased and recorded. Do not tell the user to postpone "
+                        "this completed purchase, buy it again next month, or impose an arbitrary date. "
+                        "A deferred purchase must explicitly mean the NEXT similar purchase. Avoid vague "
+                        "manage-the-budget advice; specify one relevant action the user can actually take. "
                         "roast_message is the user-facing '욕쟁이 할머니 모드': a sharp but caring "
                         "Korean market grandmother in her seventies checking a ledger, not a "
                         "formal financial report. Use 1-3 colloquial Korean sentences, with "
-                        "purchase-specific wit from the supplied category or reason, one fitting "
-                        "생활 비유 such as 장부, 지갑, 냄비, 밥솥, 쌀독 or 앞치마, and the same "
-                        "next action. Every roast sentence must sound spoken: end with 해라, 구나, "
+                        "purchase-specific wit from the supplied category or reason and the same "
+                        "next action. A 생활 비유 is optional, only when it naturally fits this purchase. "
+                        "Never force a cooking-pot, rice-bin or household-object metaphor or predict poverty. "
+                        "Every roast sentence must sound spoken: end with 해라, 구나, "
                         "하자꾸나, 어쩌냐, 거라 or a natural equivalent. Do not drift into "
                         "습니다, 하세요, 합니다 or textbook financial-report language. "
                         "Vary the opening, metaphor and rhythm instead of attaching "
@@ -344,9 +375,9 @@ class OpenAIResponsesJudge:
                         "bracketed evidence/action slots to fill only from this request; do not "
                         "copy slots, facts or an example's action: justified — '그래, 잘 썼다. "
                         "지갑도 쓸 데는 써야지, [같은 권고 행동을 구어체로].'; caution — "
-                        "'쯧, [제공된 근거]인데 냄비 넘치고 불 줄이면 늦는다. [같은 권고 행동].'; "
-                        "overspending — '아이고 이 화상아, [제공된 근거]인데 지갑을 쌀독처럼 "
-                        "퍼 쓰면 어쩌냐. [같은 권고 행동].'; insufficient_context — '아이구, "
+                        "'쯧, [구매 이유에서 나온 모순을 짧게 짚기]. [같은 권고 행동을 구어체로].'; "
+                        "overspending — '아이고, [이 구매 선택에 대한 구체적인 한마디]. "
+                        "[같은 권고 행동을 구어체로].'; insufficient_context — '아이구, "
                         "장부만 보고 속단할 순 없지. [확인 가능한 한계와 같은 권고 행동].' "
                         "A justified purchase deserves real acknowledgement, not automatic "
                         "frugality scolding or an invented claim that it was essential. Strong "

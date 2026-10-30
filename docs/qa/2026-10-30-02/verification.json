@@ -1,0 +1,59 @@
+{
+  "source_base_commit": "2af944facc7b48a1bf482002e0e4c5c5c13bce17",
+  "worktree_state": "final pass7 edits uncommitted; source hashes in source-manifest.json",
+  "backend": {
+    "passed": 199,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 121.62,
+    "isolated_redis_port": 6389,
+    "log": "/tmp/jangbu-backend-pass7.log"
+  },
+  "frontend_runs": [
+    {
+      "execution": "initial parallel",
+      "passed": 147,
+      "failed": 14,
+      "note": "13 timeouts; one cascading App input assertion; earlier failure log retained"
+    },
+    {
+      "execution": "serial default timeout5000",
+      "passed": 160,
+      "failed": 1,
+      "note": "PlanPage test timeout",
+      "log": "/tmp/jangbu-frontend-pass7-serial.log"
+    },
+    {
+      "execution": "same source PlanPage isolated",
+      "passed": 14,
+      "failed": 0,
+      "duration_seconds": 12.54
+    },
+    {
+      "execution": "final full same source, --maxWorkers=1 --no-file-parallelism --testTimeout=15000",
+      "passed": 161,
+      "failed": 0,
+      "files_passed": 17,
+      "duration_seconds": 132.0,
+      "log": "/tmp/jangbu-frontend-pass7-confirmation.log",
+      "note": "runner scheduling allowance changed via CLI only; no product/test-source edits"
+    }
+  ],
+  "lint": "passed",
+  "typescript_vite": "passed; /tmp/jangbu-build-pass7.log",
+  "python_compile": "passed",
+  "diff_check": "passed",
+  "targeted_regressions": {
+    "judge_renderer": 52,
+    "reason_screen": 24,
+    "passed": true
+  },
+  "source_manifest_sha256": "d5529b76ce38eedd72d144482e78950a9a895ea6eccb2fba1b8bb912483ac5fe",
+  "hosted_final_source": "not performed; old2af results retained separately",
+  "semantic_model_quality": "not passed; old2af9cases4pass5fail-or-fallback",
+  "release_readiness": "failed; F33 plus unknown required final matrix",
+  "postdeploy_checks": {
+    "started": 0,
+    "maximum": 2
+  }
+}

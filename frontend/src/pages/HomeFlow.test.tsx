@@ -347,6 +347,47 @@ describe("reason evidence boundaries", () => {
     return render(<BrowserRouter><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>);
   }
 
+  it.each([
+    "변경사항은 저장됐어요. 예산과 AI 요약을 새로 불러오는 중이에요.",
+    "변경사항은 저장됐지만 일부 요약을 새로 불러오지 못했어요.",
+  ])("hides stale budget usage without blocking reason drafts or submission (%s)", async (warning) => {
+    const user = userEvent.setup();
+    const answerReason = vi.fn().mockResolvedValue(undefined);
+    const state = {
+      answerReason,
+      demo: false,
+      getTransaction: vi.fn().mockResolvedValue({ transaction }),
+      summary: { ...demoSummary, total_spent_krw: 500_000, budget_spent_krw: 100_000 },
+      syncWarning: warning as string | null,
+      transactions: [transaction],
+    };
+    mocks.useLedger.mockReturnValue(state);
+    window.history.replaceState({}, "", "/transactions/tx-reason/reason");
+    const page = <BrowserRouter><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>;
+    const view = render(page);
+
+    expect(await screen.findByText(warning)).toBeInTheDocument();
+    expect(screen.queryByText(/생활비 예산 \d+% 사용/)).not.toBeInTheDocument();
+    const input = screen.getByRole("textbox", { name: /지출 이유/ });
+    await user.clear(input);
+    await user.type(input, "출근길에 필요해서 샀어요");
+    expect(screen.getByRole("button", { name: "이유 보내기" })).toBeEnabled();
+
+    state.summary = { ...state.summary, budget_spent_krw: 400_000 };
+    state.syncWarning = null;
+    view.rerender(<BrowserRouter><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>);
+
+    expect(screen.getByText("8월 생활비 예산 50% 사용 · 현재 입력 기준")).toBeInTheDocument();
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+    expect(input).toHaveValue("출근길에 필요해서 샀어요");
+
+    state.syncWarning = warning;
+    view.rerender(<BrowserRouter><Routes><Route path="/transactions/:transactionId/reason" element={<ReasonPage />} /></Routes></BrowserRouter>);
+    expect(screen.queryByText(/생활비 예산 \d+% 사용/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "이유 보내기" }));
+    expect(answerReason).toHaveBeenCalledWith("tx-reason", "출근길에 필요해서 샀어요");
+  });
+
   it.each([false, true])("counts only same-category expenses in seven Korean dates through this purchase (demo=%s)", async (demo) => {
     const record = (id: string, occurredAt: string, patch: Partial<Transaction> = {}): Transaction => ({
       ...transaction,

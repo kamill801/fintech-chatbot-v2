@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Protocol
 
 from validators import validate_message_safety, validate_roast_tone
@@ -96,17 +97,20 @@ def _safe_fallback_message(
 
 def grandma_mode_fallback(*, label: str, rationale: str, recommended_action: str) -> str:
     explanation = _spoken_rationale(rationale)
+    action = re.sub(r"보세요[.]?$", "보자꾸나.", recommended_action.strip())
     if label == "justified":
-        return f"그래, 잘 썼다. {explanation} 지갑 열 때 챙길 약속은 이거다: {recommended_action}"
+        return f"그래, 잘 썼다. {explanation} 다음엔 이걸 챙겨라: {action}"
     if label == "insufficient_context":
-        return f"아이구, 장부만 보고 속단할 순 없지. {explanation} 지갑 열기 전에 이걸 챙겨라: {recommended_action}"
+        return f"아이구, 장부만 보고 속단할 순 없지. {explanation} 다음엔 이걸 챙겨라: {action}"
     if label == "overspending":
-        return f"아이고 이 화상아, 지갑을 쌀독처럼 퍼 쓰면 어쩌냐. {explanation} 다음엔 이 약속부터 지켜라: {recommended_action}"
-    return f"쯧쯧, 냄비 넘치기 전에 불부터 줄여야지. {explanation} 지갑 열기 전엔 이걸 챙겨라: {recommended_action}"
+        return f"아이고, 이 지출은 짚고 가자꾸나. {explanation} 다음엔 이 약속부터 지켜라: {action}"
+    return f"쯧, 이번 지출은 한 번 살펴보자꾸나. {explanation} 다음엔 이걸 챙겨라: {action}"
 
 
 def _spoken_rationale(rationale: str) -> str:
     explanation = rationale.strip()
+    for written, spoken in (("것입니다", "것이구나"), ("합니다", "하구나"), ("되었습니다", "되었구나"), ("습니다", "구나"), ("입니다", "이구나"), ("이에요", "이구나")):
+        explanation = re.sub(re.escape(written) + r"(?=[.!?]|$)", spoken, explanation)
     for written, spoken in (
         ("있다.", "있구나."),
         ("없다.", "없구나."),

@@ -131,7 +131,8 @@ class StrictOpenAIJudgeTests(unittest.TestCase):
     def test_truthful_direct_denial_of_overrun_is_allowed(self) -> None:
         for field in ("rationale", "normal_message", "roast_message", "recommended_action"):
             with self.subTest(field=field):
-                payload = {**VALID_MODEL_PAYLOAD, field: "예산 초과 상태는 아니에요."}
+                text = "아이고, 예산 초과 상태는 아니구나. 다음엔 장부부터 확인해라." if field == "roast_message" else "예산 초과 상태는 아니에요."
+                payload = {**VALID_MODEL_PAYLOAD, field: text}
                 responses = FakeResponses([payload])
                 self.assertFalse(OpenAIResponsesJudge(client_factory=lambda: FakeClient(responses)).judge(request()).fallback_used)
 
@@ -310,9 +311,9 @@ class StrictOpenAIJudgeTests(unittest.TestCase):
 
     def test_deterministic_fallback_uses_a_specific_grandma_voice(self) -> None:
         result = deterministic_fallback_judgment(request())
-        self.assertTrue(any(marker in result.roast_message for marker in ("장부", "냄비", "지갑")))
+        self.assertTrue(validate_roast_tone(result.roast_message, label=result.label)[0])
         self.assertTrue(any(marker in result.roast_message for marker in ("아이고", "아이구", "쯧", "그래")))
-        self.assertIn(result.recommended_action, result.roast_message)
+        self.assertIn(result.recommended_action.removesuffix("보세요."), result.roast_message)
 
     def test_fallback_judges_without_a_reason_in_normal_mode(self) -> None:
         signals = compute_signal_set(
@@ -423,7 +424,8 @@ class RenderingTests(unittest.TestCase):
             }
         )
         rendered = render_judgment(judgment, roast_enabled=True)
-        self.assertIn("냄비", rendered.message)
+        self.assertTrue(rendered.display_fallback_used)
+        self.assertTrue(validate_roast_tone(rendered.message, label=rendered.label)[0])
         self.assertIn("이번 주 쇼핑을 한 번 쉰다.", rendered.message)
 
     def test_unsafe_normal_uses_safe_message_without_changing_recommendation(self) -> None:

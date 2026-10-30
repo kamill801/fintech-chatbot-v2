@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BrowserRouter, Route, Routes } from "../router";
+import { BrowserRouter, Link, Route, Routes } from "../router";
 import { JudgmentPage, SharePage, TransactionDetailPage } from "./JudgmentFlow";
 
 const mocks = vi.hoisted(() => ({
@@ -215,6 +215,64 @@ describe("judgment voice", () => {
 
     await waitFor(() => expect(mocks.reflectTransaction).toHaveBeenCalledWith("tx-shopping", "regretted", "충동적으로 샀어요"));
     expect(screen.getByText("내 소비 기준에 반영했어요.")).toBeInTheDocument();
+  });
+
+  it("starts a correction with an empty optional reason instead of an invented explanation", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/transactions/tx-shopping");
+    render(<BrowserRouter><Routes><Route path="/transactions/:transactionId" element={<TransactionDetailPage />} /></Routes></BrowserRouter>);
+    await user.click(await screen.findByRole("button", { name: /^판단 수정$/ }));
+    expect(screen.getByRole("textbox", { name: /수정 이유/ })).toHaveValue("");
+    await user.click(screen.getByRole("button", { name: "수정 기록 남기기" }));
+    await waitFor(() => expect(mocks.correctJudgment).toHaveBeenCalledWith("judgment-shopping", "overspending", ""));
+  });
+
+  it("preserves a failed correction draft and submits the user's trimmed reason", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/transactions/tx-shopping");
+    mocks.correctJudgment.mockRejectedValueOnce(new Error("offline"));
+    render(<BrowserRouter><Routes><Route path="/transactions/:transactionId" element={<TransactionDetailPage />} /></Routes></BrowserRouter>);
+    await user.click(await screen.findByRole("button", { name: /^판단 수정$/ }));
+    await user.selectOptions(screen.getByLabelText("내 판단"), "justified");
+    await user.type(screen.getByRole("textbox", { name: /수정 이유/ }), "  미리 계획한 필요한 구매였어요  ");
+    await user.click(screen.getByRole("button", { name: "수정 기록 남기기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("수정 기록을 저장하지 못했어요.");
+    expect(screen.getByRole("textbox", { name: /수정 이유/ })).toHaveValue("  미리 계획한 필요한 구매였어요  ");
+    await user.click(screen.getByRole("button", { name: "수정 기록 남기기" }));
+    await waitFor(() => expect(mocks.correctJudgment).toHaveBeenLastCalledWith("judgment-shopping", "justified", "미리 계획한 필요한 구매였어요"));
+  });
+
+  it("restores only the saved correction when reopening instead of a cancelled reason", async () => {
+    const user = userEvent.setup();
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockResolvedValue({ ...original, judgment: { ...original.judgment, effective_label: "justified", correction: { corrected_label: "justified", correction_reason: "이미 저장한 내 이유" } } });
+    window.history.replaceState({}, "", "/transactions/tx-shopping");
+    render(<BrowserRouter><Routes><Route path="/transactions/:transactionId" element={<TransactionDetailPage />} /></Routes></BrowserRouter>);
+    await user.click(await screen.findByRole("button", { name: /^판단 수정$/ }));
+    expect(screen.getByLabelText("내 판단")).toHaveValue("justified");
+    expect(screen.getByRole("textbox", { name: /수정 이유/ })).toHaveValue("이미 저장한 내 이유");
+    await user.clear(screen.getByRole("textbox", { name: /수정 이유/ }));
+    await user.type(screen.getByRole("textbox", { name: /수정 이유/ }), "취소할 다른 이유");
+    await user.click(screen.getByRole("button", { name: /^취소$/ }));
+    await user.click(screen.getByRole("button", { name: /^판단 수정$/ }));
+    expect(screen.getByRole("textbox", { name: /수정 이유/ })).toHaveValue("이미 저장한 내 이유");
+    expect(mocks.correctJudgment).not.toHaveBeenCalled();
+  });
+
+  it("does not carry a correction dialog or draft into another transaction", async () => {
+    const user = userEvent.setup();
+    const original = await mocks.getTransaction();
+    mocks.getTransaction.mockImplementation(async (id: string) => ({ ...original, transaction: { ...original.transaction, transaction_id: id }, judgment: { ...original.judgment, judgment_id: `judgment-${id}`, transaction_id: id } }));
+    window.history.replaceState({}, "", "/transactions/tx-shopping");
+    render(<BrowserRouter><Link to="/transactions/tx-other">다른 거래</Link><Routes><Route path="/transactions/:transactionId" element={<TransactionDetailPage />} /></Routes></BrowserRouter>);
+    await user.click(await screen.findByRole("button", { name: /^판단 수정$/ }));
+    await user.clear(screen.getByRole("textbox", { name: /수정 이유/ }));
+    await user.type(screen.getByRole("textbox", { name: /수정 이유/ }), "첫 거래에만 해당하는 이유");
+    await user.click(screen.getByRole("link", { name: "다른 거래" }));
+    await waitFor(() => expect(mocks.getTransaction).toHaveBeenCalledWith("tx-other"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /^판단 수정$/ }));
+    expect(screen.getByRole("textbox", { name: /수정 이유/ })).toHaveValue("");
   });
 
   it("opens transaction editing on the Korean ledger date and saves the edited transaction", async () => {
