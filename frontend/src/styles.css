@@ -208,6 +208,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .field-row > span:nth-last-child(2), .field-row > input, .field-row > select { justify-self: end; min-width: 0; }
 .field-row input, .field-row select {
   width: 100%;
+  min-height: 44px;
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -843,7 +844,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .plan-segments span, .planned-expenses span { display: grid; gap: 3px; }
 .plan-segments small, .planned-expenses small { color: var(--muted); font-size: 11px; }
 .planned-expenses em { display: flex; align-items: center; gap: 4px; color: var(--action); font-size: 12px; font-style: normal; }
-.planned-expenses select { max-width: 170px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.planned-expenses select { max-width: 170px; min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .plan-check-in { display: grid; grid-template-columns: auto 1fr; gap: 12px; }
 .plan-check-in > svg { color: var(--action); }
 .plan-check-in p { margin: 0; color: var(--muted); }
@@ -951,6 +952,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .judgment-screen .text-button, .judgment-screen .secondary-link,
 .transaction-detail-screen .text-button { min-height: 44px; }
 .calendar-month-control > button { min-width: 44px; }
+.personal-rules-card > a, .report-advice > a { display: inline-flex; align-items: center; min-height: 44px; }
 .info-callout > svg, .recommendation > svg, .report-advice > svg,
 .plan-coach > svg, .plan-check-in > svg { flex: 0 0 auto; }
 .info-callout > span, .plan-coach > div, .plan-check-in > div,

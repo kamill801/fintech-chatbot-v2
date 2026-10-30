@@ -23,5 +23,11 @@
   "tests/unit/test_openai_rendering_adapters.py": "2ed266e3deedd8e236f79e81d91e38f7c118078b6c3f67129c6795845e6c57ed",
   "validators.py": "7f4f46436e3f424c65308e0620dd8e0535f98d1f0931858a68f2de7f3e437b47",
   "frontend/src/auth-request.ts": "a12544954d12fa5fe28a72b991e7566c3d200f5b5fe3946a4c197a7db2c2d3f9",
-  "frontend/src/auth-request.test.ts": "78c2777dd3f4cca21faf8b4afe827bad0aa76ca3a43253cd6bb1d70f6f883a5a"
+  "frontend/src/auth-request.test.ts": "78c2777dd3f4cca21faf8b4afe827bad0aa76ca3a43253cd6bb1d70f6f883a5a",
+  "frontend/src/styles.css": "ec5870853aa6f37eadab447637e78852a457f890d909f09dee130c3eb74dbdb9",
+  "ledger/adapters/redis_store.py": "fd88cd5078e9158439522dcd6aaef079730416edddaec0efb76e511d0f21ff44",
+  "ledger/api.py": "d455c459a01ed91ad66576705072b9dcb30f1322497c5095ca8b935f091fee16",
+  "ledger/application/service.py": "046178a3236cfd809fcd847453212afae06521d8a74aac1b3e5db392549ff5c2",
+  "tests/e2e/test_flask_api.py": "52b9df3f611f241f215b5d8049af3e18600dd6082145c0fc9bb327c6cf458dc0",
+  "tests/integration/test_redis_repository.py": "e57be497f49e9a2ee5f63854fbd6175f414964fb80729ef3e330b9b5106d16bc"
 }

@@ -75,6 +75,42 @@ class FlaskLedgerE2ETests(unittest.TestCase):
         response = self.client.get("/ready")
         self.assertEqual(response.get_json()["data"]["status"], "ready")
 
+    def test_storage_errors_are_retryable_and_do_not_expose_internal_keys(self) -> None:
+        from redis.exceptions import ConnectionError, LockNotOwnedError
+
+        for error_type in (ConnectionError, LockNotOwnedError):
+            with self.subTest(error=error_type), patch.object(
+                self.app.extensions["ledger_repository"], "get_profile",
+                side_effect=error_type("ledger:private-user:mutation-lock"),
+            ):
+                response = self.client.get("/api/v1/me/profile", headers=self.headers)
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.get_json()["error"]["code"], "storage_unavailable")
+                self.assertNotIn("private-user", response.get_data(as_text=True))
+
+    def test_create_retries_its_own_pending_transaction_after_response_cache_failure(self) -> None:
+        from redis.exceptions import ConnectionError
+
+        self.put_profile()
+        self.client.put("/api/v1/me/settings", json={"roast_enabled": True},
+            headers=self.mutate_headers("roast-retry"))
+        repository = self.app.extensions["ledger_repository"]
+        with patch.object(repository, "cache_result", side_effect=ConnectionError("offline")):
+            first = self.client.post("/api/v1/me/transactions",
+                json={"amount_krw": 8500, "category": "cafe"},
+                headers=self.mutate_headers("pending-retry"))
+        self.assertEqual(first.status_code, 503)
+        retry = self.client.post("/api/v1/me/transactions",
+            json={"amount_krw": 8500, "category": "cafe"},
+            headers=self.mutate_headers("pending-retry"))
+        self.assertEqual(retry.status_code, 202)
+        other = self.client.post("/api/v1/me/transactions",
+            json={"amount_krw": 8500, "category": "cafe"},
+            headers=self.mutate_headers("different-pending"))
+        self.assertEqual(other.get_json()["error"]["code"], "pending_reason_required")
+        rows = self.client.get("/api/v1/me/transactions", headers=self.headers).get_json()["data"]["transactions"]
+        self.assertEqual(len(rows), 1)
+
     def test_get_profile_returns_null_before_onboarding(self) -> None:
         response = self.client.get("/api/v1/me/profile", headers=self.headers)
         self.assertIsNone(response.get_json()["data"]["profile"])

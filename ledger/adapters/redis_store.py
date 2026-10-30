@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any, Mapping, Sequence
+
+from redis.exceptions import RedisError
 
 from ledger.domain.events import (
     EVENT_ACCOUNT_REVOKED,
@@ -42,6 +45,9 @@ from ledger.domain.models import (
 from ledger.domain.ports import LedgerRepository, StoredResult
 from ledger.domain.plans import SpendingPlan
 from ledger.privacy import PrivacyService
+
+
+logger = logging.getLogger(__name__)
 
 
 class RedisLedgerRepository(LedgerRepository):
@@ -573,9 +579,19 @@ class RedisLedgerRepository(LedgerRepository):
                 ),
                 ex=self._privacy.retention_seconds,
             )
-            self._redis.sadd(self._registry_key(user_ref), result_key)
+            with self._redis.pipeline(transaction=True) as pipe:
+                self._track_keys(pipe, user_ref, result_key)
+                pipe.execute()
+        # Whole-history maintenance must not consume the mutation lease. Each
+        # write already sets its own TTL atomically; EXPIRE cannot recreate data
+        # if deletion or another mutation runs while this maintenance executes.
+        try:
             self._refresh_retention(user_ref)
-            return result
+        except RedisError:
+            # A maintenance outage must not report a committed write as failed.
+            # Keep the log free of account identifiers and financial payloads.
+            logger.warning("Ledger retention refresh deferred after committed write")
+        return result
 
     def _append_event(
         self,
@@ -1233,7 +1249,10 @@ class RedisLedgerRepository(LedgerRepository):
     def _track_keys(self, pipe: Any, user_ref: str, *keys: str) -> None:
         if not keys:
             return
-        pipe.sadd(self._registry_key(user_ref), *keys)
+        registry_key = self._registry_key(user_ref)
+        pipe.sadd(registry_key, *keys)
+        for key in (registry_key, *keys):
+            pipe.expire(key, self._privacy.retention_seconds)
 
     def _user_keys(self, user_ref: str) -> list[str]:
         explicit = [
@@ -1258,14 +1277,14 @@ class RedisLedgerRepository(LedgerRepository):
         ]
         found: list[str] = list(self._redis.smembers(self._registry_key(user_ref)) or [])
         for pattern in patterns:
-            found.extend(self._redis.scan_iter(match=pattern))
+            found.extend(self._redis.scan_iter(match=pattern, count=500))
         return list(dict.fromkeys(explicit + found))
 
     def _refresh_retention(self, user_ref: str) -> None:
         keys = [
             key
             for key in self._user_keys(user_ref)
-            if ":quota:" not in key and self._redis.exists(key)
+            if ":quota:" not in key
         ]
         if not keys:
             return

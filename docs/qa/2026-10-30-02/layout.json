@@ -1,0 +1,491 @@
+[
+  {
+    "path": "/?demo=1",
+    "docWidth": 320,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 320
+  },
+  {
+    "path": "/ledger?demo=1",
+    "docWidth": 320,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 320
+  },
+  {
+    "path": "/plan?demo=1",
+    "docWidth": 320,
+    "inputFonts": [
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      }
+    ],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 19.5,
+        "text": "기준 관리"
+      },
+      {
+        "height": 39,
+        "text": "실제 지출과 연결카페 온도 · 12,000원점심 · 9,000원교통카드 "
+      }
+    ],
+    "width": 320
+  },
+  {
+    "path": "/report?demo=1",
+    "docWidth": 320,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 40,
+        "text": "계획과 AI 브리핑 보기"
+      }
+    ],
+    "width": 320
+  },
+  {
+    "path": "/settings?demo=1",
+    "docWidth": 320,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 320
+  },
+  {
+    "path": "/add?demo=1",
+    "docWidth": 320,
+    "inputFonts": [
+      {
+        "font": "58px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "BUTTON",
+        "text": "교통카드1,500원"
+      }
+    ],
+    "smallTargets": [
+      {
+        "height": 24,
+        "text": "카페·간식식비교통쇼핑주거건강기타"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 24,
+        "text": "현금생활비 통장"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 18,
+        "text": ""
+      }
+    ],
+    "width": 320
+  },
+  {
+    "path": "/?demo=1",
+    "docWidth": 390,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 390
+  },
+  {
+    "path": "/ledger?demo=1",
+    "docWidth": 390,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 390
+  },
+  {
+    "path": "/plan?demo=1",
+    "docWidth": 390,
+    "inputFonts": [
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      }
+    ],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 19.5,
+        "text": "기준 관리"
+      },
+      {
+        "height": 39,
+        "text": "실제 지출과 연결카페 온도 · 12,000원점심 · 9,000원교통카드 "
+      }
+    ],
+    "width": 390
+  },
+  {
+    "path": "/report?demo=1",
+    "docWidth": 390,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 40,
+        "text": "계획과 AI 브리핑 보기"
+      }
+    ],
+    "width": 390
+  },
+  {
+    "path": "/settings?demo=1",
+    "docWidth": 390,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 390
+  },
+  {
+    "path": "/add?demo=1",
+    "docWidth": 390,
+    "inputFonts": [
+      {
+        "font": "70.2px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      }
+    ],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 24,
+        "text": "카페·간식식비교통쇼핑주거건강기타"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 24,
+        "text": "현금생활비 통장"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 18,
+        "text": ""
+      }
+    ],
+    "width": 390
+  },
+  {
+    "path": "/?demo=1",
+    "docWidth": 414,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 414
+  },
+  {
+    "path": "/ledger?demo=1",
+    "docWidth": 414,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 414
+  },
+  {
+    "path": "/plan?demo=1",
+    "docWidth": 414,
+    "inputFonts": [
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      }
+    ],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 19.5,
+        "text": "기준 관리"
+      },
+      {
+        "height": 39,
+        "text": "실제 지출과 연결카페 온도 · 12,000원점심 · 9,000원교통카드 "
+      }
+    ],
+    "width": 414
+  },
+  {
+    "path": "/report?demo=1",
+    "docWidth": 414,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 40,
+        "text": "계획과 AI 브리핑 보기"
+      }
+    ],
+    "width": 414
+  },
+  {
+    "path": "/settings?demo=1",
+    "docWidth": 414,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 414
+  },
+  {
+    "path": "/add?demo=1",
+    "docWidth": 414,
+    "inputFonts": [
+      {
+        "font": "74px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      }
+    ],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 24,
+        "text": "카페·간식식비교통쇼핑주거건강기타"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 24,
+        "text": "현금생활비 통장"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 18,
+        "text": ""
+      }
+    ],
+    "width": 414
+  },
+  {
+    "path": "/?demo=1",
+    "docWidth": 1440,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 1440
+  },
+  {
+    "path": "/ledger?demo=1",
+    "docWidth": 1440,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 1440
+  },
+  {
+    "path": "/plan?demo=1",
+    "docWidth": 1440,
+    "inputFonts": [
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      }
+    ],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 19.5,
+        "text": "기준 관리"
+      },
+      {
+        "height": 39,
+        "text": "실제 지출과 연결카페 온도 · 12,000원점심 · 9,000원교통카드 "
+      }
+    ],
+    "width": 1440
+  },
+  {
+    "path": "/report?demo=1",
+    "docWidth": 1440,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 40,
+        "text": "계획과 AI 브리핑 보기"
+      }
+    ],
+    "width": 1440
+  },
+  {
+    "path": "/settings?demo=1",
+    "docWidth": 1440,
+    "inputFonts": [],
+    "overflow": [],
+    "smallTargets": [],
+    "width": 1440
+  },
+  {
+    "path": "/add?demo=1",
+    "docWidth": 1440,
+    "inputFonts": [
+      {
+        "font": "74px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "SELECT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      },
+      {
+        "font": "16px",
+        "tag": "INPUT"
+      }
+    ],
+    "overflow": [],
+    "smallTargets": [
+      {
+        "height": 24,
+        "text": "카페·간식식비교통쇼핑주거건강기타"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 24,
+        "text": "현금생활비 통장"
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 26,
+        "text": ""
+      },
+      {
+        "height": 18,
+        "text": ""
+      }
+    ],
+    "width": 1440
+  }
+]

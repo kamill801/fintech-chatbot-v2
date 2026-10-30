@@ -5,6 +5,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from flask import Blueprint, Response, current_app, g, jsonify, make_response, request
+from redis.exceptions import RedisError
 
 from ledger.auth import AuthenticationError
 from ledger.application.service import LedgerService, ServiceError, ServiceResult
@@ -405,7 +406,14 @@ def create_api_blueprint(
 
     @api.app_errorhandler(ValueError)
     def handle_value_error(error: ValueError) -> Response:
+        if isinstance(error, RedisError):
+            return handle_storage_error(error)
         return _error("invalid_request", str(error), 400)
+
+    @api.app_errorhandler(RedisError)
+    def handle_storage_error(error: RedisError) -> Response:
+        current_app.logger.warning("Ledger storage temporarily unavailable")
+        return _error("storage_unavailable", "저장 연결이 지연되고 있어요. 잠시 후 다시 시도해 주세요.", 503)
 
     return api
 

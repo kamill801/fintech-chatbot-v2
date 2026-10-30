@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 import unittest
+from unittest.mock import patch
 from uuid import uuid4
 
 from ledger.adapters.redis_store import RedisLedgerRepository
@@ -189,6 +191,51 @@ class RedisRepositoryIntegrationTests(unittest.TestCase):
 
         self.assertEqual(found.judgment_id, judged.data["judgment"]["judgment_id"])
         self.assertEqual(self.redis.get(index_key), found.judgment_id)
+
+    def test_slow_retention_does_not_turn_committed_writes_into_failures(self) -> None:
+        self.service.upsert_profile(self.user_ref, profile_payload(),
+            idempotency_key="profile-slow", correlation_id=correlation_id())
+        self.service.update_settings(self.user_ref, {"roast_enabled": True},
+            idempotency_key="roast-slow", correlation_id=correlation_id())
+        original_lock = self.redis.lock
+        original_refresh = self.repository._refresh_retention
+
+        def short_lock(name, **kwargs):
+            return original_lock(name, **{**kwargs, "timeout": 0.1})
+
+        def slow_refresh(user_ref):
+            time.sleep(0.15)
+            original_refresh(user_ref)
+
+        with patch.object(self.redis, "lock", side_effect=short_lock), patch.object(
+            self.repository, "_refresh_retention", side_effect=slow_refresh
+        ):
+            created = self.service.create_transaction(self.user_ref,
+                {"amount_krw": 8500, "category": "cafe"},
+                idempotency_key="slow-tx", correlation_id=correlation_id())
+            transaction_id = created.data["transaction"]["transaction_id"]
+            judged = self.service.add_reason(self.user_ref, transaction_id,
+                {"reason": "습관처럼 커피를 샀어요"},
+                idempotency_key="slow-reason", correlation_id=correlation_id())
+        self.assertEqual(created.status, 202)
+        self.assertIn("judgment", judged.data)
+        self.assertEqual(len(self.repository.list_transactions(self.user_ref)), 1)
+
+    def test_refresh_failure_preserves_success_and_write_time_retention(self) -> None:
+        from redis.exceptions import ConnectionError
+
+        with patch.object(self.repository, "_refresh_retention", side_effect=ConnectionError("offline")):
+            self.service.upsert_profile(self.user_ref, profile_payload(),
+                idempotency_key="profile-retention", correlation_id=correlation_id())
+        keys = list(self.redis.scan_iter(match=f"ledger:{self.user_ref}:*"))
+        self.assertTrue(keys)
+        self.assertTrue(all(0 < self.redis.ttl(key) <= 86400 for key in keys))
+
+    def test_retention_refresh_batches_expiry_without_per_key_round_trips(self) -> None:
+        self.service.upsert_profile(self.user_ref, profile_payload(),
+            idempotency_key="profile-batch", correlation_id=correlation_id())
+        with patch.object(self.redis, "exists", side_effect=AssertionError("per-key round trip")):
+            self.repository._refresh_retention(self.user_ref)
 
     def test_pending_question_mutations_are_serialized_per_user(self) -> None:
         barrier = threading.Barrier(3)

@@ -4,18 +4,25 @@
   "previous_run": "../2026-10-30/rounds.json",
   "authority": "2026-10-30 explicit user continue, finish unverified quality and bugs, prepare user-ready release",
   "max_passes": 7,
-  "passes_started": 2,
-  "passes_completed": 2,
+  "passes_started": 3,
+  "passes_completed": 3,
   "active_pass": null,
   "phase": "candidate_release",
   "state": "running",
   "required_matrix_ref": "CONTRACT.md",
   "provider_budget": {
     "max_calls": 36,
-    "calls_attempted": 0,
+    "calls_attempted": 2,
     "cost_known": null,
-    "cost_unknown_calls": 0,
-    "reservations": []
+    "cost_unknown_calls": 2,
+    "reservations": [
+      {
+        "case": "1A",
+        "maximum_attempt_slots": 2,
+        "state": "reserved_before_submit",
+        "actual_attempts": "unknown until observable; maximum charged to budget"
+      }
+    ]
   },
   "post_deploy": {
     "max_checks": 2,
@@ -24,10 +31,20 @@
     "checks": []
   },
   "release": {
-    "state": "candidate_prepared",
-    "source_sha": null,
-    "vercel": null,
-    "render": null
+    "state": "candidate_live",
+    "source_sha": "76a24ae4a3643629e6af07b8b38c4ef1bc611d55",
+    "vercel": {
+      "id": "dpl_8UxuLuecTqjcnsa4bcVuchxbAou2",
+      "url": "https://jangbu-5sf2fkmd1-upglow.vercel.app",
+      "alias": "https://jangbu-ai.vercel.app",
+      "state": "READY",
+      "source_proof": "CLI v13 deployment meta.releaseCommitSha exact76a24ae4a3643629e6af07b8b38c4ef1bc611d55 and readyStateREADY"
+    },
+    "render": {
+      "id": "dep-dbi8i3vlk1mc73fjhcl0",
+      "state": "Live",
+      "source_sha": "76a24ae4a3643629e6af07b8b38c4ef1bc611d55"
+    }
   },
   "passes": [
     {
@@ -72,10 +89,32 @@
         "frontend151/151, backend178/178 including isolated Redis integration skip0, lint/tsc/Vite/Python compile/diff pass",
         "Source manifest frozen before candidate commit; original production account21 records read back"
       ]
+    },
+    {
+      "number": 3,
+      "phase": "verify",
+      "status": "completed_local_repair",
+      "scope": "Hosted candidate retained flows and actual persona batch1; responsive demo preparation",
+      "findings": [
+        "F24 delayed retention refresh outlives mutation lease, raising ValueError after committed transaction/reason; isolated actual Redis repro confirmed both false400 and zero provider calls; hosted state matches, raw hosted exception not yet observed",
+        "F25 small plan management/report links and composer/reservation controls below44px effective target"
+      ],
+      "evidence": [
+        "Hosted new QA transaction11a3fa94 persisted despite400; reason submit also failed; no candidate model output proven",
+        "24 responsive DOM scans: no document overflow, inputs>=16px; intentional quick-entry horizontal scroll excluded",
+        "Vercel CLI v13 exact metadata releaseCommitSha76a24ae4a3643629e6af07b8b38c4ef1bc611d55 READY verified",
+        "Three meaningful new Redis regressions failed before repair, integration7/7 after; E2E same-key recovery failed409 then passed202, different-key pending guard retained",
+        "Full frontend151/151, backend183/183 skip0, lint/tsc/Vite/Python compile/diff pass; 12 corrected-page responsive scans document fits and affected controls44px",
+        "Read-only native review: no new blocker; existing finite-lease and deletion-concurrency architecture unchanged, not claimed as mathematically fenced"
+      ],
+      "changes": [
+        "F24 atomically expire every written key, release mutation lock before whole-history TTL refresh, pipeline EXPIRE without per-key EXISTS, preserve committed success during maintenance outage; Redis errors503 without internal details; same-operation pending create replay recovers response failure",
+        "F25 44px composer/date/select and plan/report management link targets"
+      ]
     }
   ],
   "open_defects": [
-    "Hosted validation remains: candidate persona3batches, fresh Kakao callback, final retained-flow UI/readback and responsive/device evidence"
+    "Hosted repaired storage verification, nine actual model cases in3batches, fresh Kakao callback/user handoff, retained-flow and device gates pending"
   ],
   "stop_reason": null
 }

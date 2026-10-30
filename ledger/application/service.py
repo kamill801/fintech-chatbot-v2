@@ -491,12 +491,15 @@ class LedgerService:
             )
         settings = self.repository.get_settings(user_ref)
         transaction_type = _transaction_type(payload.get("transaction_type"))
+        transaction_record_key = _key("transaction-record", idempotency_key)
+        recorded = self.repository.get_cached_result(user_ref, transaction_record_key)
         active_pending = self.repository.get_pending_question(user_ref)
         if (
             transaction_type == "expense"
             and settings.roast_enabled
             and active_pending is not None
             and active_pending.answered_at is None
+            and (recorded is None or active_pending.transaction_id != recorded.body["transaction"]["transaction_id"])
         ):
             raise ServiceError(
                 "pending_reason_required",
@@ -524,8 +527,6 @@ class LedgerService:
         )
         transaction = self.manual_source.create_record(draft)
         _validate_transaction_accounts(settings, transaction)
-        transaction_record_key = _key("transaction-record", idempotency_key)
-        recorded = self.repository.get_cached_result(user_ref, transaction_record_key)
         quota_prechecked = False
         requires_interactive_reason = (
             transaction.transaction_type == "expense"
