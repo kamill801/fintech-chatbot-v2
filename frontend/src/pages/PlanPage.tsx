@@ -178,6 +178,8 @@ function previewRecoveryMessage(error: unknown): string {
 
 function narrativeStatusText(reason: SpendingPlanState["narrative"]["display_reason"]): string {
   switch (reason) {
+    case "evidence_repaired":
+      return "기록된 조언을 현재 예산 기준에 맞춰 다시 정리했어요.";
     case "data_changed":
       return "최근 장부 변화는 현재 계산 기준으로 반영했어요.";
     case "language_repaired":

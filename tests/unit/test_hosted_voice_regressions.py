@@ -77,6 +77,16 @@ class HostedVoiceRegressions(unittest.TestCase):
         self.assertTrue(result.fallback_used)
         self.assertEqual(result.label, "caution")
 
+    def test_attempt_diagnostics_never_log_provider_error_text_or_purchase_data(self):
+        secret = "private-provider-key-and-purchase-detail"
+        responses = FakeResponses([RuntimeError(secret), RuntimeError(secret)])
+        with self.assertLogs("ledger.adapters.openai_judge", level="WARNING") as captured:
+            result = OpenAIResponsesJudge(client_factory=lambda: FakeClient(responses)).judge(request())
+        self.assertTrue(result.fallback_used)
+        self.assertEqual(len(responses.calls), 2)
+        self.assertTrue(all("stage=provider error_type=RuntimeError" in line for line in captured.output))
+        self.assertNotIn(secret, " ".join(captured.output))
+
     def test_emergency_display_fallback_converts_formal_copy_without_adding_an_action(self):
         text = grandma_mode_fallback(label="justified", rationale="가족의 응급 상황에서 사용한 것은 불가피한 결정이에요. 상황이 중요해 잘 처리된 것입니다.", recommended_action="비상시를 위한 예비자금을 준비해 보세요.")
         self.assertNotIn("것입니다", text)

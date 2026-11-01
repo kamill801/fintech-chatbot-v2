@@ -104,7 +104,7 @@ export function CurrencyInput({
   }, [editing, value]);
 
   function commit() {
-    const parsed = draft === "" ? minimum : Number(draft);
+    const parsed = draft === "" ? minimum : Number(draft.replace(/,/g, ""));
     onChange(Math.max(minimum, Number.isSafeInteger(parsed) ? parsed : minimum));
     setEditing(false);
   }
@@ -119,7 +119,9 @@ export function CurrencyInput({
         aria-label={ariaLabel}
         value={editing ? draft : Math.round(value).toLocaleString("ko-KR")}
         onFocus={(event) => {
-          setDraft(String(value));
+          // Keep the displayed value unchanged while selecting it. Switching
+          // from formatted text here makes the browser collapse the selection.
+          setDraft(Math.round(value).toLocaleString("ko-KR"));
           setEditing(true);
           event.currentTarget.select();
         }}

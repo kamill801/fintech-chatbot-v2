@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass, field
@@ -12,13 +13,14 @@ from uuid import uuid4
 
 from ledger.application.signals import POLICY_VERSION
 from ledger.domain.models import DeterministicSignalSet, JudgmentResult
-from ledger.language import validate_korean_user_text
+from ledger.language import has_completed_purchase_deferral, validate_korean_user_text
 from ledger.privacy import build_prompt_payload
 from ledger.rendering import grandma_mode_fallback
 from validators import validate_roast_tone
 
 
 ALLOWED_LABELS = {"justified", "caution", "overspending", "insufficient_context"}
+logger = logging.getLogger(__name__)
 REQUIRED_OUTPUT_FIELDS = {
     "label",
     "confidence",
@@ -170,8 +172,7 @@ def validate_judgment_evidence(payload: dict, request: JudgmentRequest) -> None:
             if delivery_claim and not reported_delivery and not delivery_advice:
                 raise EvidenceMismatch("Category history does not prove delivery frequency; name the broad category or use only explicit self-reported delivery frequency.")
             # The transaction is already recorded. Deferral must refer to a NEXT purchase.
-            if (re.search(r"이번.{0,15}(?:구매|구입|소비).{0,20}(?:미뤄|미루)", clause)
-                    or re.search(r"다음\s*달.{0,12}(?:구매해|구매하|구입해|사세요|사자)", clause)):
+            if has_completed_purchase_deferral(clause):
                 raise EvidenceMismatch("This purchase is already recorded; recommend a concrete next-purchase action, not postponing this completed purchase or an arbitrary purchase date.")
             if not reported_daily:
                 for claim in re.finditer(frequency, clause):
@@ -283,10 +284,14 @@ class OpenAIResponsesJudge:
             return deterministic_fallback_judgment(request)
         last_error: Exception | None = None
         for _attempt in range(self.max_attempts):
+            stage = "provider"
             try:
                 payload = self._call_model(request, retry_hint=str(last_error) if isinstance(last_error, EvidenceMismatch) else None)
+                stage = "schema"
                 parsed = parse_judgment_payload(payload)
+                stage = "evidence"
                 validate_judgment_evidence(parsed, request)
+                stage = "voice"
                 valid_voice, voice_error = validate_roast_tone(parsed["roast_message"], label=parsed["label"])
                 if not valid_voice:
                     raise EvidenceMismatch(f"Grandma voice validation: {voice_error}. Use natural spoken Korean and preserve the same action.")
@@ -300,6 +305,9 @@ class OpenAIResponsesJudge:
                     **parsed,
                 )
             except Exception as exc:
+                # Only fixed stage names and exception classes. No error text,
+                # purchase data, identity, credentials or model response.
+                logger.warning("ledger_judgment_attempt_failed stage=%s error_type=%s", stage, type(exc).__name__)
                 last_error = exc
         fallback = deterministic_fallback_judgment(request)
         if last_error is not None:

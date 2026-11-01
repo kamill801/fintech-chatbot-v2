@@ -232,7 +232,7 @@ export interface PlanNarrative {
   assumptions: string[];
   confidence: "low" | "medium" | "high";
   fallback_used: boolean;
-  display_reason?: "current" | "data_changed" | "language_repaired" | "unavailable";
+  display_reason?: "current" | "data_changed" | "language_repaired" | "evidence_repaired" | "unavailable";
 }
 
 export interface SpendingPlanState {

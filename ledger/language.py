@@ -41,3 +41,12 @@ def validate_korean_user_text(value: str, *, field_name: str) -> str:
 def validate_no_financial_numbers(value: str, *, field_name: str) -> None:
     if has_financial_number_text(value):
         raise ValueError(f"{field_name} must not calculate or restate numeric values")
+
+
+def has_completed_purchase_deferral(value: str) -> bool:
+    """Bounded guard for observed advice to postpone an already recorded purchase."""
+    return any(
+        re.search(r"이번.{0,15}(?:구매|구입|소비).{0,20}(?:미뤄|미루)", clause)
+        or re.search(r"다음\s*달.{0,12}(?:구매해|구매하|구입해|사세요|사자)", clause)
+        for clause in re.split(r"[.!?。\n]", value)
+    )

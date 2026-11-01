@@ -112,6 +112,17 @@ class PlanReliabilityTests(unittest.TestCase):
         self.assertEqual(self.advisor.calls, 1)
         self.assertEqual(self.repository.get_spending_plan(self.user).narrative["headline"], "확정한 계획을 차분하게 이어가요.")
 
+    def test_historical_plan_overrun_claim_is_repaired_without_audit_rewrite_or_ai_call(self):
+        self.activate()
+        current = self.repository.get_spending_plan(self.user)
+        legacy = {**current.narrative, "explanation": "현재 예산이 초과되었으므로 지출을 줄이세요."}
+        self.repository._users[self.user].spending_plan = self.privacy.encrypt_json(replace(current, narrative=legacy).to_dict())
+        shown = self.service.get_spending_plan(self.user).data
+        self.assertEqual(shown["narrative"]["display_reason"], "evidence_repaired")
+        self.assertNotEqual(shown["narrative"]["explanation"], legacy["explanation"])
+        self.assertEqual(self.repository.get_spending_plan(self.user).narrative, legacy)
+        self.assertEqual(self.advisor.calls, 1)
+
     def test_legacy_english_plan_and_transaction_display_korean_without_audit_rewrite(self):
         self.activate()
         current = self.repository.get_spending_plan(self.user)

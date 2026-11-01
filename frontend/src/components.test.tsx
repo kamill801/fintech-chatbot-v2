@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { CurrencyInput, Dialog, ModePill, Toggle, TransactionRow } from "./components";
@@ -67,6 +67,23 @@ describe("shared UI", () => {
     await user.click(screen.getByRole("button", { name: "기록하기" }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("replaces a focused formatted amount instead of appending to the old amount", async () => {
+    const user = userEvent.setup();
+    const view = render(<CurrencyFormHarness onSubmit={vi.fn()} />);
+    const input = within(view.container).getByLabelText<HTMLInputElement>("지출 금액");
+
+    await user.click(input);
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(input.value.length);
+    await user.keyboard("15000");
+    await user.tab();
+    expect(input).toHaveValue("15,000");
+    // Focusing and leaving an unchanged formatted value must also preserve it.
+    await user.click(input);
+    await user.tab();
+    expect(input).toHaveValue("15,000");
   });
 
   it("contains keyboard focus, closes on Escape and restores the opener", async () => {

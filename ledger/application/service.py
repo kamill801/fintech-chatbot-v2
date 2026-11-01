@@ -19,6 +19,7 @@ from ledger.adapters.openai_planner import (
     NARRATIVE_FIELDS,
     deterministic_plan_narrative,
     parse_plan_narrative,
+    validate_plan_evidence,
 )
 from ledger.adapters.synthetic import ProviderUnavailableError
 from ledger.application.signals import POLICY_VERSION, SignalInputs, clamp, compute_signal_set
@@ -49,7 +50,7 @@ from ledger.domain.plans import (
 )
 from ledger.privacy import sanitize_free_text, sanitize_share_payload
 from ledger.plan_preview import InvalidPlanPreview, PlanPreviewTokens
-from ledger.language import is_korean_user_text
+from ledger.language import has_completed_purchase_deferral, is_korean_user_text
 from ledger.quota import JudgmentQuotaLimiter, QuotaExceededError, QuotaUnavailableError
 from ledger.rendering import grandma_mode_fallback, render_judgment
 from ledger.telemetry import TelemetryEvent, confidence_band
@@ -1307,6 +1308,8 @@ class LedgerService:
                 "rationale": judgment.rationale,
             }
             improvement = judgment.recommended_action
+            if has_completed_purchase_deferral(improvement):
+                improvement = f"다음 {_category_name(transaction.category)} 지출 전에는 남은 생활비를 먼저 확인해 보세요."
         elif top_category:
             improvement = (
                 f"다음 지출 전에는 {_category_name(top_category)} 예산이 얼마나 남았는지 먼저 확인해요."
@@ -1764,6 +1767,10 @@ class LedgerService:
             except (ValueError, TypeError):
                 reason = "language_repaired"
             else:
+                try:
+                    validate_plan_evidence(PlanNarrative(**{key: stored[key] for key in NARRATIVE_FIELDS}, fallback_used=bool(stored.get("fallback_used"))), request)
+                except ValueError:
+                    return {**deterministic_plan_narrative(request).to_dict(), "display_reason": "evidence_repaired"}
                 if stored.get("evidence_fingerprint") == _fingerprint(request.allowlisted_payload()):
                     return {**stored, "display_reason": "unavailable" if stored.get("fallback_used") else "current"}
                 reason = "data_changed"
@@ -1812,6 +1819,7 @@ class LedgerService:
                 {key: advice.to_dict()[key] for key in NARRATIVE_FIELDS},
                 {item.allocation_id for item in plan.allocations},
             )
+            validate_plan_evidence(advice, request)
             return advice
         except Exception:
             return deterministic_plan_narrative(request)

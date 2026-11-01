@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from dataclasses import replace
 from dataclasses import dataclass
 
 from ledger.adapters.openai_planner import (
@@ -89,6 +90,17 @@ def advice_request() -> PlanAdviceRequest:
 
 
 class OpenAIPlanAdvisorTests(unittest.TestCase):
+    def test_segment_overrun_cannot_be_reported_as_overall_budget_overrun(self) -> None:
+        request = advice_request()
+        request = replace(request, allocations=[{**request.allocations[0], "flexible_remaining_krw": -1000}])
+        bad = {**VALID_NARRATIVE, "explanation": "현재 예산이 초과되었으므로 지출을 줄여야 해요."}
+        good = {**VALID_NARRATIVE, "explanation": "이번 구간에 배정한 예산을 넘었으니 다음 지출을 확인해요."}
+        responses = FakeResponses([bad, good])
+        result = OpenAIResponsesPlanAdvisor(client_factory=lambda: FakeClient(responses)).advise(request)
+        self.assertEqual(len(responses.calls), 2)
+        self.assertEqual(result.explanation, good["explanation"])
+        self.assertFalse(result.fallback_used)
+
     def test_sends_only_allowlisted_aggregate_input_with_strict_non_persistent_schema(self) -> None:
         fake_responses = FakeResponses([VALID_NARRATIVE.copy()])
         advisor = OpenAIResponsesPlanAdvisor(

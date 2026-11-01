@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
@@ -209,6 +210,27 @@ def parse_plan_narrative(payload: dict[str, Any], allocation_ids: set[str]) -> P
     )
 
 
+def validate_plan_evidence(narrative: PlanNarrative, request: PlanAdviceRequest) -> None:
+    """Do not turn an allocation overrun into a whole-plan overrun."""
+    if int(request.deterministic_progress.get("total_remaining_krw", 0)) < 0:
+        return
+    overdrawn_segments = any(int(item.get("flexible_remaining_krw", 0)) < 0 for item in request.allocations)
+    texts = [narrative.headline, narrative.explanation, narrative.next_action,
+             *narrative.assumptions, *(item["focus"] for item in narrative.segment_focuses)]
+    for text in texts:
+        for clause in re.split(r"[.!?。\n,]|지만", text):
+            claim = re.search(r"예산.{0,12}?(?:초과|넘었|넘긴|넘겼)", clause)
+            if not claim:
+                continue
+            suffix = clause[claim.end():]
+            if re.match(r"\s*(?:하지|하지는|한 것은|는)?\s*(?:않|아니|말|할|하면)", suffix):
+                continue
+            scoped = re.search(r"(?:구간|주차|배정).{0,20}$", clause[:claim.start()])
+            whole_plan = re.search(r"전체|총|기간", clause[:claim.start()])
+            if not (scoped and overdrawn_segments and not whole_plan):
+                raise ValueError("Distinguish the overdrawn allocation from the whole plan, which still has budget remaining.")
+
+
 class OpenAIResponsesPlanAdvisor:
     def __init__(
         self,
@@ -254,7 +276,11 @@ class OpenAIResponsesPlanAdvisor:
                                 "must be Korean only; short technical terms such as AI are allowed only when "
                                 "necessary. Never calculate, restate, infer, "
                                 "round, or compare numeric values. Do not ask for or invent merchants, memos, "
-                                "reasons, notes, accounts, identities, or transactions."
+                                "reasons, notes, accounts, identities, or transactions. "
+                                "Distinguish total_remaining_krw for the entire plan from each allocation's "
+                                "flexible_remaining_krw. If only an allocation is negative, explicitly say "
+                                "이번 구간에 배정한 예산, never imply the entire budget was exceeded. "
+                                "Use familiar Korean words such as 이번 구간 rather than 세그먼트."
                             ),
                         },
                         {"role": "user", "content": json.dumps(request.allowlisted_payload(), ensure_ascii=False)},
@@ -270,10 +296,12 @@ class OpenAIResponsesPlanAdvisor:
                     max_output_tokens=500,
                     timeout=self.timeout_seconds,
                 )
-                return parse_plan_narrative(
+                narrative = parse_plan_narrative(
                     json.loads(_extract_response_text(response)),
                     {item["allocation_id"] for item in request.allocations},
                 )
+                validate_plan_evidence(narrative, request)
+                return narrative
             except Exception:
                 continue
         return deterministic_plan_narrative(request)

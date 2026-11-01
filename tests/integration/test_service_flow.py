@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
 
 from ledger.application.service import ServiceError
 from ledger.domain.events import (
@@ -450,6 +451,28 @@ class InMemoryLedgerFlowTests(unittest.TestCase):
         self.assertEqual(briefing["regret_pattern"]["category"], "food_delivery")
         self.assertEqual(briefing["evidence_state"], "learned")
         self.assertIn("배달", briefing["improvement"])
+
+    def test_current_briefing_does_not_repeat_invalid_historical_purchase_deferral(self) -> None:
+        self.upsert_profile()
+        created = self.service.create_transaction(
+            self.user_ref,
+            {"amount_krw": 50000, "category": "shopping", "occurred_at": now_iso()},
+            idempotency_key="tx-old-advice", correlation_id=correlation_id(),
+        )
+        transaction_id = created.data["transaction"]["transaction_id"]
+        original = self.repository.get_judgment_for_transaction(self.user_ref, transaction_id)
+        for index, action in enumerate(("다음 달 초에 구매해보세요.", "이번 옷 구매는 다음 달로 미뤄 보세요.", "다음 쇼핑 전 예산을 확인해 보세요.")):
+            with self.subTest(action=action):
+                historical = replace(original, label="caution", recommended_action=action)
+                self.repository.save_judgment(self.user_ref, historical,
+                    idempotency_key=f"old-advice-{index}", correlation_id=correlation_id())
+                briefing = self.service.get_summary(self.user_ref).data["summary"]["weekly_briefing"]
+                if index < 2:
+                    self.assertNotEqual(briefing["improvement"], action)
+                    self.assertIn("다음", briefing["improvement"])
+                else:
+                    self.assertEqual(briefing["improvement"], action)
+                self.assertEqual(self.repository.get_judgment_for_transaction(self.user_ref, transaction_id), historical)
 
     def test_share_payload_uses_corrected_effective_label(self) -> None:
         telemetry_events = []
