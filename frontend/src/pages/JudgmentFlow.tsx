@@ -18,6 +18,7 @@ import {
   EvidenceList,
   Dialog,
   Highlight,
+  InfoCallout,
   JudgmentBadge,
   ModePill,
   PageHeader,
@@ -424,6 +425,7 @@ export function SharePage() {
   const [publishing, setPublishing] = useState(false);
   const recordedViewId = useRef<string | null>(null);
   const judgmentId = detail?.judgment?.judgment_id ?? null;
+  const canShare = settings.roast_enabled || demo;
   const payload: SharePayload | null = useMemo(() => {
     if (!detail?.judgment) return null;
     return {
@@ -435,11 +437,11 @@ export function SharePage() {
   }, [detail]);
 
   useEffect(() => {
-    if (judgmentId && recordedViewId.current !== judgmentId) {
+    if (canShare && judgmentId && recordedViewId.current !== judgmentId) {
       recordedViewId.current = judgmentId;
       void recordShareView(judgmentId).catch(() => setStatus("공유 조회 기록을 남기지 못했어요."));
     }
-  }, [judgmentId, recordShareView]);
+  }, [canShare, judgmentId, recordShareView]);
 
   async function recordSuccess(judgmentId: string, successMessage: string) {
     try {
@@ -452,7 +454,7 @@ export function SharePage() {
 
   async function publish(downloadOnly = false) {
     if (!detail?.judgment || !payload) return;
-    if (!settings.roast_enabled && !demo) {
+    if (!canShare) {
       setStatus("욕쟁이 할머니 모드를 켠 판단만 공유할 수 있어요.");
       return;
     }
@@ -488,6 +490,7 @@ export function SharePage() {
       <PageHeader title="결과 공유" close />
       {detail.judgment && <JudgmentProvenance judgment={detail.judgment} />}
       <h1>웃기더라도, <Highlight>내 돈</Highlight>은 가리고.</h1>
+      {!canShare && <InfoCallout><span>할머니 모드를 켜면 이 판단을 이미지로 공유할 수 있어요.</span><Link className="secondary-link" to={withDemo(`/judgments/${transactionId}`, demo)}>판단 화면에서 모드 켜기</Link></InfoCallout>}
       <section className="share-card" aria-label="공유 이미지 미리보기">
         <div className="share-stamp"><strong>장부 AI · 소비 판단</strong></div>
         <blockquote>{copy}</blockquote>
@@ -506,8 +509,8 @@ export function SharePage() {
       </Surface>
       <p className="privacy-note"><LockKey size={17} /> 기본값은 민감한 정보를 가려요</p>
       {status && <p className="success-notice" role="status">{status}</p>}
-      <PrimaryButton disabled={publishing} onClick={() => void publish(false)}><ShareNetwork size={22} /> {publishing ? "준비 중" : "이미지로 공유"}</PrimaryButton>
-      <TextButton disabled={publishing} onClick={() => void publish(true)}><DownloadSimple size={20} /> 이미지 저장</TextButton>
+      <PrimaryButton disabled={publishing || !canShare} onClick={() => void publish(false)}><ShareNetwork size={22} /> {publishing ? "준비 중" : "이미지로 공유"}</PrimaryButton>
+      <TextButton disabled={publishing || !canShare} onClick={() => void publish(true)}><DownloadSimple size={20} /> 이미지 저장</TextButton>
       <button className="sr-only" onClick={() => navigate(-1)}>닫기</button>
     </main>
   );

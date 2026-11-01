@@ -356,6 +356,37 @@ describe("judgment voice", () => {
     expect(screen.getByText("식비")).toBeInTheDocument();
   });
 
+  it("explains share eligibility before an unavailable action and skips ineligible view tracking", async () => {
+    const ledger = mocks.useLedger();
+    mocks.useLedger.mockReturnValue({ ...ledger, settings: { ...ledger.settings, roast_enabled: false } });
+    window.history.replaceState({}, "", "/share/tx-shopping");
+    render(<BrowserRouter><Routes><Route path="/share/:transactionId" element={<SharePage />} /></Routes></BrowserRouter>);
+
+    expect(await screen.findByRole("link", { name: "판단 화면에서 모드 켜기" })).toHaveAttribute("href", "/judgments/tx-shopping");
+    expect(screen.getByText("할머니 모드를 켜면 이 판단을 이미지로 공유할 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "이미지로 공유" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "이미지 저장" })).toBeDisabled();
+    expect(mocks.recordShareView).not.toHaveBeenCalled();
+    expect(mocks.recordShareSuccess).not.toHaveBeenCalled();
+  });
+
+  it("records an eligible view when mode is enabled without resetting private share options", async () => {
+    const ledger = mocks.useLedger();
+    mocks.useLedger.mockReturnValue({ ...ledger, settings: { ...ledger.settings, roast_enabled: false } });
+    window.history.replaceState({}, "", "/share/tx-shopping");
+    const page = <BrowserRouter><Routes><Route path="/share/:transactionId" element={<SharePage />} /></Routes></BrowserRouter>;
+    const { rerender } = render(page);
+    await screen.findByRole("button", { name: "이미지 저장" });
+    expect(mocks.recordShareView).not.toHaveBeenCalled();
+
+    mocks.useLedger.mockReturnValue(ledger);
+    rerender(<BrowserRouter><Routes><Route path="/share/:transactionId" element={<SharePage />} /></Routes></BrowserRouter>);
+    await waitFor(() => expect(mocks.recordShareView).toHaveBeenCalledExactlyOnceWith("judgment-shopping"));
+    expect(screen.getByRole("button", { name: "이미지 저장" })).toBeEnabled();
+    expect(screen.getByRole("switch", { name: "금액 포함" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "사용처 포함" })).not.toBeChecked();
+  });
+
   it("derives share preview from the loaded judgment and records success after download", async () => {
     const user = userEvent.setup();
     window.history.replaceState({}, "", "/share/tx-shopping");
