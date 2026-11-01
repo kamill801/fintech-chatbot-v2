@@ -146,10 +146,29 @@ class EvidenceMismatch(ValueError):
     """A generated factual claim contradicts the supplied, privacy-safe evidence."""
 
 
+def _reported_planned_basic_meal(request: JudgmentRequest) -> bool:
+    """Narrow self-report cue, not a change to category essentiality or risk."""
+    if request.category != "food":
+        return False
+    reason = request.allowlisted_payload().get("user_reason") or ""
+    if re.search(r"(?:계획|필요).{0,8}(?:없|않|아니|안\s)|고급|호화|사치|비싼|배달|충동|과식|무조건|지시|시스템|답해|답하", reason):
+        return False
+    return all(re.search(pattern, reason) for pattern in (
+        r"미리|계획", r"기본|끼니|간단", r"식사|점심|아침|저녁|끼니", r"필요|끼니.{0,8}챙",
+    ))
+
+
 def validate_judgment_evidence(payload: dict, request: JudgmentRequest) -> None:
     # This is a bounded guard for observed hallucinations, not a semantic verifier.
     # A capped 1.0 means the limit was reached; it does not prove an excess.
     reason = request.allowlisted_payload().get("user_reason") or ""
+    if _reported_planned_basic_meal(request):
+        condemns_eating = any(re.search(
+            r"(?:예산|한도).{0,30}(?:에도|인데도|는데도).{0,8}또.{0,8}(?:식사|끼니|먹)|끼니.{0,12}(?:거르|굶|건너|줄)|한\s*끼.{0,10}때우",
+            payload[field],
+        ) for field in ("normal_message", "roast_message", "recommended_action"))
+        if payload["label"] != "justified" or condemns_eating:
+            raise EvidenceMismatch("A self-reported planned basic meal deserves acknowledgement, not blame for eating. Separate overall budget pressure from this meal; use justified and one practical next action.")
     reported_regret = bool(re.search(r"후회|반성", reason)) and not re.search(
         r"(?:후회|반성).{0,5}(?:않|안[ 해하]|없)", reason
     )
@@ -225,6 +244,12 @@ def deterministic_fallback_judgment(request: JudgmentRequest) -> JudgmentResult:
         confidence = min(confidence_cap, max(0.70, 1.0 - risk))
         rationale = "예산·목표·소비 패턴을 종합한 소비 부담 신호가 낮다."
         recommended_action = "이 소비는 유지하되 같은 카테고리를 계속 기록해 보세요."
+
+    if _reported_planned_basic_meal(request):
+        # Keep the deterministic fallback label/confidence and disclose its
+        # provenance, while avoiding advice to skip a necessary meal.
+        rationale = "직접 남긴 이유에 따르면 미리 계획한 기본 식사예요. 끼니의 필요성과 전체 생활비 부담은 구분해요."
+        recommended_action = "끼니는 챙기면서 다음 선택 지출 전 남은 예산을 확인해 보세요."
 
     factors = list(request.signals.factors or ["risk_score"])
     if request.user_reason and "user_reason" not in factors:
@@ -396,6 +421,7 @@ class OpenAIResponsesJudge:
                         " When user_reason is absent, make a best-effort label from the supplied "
                         "signals and do not ask the user to add a reason. Reserve "
                         "insufficient_context for data_confidence below 0.35."
+                        + (" This request describes a self-reported planned basic meal. Use justified, acknowledge the necessary meal, and discuss any overall budget pressure separately. Broad food recurrence is not evidence of overeating. Do not tell the user to skip meals or scold them for eating." if _reported_planned_basic_meal(request) else "")
                         + (f" Previous response failed evidence validation: {retry_hint} Correct that factual claim." if retry_hint else "")
                     ),
                 },
